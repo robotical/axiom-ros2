@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, Tuple
 
 class SensorDecoder(ABC):
     topic_key: str  # matches payload["_t"], e.g., "LSM6DS"
