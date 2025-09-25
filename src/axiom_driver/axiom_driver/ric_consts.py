@@ -12,5 +12,8 @@ ELEM_BODY        = 0x02
 ELEM_COMMAND_FRAME = 0x03
 ELEM_FILEBLOCK   = 0x04
 
+PROTO_RAWCMDFRAME = 0x3E
+TYPE_PUBLISH     = 2
+
 def pack_type_proto(msg_type: int, proto: int) -> int:
     return ((msg_type & 0x3) << 6) | (proto & 0x3F)

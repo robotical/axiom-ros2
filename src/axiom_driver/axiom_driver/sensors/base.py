@@ -6,7 +6,7 @@ class SensorDecoder(ABC):
 
     def __init__(self, device_frame_id: str = "axiom_link"):
         self.frame_id = device_frame_id
-        # 16-bit device timestamp unwrapping support
+    # Support unwrapping 16-bit device timestamps
         self._last_ts_wrapped = 0
         self._offset_ms = 0
 

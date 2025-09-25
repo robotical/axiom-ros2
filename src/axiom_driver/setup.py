@@ -21,6 +21,9 @@ setup(
         'test': [
             'pytest',
         ],
+        'serial': [
+            'pyserial>=3.5',
+        ],
     },
     entry_points={
         'console_scripts': [

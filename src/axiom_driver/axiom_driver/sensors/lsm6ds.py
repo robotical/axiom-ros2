@@ -16,15 +16,14 @@ class LSM6DSDecoder(SensorDecoder):
                 break
             b = bytes.fromhex(chunk)
             ts_wrapped = struct.unpack(">H", b[:2])[0]
-            ts_ms = self.unwrap_ts_ms(ts_wrapped)
+            _ts_ms = self.unwrap_ts_ms(ts_wrapped)
             gx, gy, gz, ax, ay, az = struct.unpack("<hhhhhh", b[2:])
 
             msg = Imu()
             msg.header.frame_id = self.frame_id
-            # Put host time for now; optionally convert ts_ms to ROS time with an offset
-            # msg.header.stamp = ... (bridge can fill common stamp)
+            # For now we leave header.stamp to the bridge, which can apply a device↔host offset
 
-            # scales from your demo
+            # Scales mirrored from the current demo setup
             msg.angular_velocity.x = (gx / 16.384) * DPS_TO_RAD
             msg.angular_velocity.y = (gy / 16.384) * DPS_TO_RAD
             msg.angular_velocity.z = (gz / 16.384) * DPS_TO_RAD

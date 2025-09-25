@@ -14,7 +14,7 @@ class AHT20Decoder(SensorDecoder):
             ts_wrapped = struct.unpack(">H", b[:2])[0]
             _ts_ms = self.unwrap_ts_ms(ts_wrapped)
 
-            # Match your bit slicing
+            # Bit slicing follows the device data layout
             humid_raw = struct.unpack(">I", b[3:7])[0]
             temp_raw  = struct.unpack(">I", b[4:8])[0]
             humid = ((humid_raw & 0xFFFFF000) >> 12) / 10485.76

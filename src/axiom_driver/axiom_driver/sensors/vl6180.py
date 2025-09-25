@@ -17,7 +17,7 @@ class VL6180Decoder(SensorDecoder):
             b = bytes.fromhex(chunk)
             ts_wrapped = struct.unpack(">H", b[:2])[0]
             _ts_ms = self.unwrap_ts_ms(ts_wrapped)
-            # bytes[2] may be a status; your code skips it and takes byte[3]
+            # bytes[2] may carry a status; we follow the current convention and use byte[3]
             dist_mm = struct.unpack("B", b[3:4])[0]
 
             msg = Range()

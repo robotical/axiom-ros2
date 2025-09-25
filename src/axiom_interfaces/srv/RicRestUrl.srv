@@ -1,5 +1,5 @@
 # Send a RICREST URL request (e.g., "traj/getReady") over the active transport.
-# On success returns the raw JSON text from CMDRESPJSON (NUL stripped).
+# Returns the raw JSON text from CMDRESPJSON (with any trailing NUL removed).
 string url_path
 float32 timeout        # seconds (0 = node default)
 string ws_pcol         # optional override: "RICSerial" | "RICFrame" | "RICJSON"

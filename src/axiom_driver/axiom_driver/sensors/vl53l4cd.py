@@ -2,7 +2,7 @@ import struct
 from sensor_msgs.msg import Range
 from .base import SensorDecoder
 
-# Datasheet-ish defaults; adjust as needed for your module/mechanics
+# Approximate defaults; adjust if the module/mechanics differ
 FOV_RAD = 0.47  # ~27 degrees
 MIN_M = 0.02
 MAX_M = 1.30
@@ -19,7 +19,7 @@ class VL53L4CDDecoder(SensorDecoder):
             ts_wrapped = struct.unpack(">H", b[:2])[0]
             _ts_ms = self.unwrap_ts_ms(ts_wrapped)
             valid, dist_mm = struct.unpack(">BH", b[2:5])
-            valid = (~valid) & 0x04  # from your code; treat 0x04 as valid bit
+            valid = (~valid) & 0x04  # treat 0x04 as the "valid" bit per current firmware
             if not valid:
                 continue
 
