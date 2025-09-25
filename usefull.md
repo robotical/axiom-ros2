@@ -1,0 +1,1 @@
+to connect axiom to wifi use w/TP-Link_092B/11630470/Marty_598c8a (must be sent from when monitoring fw flash)

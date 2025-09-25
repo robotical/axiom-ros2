@@ -1,0 +1,5 @@
+uint32 payload_size   # optional echo payload size (bytes)
+---
+bool success
+float32 rtt_ms
+string message

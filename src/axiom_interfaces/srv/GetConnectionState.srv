@@ -1,0 +1,4 @@
+---
+bool connected
+string device_uri
+string last_error

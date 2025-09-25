@@ -1,0 +1,4 @@
+string device_uri   # e.g., ws://192.168.1.10/devjson
+---
+bool success
+string message
