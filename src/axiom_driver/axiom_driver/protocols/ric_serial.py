@@ -47,6 +47,7 @@ class RICSerial:
                         try:
                             self.on_error(f'No HDLC flag found in {len(self._buf)}B chunk; dropping')
                         except Exception:
+                            self.get_logger().error('Error in on_error callback')
                             pass
                     self._buf.clear()
                     return
@@ -72,6 +73,7 @@ class RICSerial:
                         try:
                             cb(payload)
                         except Exception:
+                            self.get_logger().error('Error in on_frame callback')
                             pass
                 else:
                     err = self.on_error
@@ -79,5 +81,6 @@ class RICSerial:
                         try:
                             err(f'HDLC decode failed len={len(framed)}')
                         except Exception:
+                            self.get_logger().error('Error in on_error callback')
                             pass
                 # Loop to see if the buffer already contains another frame

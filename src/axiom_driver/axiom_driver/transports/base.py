@@ -38,6 +38,7 @@ class Transport:
             try:
                 cb(connected, msg)
             except Exception:
+                self.get_logger().error('Error in on_status callback')
                 pass
 
     # Helper to emit bytes
@@ -47,6 +48,7 @@ class Transport:
             try:
                 cb(data)
             except Exception:
+                self.get_logger().error('Error in on_status callback')
                 pass
 
     # Helper to emit text
@@ -56,4 +58,5 @@ class Transport:
             try:
                 cb(text)
             except Exception:
+                self.get_logger().error('Error in on_status callback')
                 pass
