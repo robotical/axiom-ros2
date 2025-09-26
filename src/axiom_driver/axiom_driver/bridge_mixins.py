@@ -138,7 +138,7 @@ class SerialMixin(SensorPayloadMixin):
     def _serial_on_bytes(self, raw: bytes):
         if not raw:
             return
-        if self._serial_info:
+        if self._serial_debug:
             preview = ' '.join(f'{b:02X}' for b in raw[:64])
             self.get_logger().info(f'Serial RX raw: {preview}' + (' …' if len(raw) > 64 else ''))
 
@@ -196,6 +196,7 @@ class SerialMixin(SensorPayloadMixin):
                 if isinstance(obj, dict) and obj:
                     self._dispatch_sensor_payload(obj)
             except Exception:
+                self.get_logger().warn('Console JSON dispatch failed')
                 pass
 
     # -------------------- Status / frames --------------------

@@ -63,6 +63,7 @@ class SerialTransport(Transport):
                     try:
                         self._ser.flush()
                     except Exception:
+                        self.get_logger().error('Error flushing serial port')
                         pass
             finally:
                 # Closing serial unblocks reader/writer
@@ -70,6 +71,7 @@ class SerialTransport(Transport):
                     if self._ser is not None:
                         self._ser.close()
                 except Exception:
+                    self.get_logger().error('Error closing serial port')
                     pass
                 self._ser = None
             self._emit_status(False, 'serial closed')

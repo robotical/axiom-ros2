@@ -361,6 +361,7 @@ def main(args=None):
         node = AxiomBridgeNode()
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
+        node.get_logger().info('Shutting down')
         pass
     finally:
         rclpy.shutdown()

@@ -68,4 +68,5 @@ class Dispatcher:
             try:
                 cb(frame)
             except Exception:
+                self.get_logger().error('Error in on_publish callback')
                 pass
