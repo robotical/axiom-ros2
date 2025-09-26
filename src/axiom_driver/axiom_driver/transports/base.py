@@ -49,7 +49,7 @@ class Transport:
             try:
                 cb(data)
             except Exception:
-                logger.error('Error in on_status callback')
+                logger.error('Error in on_bytes callback')
                 pass
 
     # Helper to emit text
@@ -59,5 +59,5 @@ class Transport:
             try:
                 cb(text)
             except Exception:
-                logger.error('Error in on_status callback')
+                logger.error('Error in on_text callback')
                 pass
