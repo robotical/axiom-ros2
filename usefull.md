@@ -7,7 +7,7 @@ to build everything:  colcon build --symlink-install
 Connect ws:
 ros2 launch axiom_driver axiom_minimal_launch.py \
   transport:=ws \
-  device_uri:=ws://192.168.1.7/devjson \
+  device_uri:=ws://192.168.1.8/devjson \
   use_dual_ws:=true ws_path:=/ws ws_pcol:=RICSerial
 
 Connect serial:

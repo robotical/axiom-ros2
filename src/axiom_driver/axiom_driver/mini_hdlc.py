@@ -1,5 +1,5 @@
-FLAG_DEFAULT = 0x7E
-ESC_DEFAULT  = 0x7D
+FLAG_DEFAULT = 0xE7
+ESC_DEFAULT  = 0xD7
 XOR_DEFAULT  = 0x20
 
 # CRC-16-CCITT (poly 0x1021, init 0xFFFF), big-endian transmit
