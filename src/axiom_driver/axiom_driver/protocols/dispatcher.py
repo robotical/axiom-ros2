@@ -2,7 +2,8 @@ import threading
 from typing import Callable, Dict, Optional
 
 from axiom_driver.ric_consts import TYPE_RESPONSE, PROTO_RICREST, ELEM_CMDRESPJSON
-
+import rclpy.logging
+logger = rclpy.logging.get_logger("Dispatcher")
 
 class Dispatcher:
     """
@@ -68,5 +69,5 @@ class Dispatcher:
             try:
                 cb(frame)
             except Exception:
-                self.get_logger().error('Error in on_publish callback')
+                logger.error('Error in on_publish callback')
                 pass

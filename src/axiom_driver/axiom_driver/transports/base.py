@@ -1,6 +1,7 @@
 import threading
 from typing import Callable, Optional
-
+import rclpy.logging
+logger = rclpy.logging.get_logger("Transport")
 
 class Transport:
     """
@@ -38,7 +39,7 @@ class Transport:
             try:
                 cb(connected, msg)
             except Exception:
-                self.get_logger().error('Error in on_status callback')
+                logger.error('Error in on_status callback')
                 pass
 
     # Helper to emit bytes
@@ -48,7 +49,7 @@ class Transport:
             try:
                 cb(data)
             except Exception:
-                self.get_logger().error('Error in on_status callback')
+                logger.error('Error in on_status callback')
                 pass
 
     # Helper to emit text
@@ -58,5 +59,5 @@ class Transport:
             try:
                 cb(text)
             except Exception:
-                self.get_logger().error('Error in on_status callback')
+                logger.error('Error in on_status callback')
                 pass

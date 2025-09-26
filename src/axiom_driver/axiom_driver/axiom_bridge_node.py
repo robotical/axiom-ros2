@@ -295,7 +295,7 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         mode = self._ws_mode(req.ws_pcol)
         payload = self._mini_hdlc.encode(ric) if mode == 'RICSerial' else ric
 
-        # NEW: dump the inner RIC frame and the on-wire payload
+        # dump the inner RIC frame and the on-wire payload
         self.get_logger().info(
             f'WS TX: msgnum={msgnum} mode={mode} proto_id={proto_id} '
             f'RIC(len={len(ric)}):{ric[:16].hex()}{"…" if len(ric)>16 else ""} '
