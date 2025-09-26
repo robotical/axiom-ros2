@@ -22,4 +22,4 @@ ros2 service call /ric_rest_url axiom_interfaces/srv/RicRestUrl \
 
 
 To see raw IMU data:
-ros2 topic echo /axiom/axiom01/LSM6DS_76a/imu/data_raw
+ros2 topic echo /LSM6DS_76a/imu/data_raw
