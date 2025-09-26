@@ -1,5 +1,5 @@
-FLAG_DEFAULT = 0xE7
-ESC_DEFAULT  = 0xD7
+FLAG_DEFAULT = 0x7E
+ESC_DEFAULT  = 0x7D
 XOR_DEFAULT  = 0x20
 
 # CRC-16-CCITT (poly 0x1021, init 0xFFFF), big-endian transmit
@@ -18,6 +18,9 @@ def crc16_ccitt(data: bytes, init: int = 0xFFFF) -> int:
 
 class MiniHDLC:
     def __init__(self, flag: int = FLAG_DEFAULT, esc: int = ESC_DEFAULT, xo: int = XOR_DEFAULT):
+        """Minimal HDLC-like framing used by firmware.
+        Defaults match console firmware: flag=0x7E, esc=0x7D, xor=0x20.
+        """
         self.flag = flag; self.esc = esc; self.xo = xo
 
     def encode(self, payload: bytes) -> bytes:

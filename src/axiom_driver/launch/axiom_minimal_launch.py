@@ -18,6 +18,8 @@ def generate_launch_description():
         DeclareLaunchArgument('serial.baud', default_value='115200'),
         DeclareLaunchArgument('serial.timeout', default_value='0.02'),
         DeclareLaunchArgument('serial.mode', default_value='auto'),
+        DeclareLaunchArgument('serial.autosub', default_value='true'),
+        DeclareLaunchArgument('serial.devjson_rate_hz', default_value='0.1'),
 
         Node(
             package='axiom_driver',
@@ -33,7 +35,9 @@ def generate_launch_description():
                 'serial.baud': LaunchConfiguration('serial.baud'),
                 'serial.timeout': LaunchConfiguration('serial.timeout'),
                 'serial.mode': LaunchConfiguration('serial.mode'),
+                'serial.autosub': LaunchConfiguration('serial.autosub'),
+                'serial.devjson_rate_hz': LaunchConfiguration('serial.devjson_rate_hz'),
             }],
-            arguments=['--ros-args', '--log-level', 'DEBUG'],
+            arguments=['--ros-args', '--log-level', 'INFO'],
         ),
     ])
