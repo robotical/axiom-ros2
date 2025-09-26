@@ -22,6 +22,7 @@ import time
 from typing import Dict, Optional
 
 from .ric_consts import (
+    PROTO_BRIDGE_RICREST,
     TYPE_RESPONSE,
     PROTO_RICREST,
     ELEM_CMDRESPJSON,
@@ -72,7 +73,7 @@ class PublishMixin(SensorPayloadMixin):
                 if isinstance(obj, dict):
                     self._dispatch_sensor_payload(obj)
             except Exception:
-                self.get_logger().debug('Publish ROSSerial JSON decode failed')
+                self.get_logger().info('Publish ROSSerial JSON decode failed')
             return
 
         # RAWCMDFRAME (RICJSON) publish → JSON (may be NUL-terminated)
@@ -86,7 +87,7 @@ class PublishMixin(SensorPayloadMixin):
                 if isinstance(obj, dict):
                     self._dispatch_sensor_payload(obj)
             except Exception:
-                self.get_logger().debug('Publish RAWCMDFRAME JSON decode failed')
+                self.get_logger().info('Publish RAWCMDFRAME JSON decode failed')
             return
 
         # Fallback: some builds publish via RICREST/CMDRESPJSON
@@ -102,10 +103,10 @@ class PublishMixin(SensorPayloadMixin):
                     if isinstance(obj, dict):
                         self._dispatch_sensor_payload(obj)
                 except Exception:
-                    self.get_logger().debug('Publish RICREST JSON decode failed')
+                    self.get_logger().info('Publish RICREST JSON decode failed')
             return
 
-        self.get_logger().debug(
+        self.get_logger().info(
             f'Unhandled publish/report frame: type={(tprot >> 6) & 0x3} proto={proto} len={len(frame)}'
         )
 
@@ -137,7 +138,7 @@ class SerialMixin(SensorPayloadMixin):
     def _serial_on_bytes(self, raw: bytes):
         if not raw:
             return
-        if self._serial_debug:
+        if self._serial_info:
             preview = ' '.join(f'{b:02X}' for b in raw[:64])
             self.get_logger().info(f'Serial RX raw: {preview}' + (' …' if len(raw) > 64 else ''))
 
@@ -227,7 +228,7 @@ class SerialMixin(SensorPayloadMixin):
             msgnum, tprot, elem0 = frame[0], frame[1], frame[2]
             mtype = (tprot >> 6) & 0x3
             proto = (tprot & 0x3F)
-            self.get_logger().debug(
+            self.get_logger().info(
                 f'Serial frame: msgnum={msgnum} type={mtype} proto={proto} elem={elem0 if len(frame)>2 else -1} len={len(frame)}'
             )
             from .ric_consts import (
@@ -358,7 +359,7 @@ class WebSocketMixin(SensorPayloadMixin):
         try:
             data = json.loads(message)
         except Exception:
-            self.get_logger().debug('Data WS: non-JSON text frame ignored')
+            self.get_logger().info('Data WS: non-JSON text frame ignored')
             return
         self._dispatch_sensor_payload(data)
 
@@ -378,15 +379,25 @@ class WebSocketMixin(SensorPayloadMixin):
         mode = self._ws_mode()
         if isinstance(message, (bytes, bytearray)):
             buf = bytes(message)
+            self.get_logger().info(
+                f'WS RX(bin): len={len(buf)} first={buf[:16].hex()}{"…" if len(buf)>16 else ""} mode={mode}'
+            )   
             if mode == 'RICSerial':
                 ok, payload = self._mini_hdlc.try_decode(buf)
                 if not ok:
                     self.get_logger().warn('Control WS: HDLC decode failed (crc/framing)')
                     return
                 ric = payload
+                self.get_logger().info(
+                    f'WS RX: HDLC ok → RIC len={len(ric)} first={ric[:16].hex()}{"…" if len(ric)>16 else ""}'
+                )
             else:
                 ric = buf
+                self.get_logger().info(
+                    f'WS RX: HDLC not used/failed(ok={ok}) → treating as RAW RIC len={len(ric)}'
+                )
             if len(ric) < 3:
+                self.get_logger().info('WS RX: too short for RIC header; ignoring')
                 return
             typeproto = ric[1]
             if typeproto != pack_type_proto(TYPE_RESPONSE, PROTO_RICREST):
@@ -398,6 +409,20 @@ class WebSocketMixin(SensorPayloadMixin):
             nul = body.find(b'\x00')
             json_text = body[:nul] if nul >= 0 else body
             msgnum = ric[0]
+            mtype = (typeproto >> 6) & 0x3
+            proto = typeproto & 0x3F
+            self.get_logger().info(f'WS RX RIC: msgnum={msgnum} mtype={mtype} proto={proto} elem={elem} len={len(ric)}')
+
+            if mtype != TYPE_RESPONSE:
+                self.get_logger().info('WS RX: not a RESPONSE; ignoring')
+                
+            if proto not in (PROTO_RICREST, PROTO_BRIDGE_RICREST):
+                self.get_logger().info(f'WS RX: unexpected proto={proto}; ignoring')
+                
+            if elem != ELEM_CMDRESPJSON:
+                self.get_logger().info(f'WS RX: elem={elem} not CMDRESPJSON; ignoring')
+                
+
             with self._ric_lock:
                 ev = self._ric_wait.get(msgnum)
                 if ev is not None:
@@ -407,9 +432,9 @@ class WebSocketMixin(SensorPayloadMixin):
         # Text frames (RICJSON mode)
         try:
             _ = json.loads(message)
-            self.get_logger().debug('Control WS text frame received (RICJSON?)')
+            self.get_logger().info('Control WS text frame received (RICJSON?)')
         except Exception:
-            self.get_logger().debug('Control WS: non-JSON text ignored')
+            self.get_logger().info('Control WS: non-JSON text ignored')
 
     def _on_error_ctrl(self, ws, error):
         self.get_logger().error(f'Control WS error: {error}')

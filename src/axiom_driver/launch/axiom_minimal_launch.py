@@ -21,6 +21,11 @@ def generate_launch_description():
         DeclareLaunchArgument('serial.autosub', default_value='true'),
         DeclareLaunchArgument('serial.devjson_rate_hz', default_value='0.1'),
 
+        # WebSocket (WS)
+        DeclareLaunchArgument('use_dual_ws', default_value='true'),
+        DeclareLaunchArgument('ws_path', default_value='/ws'),
+        DeclareLaunchArgument('ws_pcol', default_value='RICSerial'),  
+
         Node(
             package='axiom_driver',
             executable='axiom_bridge_node',
@@ -37,6 +42,9 @@ def generate_launch_description():
                 'serial.mode': LaunchConfiguration('serial.mode'),
                 'serial.autosub': LaunchConfiguration('serial.autosub'),
                 'serial.devjson_rate_hz': LaunchConfiguration('serial.devjson_rate_hz'),
+                'use_dual_ws': LaunchConfiguration('use_dual_ws'),
+                'ws_path': LaunchConfiguration('ws_path'),
+                'ws_pcol': LaunchConfiguration('ws_pcol'),
             }],
             arguments=['--ros-args', '--log-level', 'INFO'],
         ),

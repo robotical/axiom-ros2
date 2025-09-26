@@ -267,7 +267,7 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
 
             ev = self._dispatcher.register_waiter(msgnum)
             self.get_logger().info(f'Sending RICREST(URL) over serial(OverAscii): msgnum={msgnum} path={url_str}')
-            self.get_logger().debug('TX(serial,overascii+hdlc)[:40]= ' + payload[:40].hex() + ('...' if len(payload) > 40 else ''))
+            self.get_logger().info('TX(serial,overascii+hdlc)[:40]= ' + payload[:40].hex() + ('...' if len(payload) > 40 else ''))
             try:
                 st.send(payload)
             except Exception as e:
@@ -295,21 +295,37 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         mode = self._ws_mode(req.ws_pcol)
         payload = self._mini_hdlc.encode(ric) if mode == 'RICSerial' else ric
 
+        # NEW: dump the inner RIC frame and the on-wire payload
+        self.get_logger().info(
+            f'WS TX: msgnum={msgnum} mode={mode} proto_id={proto_id} '
+            f'RIC(len={len(ric)}):{ric[:16].hex()}{"…" if len(ric)>16 else ""} '
+            f'ONWIRE(len={len(payload)}):{payload[:16].hex()}{"…" if len(payload)>16 else ""}'
+        )
+
         ev = threading.Event()
+        t_send = time.time()
         with self._ric_lock:
             self._ric_wait[msgnum] = ev
             self._ric_resp.pop(msgnum, None)
 
         try:
             ws.send(payload, opcode=0x2)  # binary
+            self.get_logger().info(f'WS TX sent: msgnum={msgnum} bytes={len(payload)}')
         except Exception as e:
             with self._ric_lock:
                 self._ric_wait.pop(msgnum, None)
+            self.get_logger().error(f'WS TX ERROR: msgnum={msgnum} err={e}')
             res.success = False; res.message = f'send failed: {e}'; return res
 
         if not ev.wait(timeout):
+            dt = time.time() - t_send
             with self._ric_lock:
+                still_waiting = list(self._ric_wait.keys())
                 self._ric_wait.pop(msgnum, None)
+            self.get_logger().error(
+                f'WS RPC TIMEOUT: msgnum={msgnum} waited={dt:.3f}s '
+                f'outstanding={still_waiting}'
+            )       
             res.success = False; res.message = 'timeout'; return res
 
         with self._ric_lock:
