@@ -38,6 +38,7 @@ class SensorPayloadMixin:
 
     def _dispatch_sensor_payload(self, data: Dict):  # type: ignore[override]
         frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
+        self.get_logger().info(f'Dispatching sensor payload: {data}')
         from .sensors.registry import get_decoder  # local import to avoid cycles
         for bus, devs in data.items():
             for addr, pkt in devs.items():
@@ -121,7 +122,7 @@ class SerialMixin(SensorPayloadMixin):
         baud = int(self.get_parameter('serial.baud').value)
         timeout = float(self.get_parameter('serial.timeout').value)
 
-        from .transports.serial import SerialTransport  # local import
+        from .transports.serial import SerialTransport 
 
         st = SerialTransport(port=port, baud=baud, timeout=timeout)
         self.state.serial_transport = st
@@ -136,6 +137,7 @@ class SerialMixin(SensorPayloadMixin):
 
     # -------------------- RX path --------------------
     def _serial_on_bytes(self, raw: bytes):
+        self.get_logger().info(f'Serial RX: {len(raw)} bytes')
         if not raw:
             return
         if self._serial_debug:
@@ -182,7 +184,8 @@ class SerialMixin(SensorPayloadMixin):
             self._console_buf = bytearray(text[end + 1:].encode('utf-8', errors='ignore'))
             try:
                 obj = json.loads(js)
-            except Exception:
+            except Exception as e:
+                self.get_logger().info(f'Console JSON decode failed: {e}')
                 return
 
             # Wake waiting RPC
@@ -193,10 +196,11 @@ class SerialMixin(SensorPayloadMixin):
 
             # Potential sensor publish
             try:
+                self.get_logger().info(f'Console JSON received: {obj}')
                 if isinstance(obj, dict) and obj:
                     self._dispatch_sensor_payload(obj)
-            except Exception:
-                self.get_logger().warn('Console JSON dispatch failed')
+            except Exception as e:
+                self.get_logger().warn(f'Console JSON dispatch failed: {e}')
                 pass
 
     # -------------------- Status / frames --------------------
