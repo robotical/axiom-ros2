@@ -38,7 +38,7 @@ class SensorPayloadMixin:
 
     def _dispatch_sensor_payload(self, data: Dict):  # type: ignore[override]
         frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
-        self.get_logger().info(f'Dispatching sensor payload: {data}')
+        self.get_logger().debug(f'Dispatching sensor payload: {data}')
         from .sensors.registry import get_decoder  # local import to avoid cycles
         for bus, devs in data.items():
             for addr, pkt in devs.items():
@@ -74,7 +74,7 @@ class PublishMixin(SensorPayloadMixin):
                 if isinstance(obj, dict):
                     self._dispatch_sensor_payload(obj)
             except Exception:
-                self.get_logger().info('Publish ROSSerial JSON decode failed')
+                self.get_logger().warn('Publish ROSSerial JSON decode failed')
             return
 
         # RAWCMDFRAME (RICJSON) publish → JSON (may be NUL-terminated)
@@ -88,7 +88,7 @@ class PublishMixin(SensorPayloadMixin):
                 if isinstance(obj, dict):
                     self._dispatch_sensor_payload(obj)
             except Exception:
-                self.get_logger().info('Publish RAWCMDFRAME JSON decode failed')
+                self.get_logger().warn('Publish RAWCMDFRAME JSON decode failed')
             return
 
         # Fallback: some builds publish via RICREST/CMDRESPJSON
@@ -104,10 +104,10 @@ class PublishMixin(SensorPayloadMixin):
                     if isinstance(obj, dict):
                         self._dispatch_sensor_payload(obj)
                 except Exception:
-                    self.get_logger().info('Publish RICREST JSON decode failed')
+                    self.get_logger().warn('Publish RICREST JSON decode failed')
             return
 
-        self.get_logger().info(
+        self.get_logger().warn(
             f'Unhandled publish/report frame: type={(tprot >> 6) & 0x3} proto={proto} len={len(frame)}'
         )
 
@@ -137,12 +137,12 @@ class SerialMixin(SensorPayloadMixin):
 
     # -------------------- RX path --------------------
     def _serial_on_bytes(self, raw: bytes):
-        self.get_logger().info(f'Serial RX: {len(raw)} bytes')
+        self.get_logger().debug(f'Serial RX: {len(raw)} bytes')
         if not raw:
             return
         if self._serial_debug:
             preview = ' '.join(f'{b:02X}' for b in raw[:64])
-            self.get_logger().info(f'Serial RX raw: {preview}' + (' …' if len(raw) > 64 else ''))
+            self.get_logger().debug(f'Serial RX raw: {preview}' + (' …' if len(raw) > 64 else ''))
 
         # Decide mode if still auto
         if self._serial_mode == 'auto':
@@ -185,7 +185,7 @@ class SerialMixin(SensorPayloadMixin):
             try:
                 obj = json.loads(js)
             except Exception as e:
-                self.get_logger().info(f'Console JSON decode failed: {e}')
+                self.get_logger().warn(f'Console JSON decode failed: {e}')
                 return
 
             # Wake waiting RPC
@@ -196,7 +196,7 @@ class SerialMixin(SensorPayloadMixin):
 
             # Potential sensor publish
             try:
-                self.get_logger().info(f'Console JSON received: {obj}')
+                self.get_logger().debug(f'Console JSON received: {obj}')
                 if isinstance(obj, dict) and obj:
                     self._dispatch_sensor_payload(obj)
             except Exception as e:
@@ -233,7 +233,7 @@ class SerialMixin(SensorPayloadMixin):
             msgnum, tprot, elem0 = frame[0], frame[1], frame[2]
             mtype = (tprot >> 6) & 0x3
             proto = (tprot & 0x3F)
-            self.get_logger().info(
+            self.get_logger().debug(
                 f'Serial frame: msgnum={msgnum} type={mtype} proto={proto} elem={elem0 if len(frame)>2 else -1} len={len(frame)}'
             )
             from .ric_consts import (
@@ -364,7 +364,7 @@ class WebSocketMixin(SensorPayloadMixin):
         try:
             data = json.loads(message)
         except Exception:
-            self.get_logger().info('Data WS: non-JSON text frame ignored')
+            self.get_logger().warn('Data WS: non-JSON text frame ignored')
             return
         self._dispatch_sensor_payload(data)
 
