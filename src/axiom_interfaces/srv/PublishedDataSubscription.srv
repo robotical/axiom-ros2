@@ -1,0 +1,4 @@
+float32 rate_hz   # frequency of published data (Hz)
+---
+bool success
+string message

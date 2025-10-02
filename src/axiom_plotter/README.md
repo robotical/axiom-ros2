@@ -24,7 +24,7 @@ It was designed to complement [`axiom_driver`](../axiom_driver) by providing a l
 Make sure you are in the root of your ROS 2 workspace:
 
 ```bash
-cd ~/axiom-ros2
+cd ~/Projects/axiom-ros2
 colcon build --symlink-install --packages-select axiom_plotter
 source install/setup.bash
 ```

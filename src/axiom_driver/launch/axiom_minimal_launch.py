@@ -18,7 +18,7 @@ def generate_launch_description():
         DeclareLaunchArgument('serial.baud', default_value='115200'),
         DeclareLaunchArgument('serial.timeout', default_value='0.02'),
         DeclareLaunchArgument('serial.mode', default_value='auto'),
-        DeclareLaunchArgument('serial.autosub', default_value='true'),
+        DeclareLaunchArgument('autosub', default_value='false'),
         DeclareLaunchArgument('serial.devjson_rate_hz', default_value='0.1'),
 
         # WebSocket (WS)
@@ -35,12 +35,12 @@ def generate_launch_description():
                 'transport': LaunchConfiguration('transport'),
                 'device_uri': LaunchConfiguration('device_uri'),
                 'auto_connect': LaunchConfiguration('auto_connect'),
+                'autosub': LaunchConfiguration('autosub'),
                 'frame_id': LaunchConfiguration('frame_id'),
                 'serial.port': LaunchConfiguration('serial.port'),
                 'serial.baud': LaunchConfiguration('serial.baud'),
                 'serial.timeout': LaunchConfiguration('serial.timeout'),
                 'serial.mode': LaunchConfiguration('serial.mode'),
-                'serial.autosub': LaunchConfiguration('serial.autosub'),
                 'serial.devjson_rate_hz': LaunchConfiguration('serial.devjson_rate_hz'),
                 'use_dual_ws': LaunchConfiguration('use_dual_ws'),
                 'ws_path': LaunchConfiguration('ws_path'),

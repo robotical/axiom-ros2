@@ -9,7 +9,8 @@ The mixins assume the concrete class provides:
   - attributes initialised in the main node (__init__):
         state, _dispatcher, _mini_hdlc, _ric_serial,
         _serial_mode, _oa, _console_buf, _console_wait_ev,
-        _console_resp_buf, _serial_debug, _serial_autosub_sent
+        _console_resp_buf, _serial_debug, _serial_autosub_sent, 
+        _console_pub,
   - helper methods: _ws_mode(), _dispatch_sensor_payload() (when needed)
   - locking attributes: _ric_lock, _ric_wait, _ric_resp (for WS control RPC)
 """
@@ -20,6 +21,7 @@ import json
 import threading
 import time
 from typing import Dict, Optional
+from .utils.string import find_json_fragments
 
 from .ric_consts import (
     PROTO_BRIDGE_RICREST,
@@ -41,7 +43,11 @@ class SensorPayloadMixin:
         self.get_logger().debug(f'Dispatching sensor payload: {data}')
         from .sensors.registry import get_decoder  # local import to avoid cycles
         for bus, devs in data.items():
+            if not isinstance(devs, dict):
+                continue
             for addr, pkt in devs.items():
+                if not isinstance(pkt, dict):
+                    continue
                 tkey = pkt.get('_t', '')
                 hex_data = pkt.get('x', '')
                 dec = get_decoder(tkey, frame_id)
@@ -137,7 +143,7 @@ class SerialMixin(SensorPayloadMixin):
 
     # -------------------- RX path --------------------
     def _serial_on_bytes(self, raw: bytes):
-        self.get_logger().debug(f'Serial RX: {len(raw)} bytes')
+        self.get_logger().debug(f'Serial RX: {raw}')
         if not raw:
             return
         if self._serial_debug:
@@ -171,52 +177,110 @@ class SerialMixin(SensorPayloadMixin):
         else:  # Unknown forced mode → treat as ASCII console
             self._feed_console(raw)
 
+
     def _feed_console(self, raw: bytes):
-        self._console_buf.extend(raw)
-        if len(self._console_buf) > 65536:
-            self._console_buf = self._console_buf[-32768:]
+        """
+        Console handler:
+        - Buffers incoming bytes
+        - Opportunistically extracts balanced JSON objects (handles strings/escapes)
+        - Emits any non-JSON text as console output
+        - Dispatches parsed JSON to sensor/state pipeline
+        - Optionally fulfills a waiting RPC event once per call
+        """
 
-        text = self._console_buf.decode('utf-8', errors='ignore')
-        start = text.rfind('{')
-        end = text.rfind('}')
-        if start >= 0 and end > start:
-            js = text[start:end + 1]
-            self._console_buf = bytearray(text[end + 1:].encode('utf-8', errors='ignore'))
-            try:
-                obj = json.loads(js)
-            except Exception as e:
-                self.get_logger().warn(f'Console JSON decode failed: {e}')
+        # ---------- Tunables ----------
+        MAX_BUF = 65536
+        TRIM_TO = 32768
+
+        # ---------- Helpers ----------
+        def append_and_trim(buf: bytearray, data: bytes) -> str:
+            """Append to rolling buffer, trim if too large, return UTF-8 text view."""
+            buf.extend(data)
+            if len(buf) > MAX_BUF:
+                # keep the newest part
+                del buf[: len(buf) - TRIM_TO]
+            return buf.decode('utf-8', errors='replace')
+
+        def emit_console_text(chunk: str):
+            """Log/publish plain console text (non-JSON)."""
+            if not chunk:
                 return
+            # split to keep logs/topics tidy
+            for line in chunk.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if getattr(self, "_serial_debug", False):
+                    self.get_logger().debug(f'Console: {line}')
+                else:
+                    self.get_logger().info(f'Console: {line}')
+                pub = getattr(self, "_console_pub", None)
+                if pub:
+                    from std_msgs.msg import String
+                    pub.publish(String(data=line))
 
-            # Wake waiting RPC
-            ev = self._console_wait_ev
-            if ev is not None:
-                self._console_resp_buf = js.encode('utf-8')
-                ev.set()
-
-            # Potential sensor publish
+        def try_handle_json_fragment(js_text: str, rpc_consumed: bool) -> bool:
+            """Parse JSON (best-effort), dispatch if dict, and fulfill RPC once.
+            Returns updated rpc_consumed flag."""
             try:
-                self.get_logger().debug(f'Console JSON received: {obj}')
-                if isinstance(obj, dict) and obj:
-                    self._dispatch_sensor_payload(obj)
-            except Exception as e:
-                self.get_logger().warn(f'Console JSON dispatch failed: {e}')
-                pass
+                obj = json.loads(js_text)
+            except Exception as ex:
+                if getattr(self, "_serial_debug", False):
+                    self.get_logger().debug(f'Console JSON parse skipped: {ex}')
+                return rpc_consumed
 
+            # fulfill waiting RPC once
+            ev = getattr(self, "_console_wait_ev", None)
+            if (ev is not None) and (not rpc_consumed):
+                self._console_resp_buf = js_text.encode('utf-8')
+                ev.set()
+                rpc_consumed = True
+
+            if getattr(self, "_serial_debug", False):
+                self.get_logger().debug(f'Console JSON: {obj}')
+
+            if isinstance(obj, dict) and obj:
+                try:
+                    self._dispatch_sensor_payload(obj)
+                except Exception as ex:
+                    self.get_logger().warn(f'Console JSON dispatch failed: {ex}')
+
+            return rpc_consumed
+
+        # ---------- Main flow ----------
+        text = append_and_trim(self._console_buf, raw)
+        emit_console_text(text)
+        fragments = find_json_fragments(text)
+
+        last = 0
+        rpc_used = False
+
+        for s, e in fragments:
+            # plain text before this JSON
+            if s > last:
+                pass
+                # emit_console_text(text[last:s])
+
+            js = text[s:e]
+            rpc_used = try_handle_json_fragment(js, rpc_used)
+            last = e
+
+        # Tail after the last JSON remains buffered (may be partial JSON or plain)
+        tail = text[last:]
+        self._console_buf = bytearray(tail.encode('utf-8', errors='replace'))
     # -------------------- Status / frames --------------------
     def _on_serial_status(self, connected: bool, msg: str):
         if connected:
             self.get_logger().info('Serial status: connected')
             self.state.connected = True
             self.state.last_error = ''
-            if self.get_parameter('serial.autosub').value and not self._serial_autosub_sent:
+            if self.get_parameter('autosub').value:
                 st = self.state.serial_transport
                 if st is not None:
                     try:
                         rate = float(self.get_parameter('serial.devjson_rate_hz').value)
-                        line = f'subscription?action=update&topic=devjson&rateHz={rate}\n'
+                        line = f'subscription?action=update&name=devjson&rateHz={rate}\n'
                         st.send(line.encode('utf-8'))
-                        self._serial_autosub_sent = True
                         self.get_logger().info(f'Sent serial auto-subscription for devjson (rate {rate} Hz)')
                     except Exception as e:
                         self.get_logger().warn(f'Failed to send serial auto-subscription: {e}')
@@ -226,7 +290,6 @@ class SerialMixin(SensorPayloadMixin):
                 self.state.last_error = msg
             self.get_logger().warn(f'Serial status: disconnected ({msg})')
             self._dispatcher.reset_waiters('serial status change')
-            self._serial_autosub_sent = False
 
     def _on_serial_frame(self, frame: bytes):
         if len(frame) >= 3:
@@ -344,21 +407,24 @@ class WebSocketMixin(SensorPayloadMixin):
 
     # ------------- Data channel callbacks -------------
     def _on_open_data(self, ws):
-        self.get_logger().info('Data WS opened')
+        self.get_logger().info('Data WS opened, you can now send subscription requests')
+        self.ws_data_opened = True
         self.state._opened_event.set()
-        try:
-            subscribe_cmd = {
-                'cmdName': 'subscription',
-                'action': 'update',
-                'pubRecs': [
-                    {'name': 'devjson', 'trigger': 'timeorchange', 'rateHz': 0.1},
-                ],
-            }
-            ws.send(json.dumps(subscribe_cmd))
-        except Exception as e:
-            self.get_logger().warn(f'Failed to send subscription: {e}')
+        if (self.get_parameter('autosub').value):
+            try:
+                subscribe_cmd = {
+                    'cmdName': 'subscription',
+                    'action': 'update',
+                    'pubRecs': [
+                        {'name': 'devjson', 'trigger': 'timeorchange', 'rateHz': 0.1},
+                    ],
+                }
+                ws.send(json.dumps(subscribe_cmd))
+            except Exception as e:
+                self.get_logger().warn(f'Failed to send subscription: {e}')
 
     def _on_message_data(self, ws, message):
+        self.get_logger().debug(f'Data WS RX: {len(message)} bytes')
         if isinstance(message, (bytes, bytearray)):
             return
         try:

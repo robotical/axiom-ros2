@@ -11,11 +11,12 @@ Behaviour is intentionally unchanged.
 import time
 import threading
 import json
-from typing import Optional, Dict
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
+from std_msgs.msg import String
 
 from .bridge_connection import ConnectionState
 from .bridge_mixins import WebSocketMixin, SerialMixin, PublishMixin, SensorPayloadMixin
@@ -33,7 +34,7 @@ from .protocols.ric_serial import RICSerial
 from .protocols.overascii import Decoder as OverAsciiDecoder, encode as overascii_encode
 from .ric_consts import TYPE_PUBLISH, PROTO_RAWCMDFRAME, PROTO_ROSSERIAL
 from axiom_interfaces.srv import (
-    Connect, Disconnect, Ping, GetConnectionState, RicRestUrl
+    Connect, Disconnect, Ping, GetConnectionState, RicRestUrl, PublishedDataSubscription
 )
 
 
@@ -65,7 +66,7 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         self.declare_parameter('serial.port', '/dev/ttyUSB0')
         self.declare_parameter('serial.baud', 115200)
         self.declare_parameter('serial.timeout', 0.02)
-        self.declare_parameter('serial.autosub', True)
+        self.declare_parameter('autosub', False)
         self.declare_parameter('serial.devjson_rate_hz', 0.1)
         # Serial mode:
         #   'auto'      → detect OverAscii vs ASCII by inbound stream
@@ -112,7 +113,18 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         self._console_wait_ev = None  # type: Optional[threading.Event]
         self._console_resp_buf = None  # type: Optional[bytes]
         self._serial_debug = bool(self.get_parameter('debug_hex').value)
-        self._serial_autosub_sent = False
+
+        # Publishers
+        self._console_pub = self.create_publisher(
+            msg_type=String,
+            topic='serial_console',
+            qos_profile=10
+        )
+
+        # Subscription tracking
+
+        # WS helpers
+        self.ws_data_opened = False
 
         # ===== Services =====
         self.create_service(Connect, 'connect', self.handle_connect)
@@ -120,6 +132,7 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         self.create_service(Ping, 'ping', self.handle_ping)
         self.create_service(GetConnectionState, 'get_connection_state', self.handle_get_state)
         self.create_service(RicRestUrl, 'ric_rest_url', self.handle_ric_rest_url)
+        self.create_service(PublishedDataSubscription, 'publish_data_subscription', self.handle_published_data_subscription)
 
         # ===== Autoconnect =====
         if self.get_parameter('auto_connect').get_parameter_value().bool_value:
@@ -337,6 +350,68 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
         res.message = 'OK'
         return res
 
+    def handle_published_data_subscription(self, req: PublishedDataSubscription.Request, res: PublishedDataSubscription.Response):
+        """
+        Subscribe the device to 'devjson' published data via the selected transport.
+        """
+        # ---------- Small helpers ----------
+        def set_res(success: bool, msg: str):
+            res.success = success
+            res.message = msg
+            return res
+
+        def transport_mode() -> str:
+            return self.get_parameter('transport').get_parameter_value().string_value
+
+        def subscribe_serial(rate_hz: float):
+            st = self.state.serial_transport
+            if st is None:
+                self.get_logger().warn('Serial transport not started')
+                return set_res(False, 'Serial transport not started')
+            try:
+                line = f'subscription?action=update&name=devjson&rateHz={rate_hz}\n'
+                st.send(line.encode('utf-8'))
+                self.get_logger().info(f'Sent serial auto-subscription for devjson (rate {rate_hz} Hz)')
+                return set_res(True, 'Subscription sent')
+            except Exception as e:
+                self.get_logger().warn(f'Failed to send serial auto-subscription: {e}')
+                return set_res(False, f'Failed to send subscription: {e}')
+
+        def subscribe_ws(rate_hz: float):
+            ws = self.state.data_ws
+            if ws is None or not self.ws_data_opened:
+                self.get_logger().warn('Data WS not open')
+                return set_res(False, 'Data WS not open')
+            try:
+                cmd = {
+                    'cmdName': 'subscription',
+                    'action': 'update',
+                    'pubRecs': [
+                        {'name': 'devjson', 'trigger': 'timeorchange', 'rateHz': rate_hz},
+                    ],
+                }
+                ws.send(json.dumps(cmd))
+                self.get_logger().info(f'Sent subscription: {cmd}')
+                return set_res(True, 'Subscription sent')
+            except Exception as e:
+                msg = f'Failed to send subscription: {e}'
+                self.get_logger().warn(msg)
+                return set_res(False, msg)
+
+        # ---------- Pre-checks ----------
+        if not self.state.connected:
+            return set_res(False, 'Not connected')
+
+        # ---------- Dispatch ----------
+        mode = transport_mode()
+        rate = float(req.rate_hz)
+
+        if mode == 'serial':
+            return subscribe_serial(rate)
+        if mode == 'ws':
+            return subscribe_ws(rate)
+
+        return set_res(False, f'Unsupported transport: {mode}')
     # ============================ Helpers ============================
 
     def _next_msgnum(self) -> int:

@@ -2,7 +2,11 @@ to connect axiom to wifi RICREST to w/TP-Link_092B/11630470/Marty_598c8a
 
 
 to build everything:  colcon build --symlink-install
+or specific package:
+colcon build --symlink-install --packages-select <package_name>
 
+clean build:
+rm -rf build/ install/ log/
 
 Connect ws:
 ros2 launch axiom_driver axiom_minimal_launch.py \
@@ -23,3 +27,8 @@ ros2 service call /ric_rest_url axiom_interfaces/srv/RicRestUrl \
 
 To see raw IMU data:
 ros2 topic echo /LSM6DS_76a/imu/data_raw
+
+
+create package with:
+go to the src in root and:
+ros2 pkg create --build-type ament_python <package_name> --dependencies rclpy
