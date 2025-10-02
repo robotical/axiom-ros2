@@ -27,7 +27,7 @@ class VL53L4CDDecoder(SensorDecoder):
 
             valid = (~valid_raw) & 0x04
 
-            logger.info(
+            logger.debug(
                 f"VL53L4CD raw=0x{hex_sample_and_ts} ts={_ts_ms} valid_raw=0x{valid_raw:02X} "
                 f"bit2={(valid_raw & 0x04)!=0} dist_mm={dist_mm}"
             )
