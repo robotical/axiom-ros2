@@ -14,6 +14,13 @@
 
   <member_of_group>rosidl_interface_packages</member_of_group>
 
+    <!-- Build-time deps for message generation -->
+  <build_depend>std_msgs</build_depend>
+
+  <!-- Exec-time deps for using the generated code -->
+  <exec_depend>std_msgs</exec_depend>
+
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

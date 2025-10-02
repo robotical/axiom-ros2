@@ -11,7 +11,7 @@ rm -rf build/ install/ log/
 Connect ws:
 ros2 launch axiom_driver axiom_minimal_launch.py \
   transport:=ws \
-  device_uri:=ws://192.168.1.8/devjson \
+  device_uri:=ws://192.168.1.3/devjson \
   use_dual_ws:=true ws_path:=/ws ws_pcol:=RICSerial
 
 Connect serial:

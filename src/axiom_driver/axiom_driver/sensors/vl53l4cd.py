@@ -22,10 +22,10 @@ class VL53L4CDDecoder(SensorDecoder):
             b = bytes.fromhex(hex_sample_and_ts)
             ts_wrapped = struct.unpack(">H", b[:2])[0]
             _ts_ms = self.unwrap_ts_ms(ts_wrapped)
-
+            
             valid_raw, dist_mm = struct.unpack(">BH", b[2:5])
 
-            valid = (valid_raw & 0x04) != 0
+            valid = (~valid_raw) & 0x04
 
             logger.info(
                 f"VL53L4CD raw=0x{hex_sample_and_ts} ts={_ts_ms} valid_raw=0x{valid_raw:02X} "

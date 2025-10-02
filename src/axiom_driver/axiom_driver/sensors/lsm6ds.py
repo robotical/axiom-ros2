@@ -1,5 +1,5 @@
 import struct
-from sensor_msgs.msg import Imu
+from axiom_interfaces.msg import Imu6
 from .base import SensorDecoder
 
 DPS_TO_RAD = 0.017453292519943295
@@ -19,20 +19,16 @@ class LSM6DSDecoder(SensorDecoder):
             _ts_ms = self.unwrap_ts_ms(ts_wrapped)
             gx, gy, gz, ax, ay, az = struct.unpack("<hhhhhh", b[2:])
 
-            msg = Imu()
+            msg = Imu6()
             msg.header.frame_id = self.frame_id
             # For now we leave header.stamp to the bridge, which can apply a device↔host offset
 
             # Scales mirrored from the current demo setup
-            msg.angular_velocity.x = (gx / 16.384) * DPS_TO_RAD
-            msg.angular_velocity.y = (gy / 16.384) * DPS_TO_RAD
-            msg.angular_velocity.z = (gz / 16.384) * DPS_TO_RAD
-            msg.linear_acceleration.x = (ax / 8192.0) * G_TO_MS2
-            msg.linear_acceleration.y = (ay / 8192.0) * G_TO_MS2
-            msg.linear_acceleration.z = (az / 8192.0) * G_TO_MS2
-
-            # unknown covariances
-            msg.angular_velocity_covariance[0] = -1.0
-            msg.linear_acceleration_covariance[0] = -1.0
+            msg.gx = (gx / 16.384) * DPS_TO_RAD
+            msg.gy = (gy / 16.384) * DPS_TO_RAD
+            msg.gz = (gz / 16.384) * DPS_TO_RAD
+            msg.ax = (ax / 8192.0) * G_TO_MS2
+            msg.ay = (ay / 8192.0) * G_TO_MS2
+            msg.az = (az / 8192.0) * G_TO_MS2
 
             yield ("imu/data_raw", msg)
