@@ -55,6 +55,9 @@ class SensorPayloadMixin:
                 segments = self._extract_hex_segments(pkt)
                 if not segments:
                     continue
+                self.get_logger().debug(
+                    f"Dispatching {device_type}@{addr} on {bus_name} groups={list(segments)}"
+                )
                 devinfo = self._get_device_typeinfo(bus_name, device_type)
                 if not devinfo:
                     self.get_logger().debug(
@@ -230,18 +233,27 @@ class SensorPayloadMixin:
                     except Exception:
                         pass
 
-        ts_bytes = int(resp_meta.get('tb') or 2)
+        tb_value = resp_meta.get('tb')
+        ts_bytes = int(tb_value) if tb_value is not None else 0
         ts_fmt = resp_meta.get('tf') or '>H'
-        wrap_mod = 1 << (ts_bytes * 8) if ts_bytes > 0 else 0
+        wrap_mod = 1 << (ts_bytes * 8) if ts_bytes else 0
         chunk_bytes = sample_bytes + ts_bytes
         if chunk_bytes <= 0:
             return []
+
+        self.get_logger().debug(
+            f'Decode start {device_type}@{addr}: len={len(payload_bytes)} '
+            f'sample_bytes={sample_bytes} ts_bytes={ts_bytes} chunk_bytes={chunk_bytes}'
+        )
 
         samples: List[Dict[str, Any]] = []
         offset = 0
         key = (bus_name, addr, device_type)
         while offset + chunk_bytes <= len(payload_bytes):
             chunk = payload_bytes[offset : offset + chunk_bytes]
+            self.get_logger().debug(
+                f'Chunk {device_type}@{addr}: {chunk.hex()} offset={offset + chunk_bytes}'
+            )
             offset += chunk_bytes
 
             ts_wrapped = 0
@@ -257,9 +269,22 @@ class SensorPayloadMixin:
                     ts_wrapped = int.from_bytes(ts_part, 'big')
                 if wrap_mod:
                     ts_unwrapped = self._unwrap_device_timestamp(key, ts_wrapped, wrap_mod)
+            else:
+                payload = chunk
 
             values = self._decode_attribute_block(payload, attr_defs)
+            self.get_logger().debug(
+                f'Decoded sample {device_type}@{addr}: ts={ts_unwrapped} '
+                f'values={json.dumps(values, default=str)}'
+            )
             samples.append({'timestamp_ms': ts_unwrapped, 'values': values})
+
+        if offset < len(payload_bytes):
+            remainder = payload_bytes[offset:]
+            if remainder:
+                self.get_logger().debug(
+                    f'Decode remainder {device_type}@{addr}: {remainder.hex()}'
+                )
 
         return samples
 
@@ -305,6 +330,10 @@ class SensorPayloadMixin:
                 'raw': value,
                 'meta': attr,
             }
+            self.get_logger().debug(
+                f'Attr decoded {name}: raw={raw_bytes.hex()} fmt={fmt} '
+                f'si={si_value} unit={attr.get("u")}'
+            )
         return results
 
     def _post_process_value(self, value: Any, attr: Dict[str, Any]) -> Any:
@@ -429,6 +458,7 @@ class SensorPayloadMixin:
         topic = f'{device_type}_{addr}/data'
         pub = self.publisher_cache.get(topic, String)
         pub.publish(msg)
+        self.get_logger().debug(f'Published generic {topic}: {msg.data}')
 
     def _publish_specialized_sample(
         self,
@@ -577,6 +607,7 @@ class PublishMixin(SensorPayloadMixin):
                 body = body[:nul]
             try:
                 obj = json.loads(body.decode('utf-8', errors='replace'))
+                self.get_logger().debug(f"Publish payload: {json.dumps(obj, separators=(',', ':'))}")
                 if isinstance(obj, dict):
                     self._dispatch_sensor_payload(obj)
             except Exception:
@@ -713,6 +744,7 @@ class SerialMixin(SensorPayloadMixin):
             Returns updated rpc_consumed flag."""
             try:
                 obj = json.loads(js_text)
+                self.get_logger().debug(f"Publish payload: {json.dumps(obj, separators=(',', ':'))}")
             except Exception as ex:
                 if getattr(self, "_serial_debug", False):
                     self.get_logger().debug(f'Console JSON parse skipped: {ex}')
