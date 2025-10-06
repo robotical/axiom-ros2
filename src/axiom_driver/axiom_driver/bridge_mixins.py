@@ -40,7 +40,7 @@ class SensorPayloadMixin:
 
     def _dispatch_sensor_payload(self, data: Dict):  # type: ignore[override]
         frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
-        self.get_logger().debug(f'Dispatching sensor payload: {data}')
+        self.get_logger().info(f'Dispatching sensor payload: {data}')
         from .sensors.registry import get_decoder  # local import to avoid cycles
         for bus, devs in data.items():
             if not isinstance(devs, dict):
@@ -149,17 +149,6 @@ class SerialMixin(SensorPayloadMixin):
         if self._serial_debug:
             preview = ' '.join(f'{b:02X}' for b in raw[:64])
             self.get_logger().debug(f'Serial RX raw: {preview}' + (' …' if len(raw) > 64 else ''))
-
-        # Decide mode if still auto
-        if self._serial_mode == 'auto':
-            high = sum(1 for b in raw if (b >= 0x80) or (b in (0x85, 0x8E, 0x8F)))
-            printable = sum(1 for b in raw if (32 <= b < 127) or (b in (9, 10, 13)))
-            if high > max(8, len(raw) // 4):
-                self._serial_mode = 'overascii'
-                self.get_logger().warn('Serial mode auto-detect: OVERASCII (RICSerial tunneled)')
-            elif printable >= max(8, len(raw) // 2) and any(b in raw for b in (10, 13)):
-                self._serial_mode = 'ascii'
-                self.get_logger().warn('Serial mode auto-detect: ASCII CONSOLE')
 
         # Route depending on mode
         if self._serial_mode == 'overascii':
