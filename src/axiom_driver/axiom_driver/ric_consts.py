@@ -5,7 +5,7 @@ TYPE_PUBLISH  = 2  # 0b10
 
 # Protocol IDs
 # 0 is used by firmware for ROSSerial-style devjson publishes on the console path
-PROTO_ROSSERIAL      = 0
+PROTO_ROSSERIAL     = 0
 PROTO_RICREST       = 2
 PROTO_BRIDGE_RICREST= 3
 

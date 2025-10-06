@@ -17,7 +17,7 @@ def generate_launch_description():
         DeclareLaunchArgument('serial.port', default_value='/dev/cu.usbmodem2101'),
         DeclareLaunchArgument('serial.baud', default_value='115200'),
         DeclareLaunchArgument('serial.timeout', default_value='0.02'),
-        DeclareLaunchArgument('serial.mode', default_value='auto'),
+        DeclareLaunchArgument('serial.mode', default_value='overascii'),
         DeclareLaunchArgument('autosub', default_value='false'),
         DeclareLaunchArgument('serial.devjson_rate_hz', default_value='0.1'),
 
