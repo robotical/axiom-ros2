@@ -25,7 +25,8 @@ def main():
     print(f"Connected: {PORT} @ {BAUD}")
 
     threading.Thread(target=reader, args=(ser,), daemon=True).start()
-    cmd = f"subscription?action=update&name={NAME}&rateHz={RATE}\n"
+    # cmd = f"subscription?action=update&name={NAME}&rateHz={RATE}\n"
+    cmd = f'{{"cmdName":"subscription","action":"update","pubRecs":[{{"name":"{NAME}","trigger":"timeorchange","rateHz":{RATE}}}]}}\n'
     ser.write(cmd.encode())
     print(f">> {cmd.strip()}")
 

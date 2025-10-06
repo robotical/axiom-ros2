@@ -11,7 +11,7 @@ Behaviour is intentionally unchanged.
 import time
 import threading
 import json
-from typing import Optional
+from typing import Optional, Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -121,6 +121,12 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
             qos_profile=10
         )
 
+        # Device type information cache (for dynamic decoder discovery)
+        self._device_typeinfo_cache = {}
+        self._device_typeinfo_lock = threading.Lock()
+        self._device_typeinfo_retry_window = 5.0
+        self._device_typeinfo_request_timeout = 2.0
+
         # Subscription tracking
 
         # WS helpers
@@ -220,21 +226,39 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
             * overascii → OverAscii(HDLC(RICFrame))
             * auto      → if still 'auto', prefer ascii first (works with 'v'), OverAscii will auto-switch on RX
         """
+        timeout = req.timeout if req.timeout > 0 else None
+        success, message, payload = self._send_ric_rest_url(
+            (req.url_path or '').strip(),
+            timeout=timeout,
+            ws_pcol_override=req.ws_pcol
+        )
+
+        res.success = success
+        res.message = message
+        res.json_text = (payload or b'').decode('utf-8', errors='replace') if payload else ''
+        return res
+
+    def _send_ric_rest_url(
+        self,
+        url_path: str,
+        *,
+        timeout: Optional[float] = None,
+        ws_pcol_override: Optional[str] = None,
+    ) -> Tuple[bool, str, Optional[bytes]]:
         transport_kind = self.get_parameter('transport').get_parameter_value().string_value
-        timeout = req.timeout if req.timeout > 0 else float(self.get_parameter('rpc_default_timeout').value)
-        url_str = (req.url_path or '').strip()
+        timeout_s = timeout if timeout and timeout > 0 else float(self.get_parameter('rpc_default_timeout').value)
+        url_str = (url_path or '').strip()
 
         # ---- Serial path ----
         if transport_kind == 'serial':
             st = self.state.serial_transport
             if st is None:
-                res.success = False; res.message = 'Serial transport not started'; return res
+                return False, 'Serial transport not started', None
 
             mode = self._serial_mode
             # ---- Serial ASCII console request/response ----
             if mode in ('ascii', 'auto'):
-                line = (url_str).strip()
-
+                line = url_str
 
                 ev = threading.Event()
                 with self._ric_lock:
@@ -247,27 +271,20 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
                     with self._ric_lock:
                         self._console_wait_ev = None
                         self._console_resp_buf = None
-                    res.success = False
-                    res.message = f'serial send failed: {e}'
-                    return res
+                    return False, f'serial send failed: {e}', None
 
-                if not ev.wait(timeout):
+                if not ev.wait(timeout_s):
                     with self._ric_lock:
                         self._console_wait_ev = None
                         self._console_resp_buf = None
-                    res.success = False
-                    res.message = 'timeout'
-                    return res
+                    return False, 'timeout', None
 
                 with self._ric_lock:
                     data = self._console_resp_buf or b''
                     self._console_wait_ev = None
                     self._console_resp_buf = None
 
-                res.success = True
-                res.json_text = data.decode('utf-8', errors='replace')
-                res.message = 'OK'
-                return res
+                return True, 'OK', data
 
             # OverAscii + RICSerial
             msgnum = self._dispatcher.next_msgnum()
@@ -284,28 +301,28 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
             try:
                 st.send(payload)
             except Exception as e:
-                res.success = False; res.message = f'serial send failed: {e}'; return res
+                return False, f'serial send failed: {e}', None
 
-            if not ev.wait(timeout):
+            if not ev.wait(timeout_s):
                 self._dispatcher.pop_payload(msgnum)
-                res.success = False; res.message = 'timeout'; return res
+                return False, 'timeout', None
 
             data = self._dispatcher.pop_payload(msgnum)
-            res.success = True; res.json_text = data.decode('utf-8', errors='replace'); res.message = 'OK'; return res
+            return True, 'OK', data
 
         # ---- WebSocket path ----
         if not self.state.connected:
-            res.success = False; res.message = 'Not connected'; return res
+            return False, 'Not connected', None
 
         ws = self.state.ctrl_ws if self.state.ctrl_ws is not None else self.state.data_ws
         if ws is None:
-            res.success = False; res.message = 'No WebSocket available'; return res
+            return False, 'No WebSocket available', None
 
         msgnum = self._next_msgnum()
         proto_name = str(self.get_parameter('ricrest_proto').value or 'RICREST').upper()
         proto_id = PROTO_BRIDGE_RICREST if proto_name == 'BRIDGE_RICREST' else PROTO_RICREST
         ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, proto_id), ELEM_URL, url_str.encode('utf-8'))
-        mode = self._ws_mode(req.ws_pcol)
+        mode = self._ws_mode(ws_pcol_override)
         payload = self._mini_hdlc.encode(ric) if mode == 'RICSerial' else ric
 
         # dump the inner RIC frame and the on-wire payload
@@ -328,9 +345,9 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
             with self._ric_lock:
                 self._ric_wait.pop(msgnum, None)
             self.get_logger().error(f'WS TX ERROR: msgnum={msgnum} err={e}')
-            res.success = False; res.message = f'send failed: {e}'; return res
+            return False, f'send failed: {e}', None
 
-        if not ev.wait(timeout):
+        if not ev.wait(timeout_s):
             dt = time.time() - t_send
             with self._ric_lock:
                 still_waiting = list(self._ric_wait.keys())
@@ -338,17 +355,14 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
             self.get_logger().error(
                 f'WS RPC TIMEOUT: msgnum={msgnum} waited={dt:.3f}s '
                 f'outstanding={still_waiting}'
-            )       
-            res.success = False; res.message = 'timeout'; return res
+            )
+            return False, 'timeout', None
 
         with self._ric_lock:
             data = self._ric_resp.pop(msgnum, b'')
             self._ric_wait.pop(msgnum, None)
 
-        res.success = True
-        res.json_text = data.decode('utf-8', errors='replace')
-        res.message = 'OK'
-        return res
+        return True, 'OK', data
 
     def handle_published_data_subscription(self, req: PublishedDataSubscription.Request, res: PublishedDataSubscription.Response):
         """
@@ -450,6 +464,7 @@ def main(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         node.get_logger().info('Shutting down')
+        node._disconnect()
         pass
     finally:
         rclpy.shutdown()

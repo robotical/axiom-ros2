@@ -17,13 +17,7 @@ This driver layers several light protocols to move RIC (Robot Interface Controll
      Format: `[msgNum:1][type/proto:1][elem:1][payload...]`  
 5. Dispacher / RPC correlation  
    - [`axiom_driver.protocols.dispatcher.Dispatcher`](src/axiom_driver/axiom_driver/protocols/dispatcher.py) matches responses (CMDRESPJSON) by `msgNum`  
-6. Sensor payload JSON (devjson) → decoded into ROS messages  
-   - [`axiom_driver.bridge_mixins.SensorPayloadMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py)  
-   - Decoders:  
-     - IMU: [`axiom_driver.sensors.lsm6ds.LSM6DSDecoder`](src/axiom_driver/axiom_driver/sensors/lsm6ds.py)  
-     - Ranges: [`axiom_driver.sensors.vl53l4cd.VL53L4CDDecoder`](src/axiom_driver/axiom_driver/sensors/vl53l4cd.py), [`axiom_driver.sensors.vl6180.VL6180Decoder`](src/axiom_driver/axiom_driver/sensors/vl6180.py)  
-     - Environment: [`axiom_driver.sensors.aht20.AHT20Decoder`](src/axiom_driver/axiom_driver/sensors/aht20.py)  
-   - Registry: [`axiom_driver.sensors.registry.get_decoder`](src/axiom_driver/axiom_driver/sensors/registry.py)
+6. Sensor payload JSON (devjson) → decoded using firmware-provided type metadata inside [`axiom_driver.bridge_mixins.SensorPayloadMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py)
 
 ### Message Type & Protocol IDs
 
@@ -82,7 +76,7 @@ WS RICSerial path skips OverAscii (HDLC only). WS RICFrame path skips both OverA
    - Serial ASCII: parsed in [`axiom_driver.bridge_mixins.SerialMixin._feed_console`](src/axiom_driver/axiom_driver/bridge_mixins.py)
    - Serial OverAscii / WS: RIC publish frame handled in [`axiom_driver.bridge_mixins.PublishMixin._handle_publish_frame`](src/axiom_driver/axiom_driver/bridge_mixins.py) or serial frame handler.
 2. Payload dict dispatched via [`axiom_driver.bridge_mixins.SensorPayloadMixin._dispatch_sensor_payload`](src/axiom_driver/axiom_driver/bridge_mixins.py)
-3. Decoder converts hex sample stream → ROS messages (e.g. [`axiom_driver.sensors.lsm6ds.LSM6DSDecoder.decode_samples`](src/axiom_driver/axiom_driver/sensors/lsm6ds.py))
+3. Firmware-provided metadata drives decoding in [`axiom_driver.bridge_mixins.SensorPayloadMixin._decode_samples_from_hex`](src/axiom_driver/axiom_driver/bridge_mixins.py)
 4. Publishers cached by [`axiom_driver.publisher_cache.PublisherCache`](src/axiom_driver/axiom_driver/publisher_cache.py)
 
 ### Encoding / Decoding Examples
@@ -139,9 +133,9 @@ Declared in [`axiom_driver.axiom_bridge_node.AxiomBridgeNode.__init__`](src/axio
 
 ### Extending
 
-Add a new sensor decoder:
-1. Implement subclass of [`axiom_driver.sensors.base.SensorDecoder`](src/axiom_driver/axiom_driver/sensors/base.py)
-2. Add to `_DECODERS` in [`axiom_driver.sensors.registry`](src/axiom_driver/axiom_driver/sensors/registry.py)
+Add support for a new sensor payload:
+1. Ensure the firmware exposes the device through `devman/typeinfo` with `resp` metadata describing each attribute.
+2. (Optional) extend `_publish_specialized_sample` in [`SensorPayloadMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py) if the decoded values should be mapped onto specific ROS message types beyond the generic JSON topic.
 
 Add a new framing / protocol layer:
 - Wrap before Mini-HDLC (outer) or replace Mini-HDLC with alternate deframer, then adapt the receive path in `SerialMixin` / `WebSocketMixin`.
@@ -155,6 +149,5 @@ Add a new framing / protocol layer:
 | Inner frame    | RICFrame (`RICFrame.pack`) |
 | RPC matching   | Dispatcher (`Dispatcher.register_waiter`, `.handle_frame`) |
 | Serial stream  | RICSerial (`feed_bytes`) |
-| Sensor decode  | Sensor decoders in `sensors/` |
+| Sensor decode  | Firmware metadata & `SensorPayloadMixin` |
 | Dynamic pubs   | `PublisherCache` |
-

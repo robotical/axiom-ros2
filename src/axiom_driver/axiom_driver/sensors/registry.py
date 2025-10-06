@@ -1,10 +1,18 @@
-from .lsm6ds import LSM6DSDecoder
-from .vl53l4cd import VL53L4CDDecoder
-from .vl6180 import VL6180Decoder
-from .aht20 import AHT20Decoder
+"""Legacy decoder registry (retained for backwards compatibility).
 
-_DECODERS = {c.topic_key: c for c in [LSM6DSDecoder, VL53L4CDDecoder, VL6180Decoder, AHT20Decoder]}
+Firmware-provided metadata now drives decoding dynamically inside
+``SensorPayloadMixin``. These helpers exist so any old imports continue to
+resolve, but they always return ``None``.
+"""
 
-def get_decoder(topic_key: str, frame_id: str):
-    cls = _DECODERS.get(topic_key)
-    return cls(frame_id) if cls else None
+from typing import Optional
+
+
+def get_decoder_by_identifier(identifier: str, frame_id: str):  # noqa: D401
+    """Return ``None``; dynamic firmware decoders supersede this helper."""
+    return None
+
+
+def get_decoder(topic_key: str, frame_id: str):  # noqa: D401
+    """Return ``None``; preserved for compatibility with legacy code."""
+    return None
