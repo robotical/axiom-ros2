@@ -19,7 +19,10 @@ from rclpy.executors import ExternalShutdownException
 from std_msgs.msg import String
 
 from .bridge_connection import ConnectionState
-from .bridge_mixins import WebSocketMixin, SerialMixin, PublishMixin, SensorPayloadMixin
+from .bridge_mixins.ws_mixin import WebSocketMixin
+from .bridge_mixins.serial_mixin import SerialMixin 
+from .bridge_mixins.publish_mixin import PublishMixin 
+from .bridge_mixins.sensor_payload_mixin import SensorPayloadMixin
 from .ric_consts import (
     TYPE_COMMAND,
     PROTO_RICREST, PROTO_BRIDGE_RICREST,
@@ -156,19 +159,34 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
                 self.state.data_ws.close()
         except Exception as e:
             self.get_logger().warn(f'Data WS close error: {e}')
+        finally:
+            thread = getattr(self.state, 'data_thread', None)
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=1.0)
+            self.state.data_thread = None
+            self.state.data_ws = None
         try:
             if self.state.ctrl_ws is not None:
                 self.state.ctrl_ws.close()
         except Exception as e:
             self.get_logger().warn(f'Control WS close error: {e}')
+        finally:
+            thread = getattr(self.state, 'ctrl_thread', None)
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=1.0)
+            self.state.ctrl_thread = None
+            self.state.ctrl_ws = None
         try:
             if self.state.serial_transport is not None:
                 self.state.serial_transport.stop()
         except Exception as e:
             self.get_logger().warn(f'Serial stop error: {e}')
+        finally:
+            self.state.serial_transport = None
 
         self._dispatcher.reset_waiters('disconnect')
         self.state.connected = False
+        self.ws_data_opened = False
         return True, 'Disconnected'
 
     # ============================ Services ============================
@@ -458,13 +476,22 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
 # ---------------------------- Entrypoint ----------------------------
 
 def main(args=None):
+    node: Optional[AxiomBridgeNode] = None
+    rclpy_initialized = False
     try:
         rclpy.init(args=args)
+        rclpy_initialized = True
         node = AxiomBridgeNode()
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
-        node.get_logger().info('Shutting down')
-        node._disconnect()
-        pass
+        if node is not None:
+            node.get_logger().info('Shutting down')
     finally:
-        rclpy.shutdown()
+        if node is not None:
+            try:
+                node._disconnect()
+            except Exception as exc:  # noqa: BLE001
+                node.get_logger().warn(f'Disconnect during shutdown failed: {exc}')
+            node.destroy_node()
+        if rclpy_initialized:
+            rclpy.shutdown()
