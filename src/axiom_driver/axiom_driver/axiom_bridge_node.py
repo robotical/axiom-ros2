@@ -369,9 +369,22 @@ class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPay
                 self.get_logger().warn('Serial transport not started')
                 return set_res(False, 'Serial transport not started')
             try:
+                # always send sub req OverAscii + RICSerial
                 line = f'subscription?action=update&name=devjson&rateHz={rate_hz}\n'
-                st.send(line.encode('utf-8'))
-                self.get_logger().info(f'Sent serial auto-subscription for devjson (rate {rate_hz} Hz)')
+                msgnum = self._dispatcher.next_msgnum()
+                proto_name = str(self.get_parameter('ricrest_proto').value or 'RICREST').upper()
+                proto_id = PROTO_BRIDGE_RICREST if proto_name == 'BRIDGE_RICREST' else PROTO_RICREST
+                ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, proto_id), ELEM_URL, line.encode('utf-8'))
+                hdlc = self._ric_serial.encode(ric)
+
+                payload = overascii_encode(hdlc)
+
+                self.get_logger().info(f'Sending RICREST(URL) over serial(OverAscii): msgnum={msgnum} path={line}')
+                self.get_logger().info('TX(serial,overascii+hdlc)[:40]= ' + payload[:40].hex() + ('...' if len(payload) > 40 else ''))
+                st.send(payload)
+
+
+                self.get_logger().info(f'Sent serial subscription for devjson (rate {rate_hz} Hz)')
                 return set_res(True, 'Subscription sent')
             except Exception as e:
                 self.get_logger().warn(f'Failed to send serial auto-subscription: {e}')
