@@ -1,0 +1,232 @@
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":228.42,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":228.42,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":228.42,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":238.46,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":248.48,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":258.49,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":268.52,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":278.55,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":288.59,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---
+data: '{"bus":"AxiomPowerV1","address":"0","type":"AxiomPowerV1","group":"x","timestamp_ms":null,"values":{"battV":{"value":298.61,"uni...'
+---

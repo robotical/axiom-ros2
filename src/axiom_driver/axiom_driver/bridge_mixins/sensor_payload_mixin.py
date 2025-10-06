@@ -8,6 +8,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
+from numpy import dtype
 
 
 class SensorPayloadMixin:
@@ -52,18 +53,18 @@ class SensorPayloadMixin:
                         continue
 
                     for sample in samples:
-                        try:
-                            self._publish_generic_sample(bus_name, addr, device_type, group_name, sample)
-                        except Exception as exc:  # noqa: BLE001
-                            self.get_logger().warn(
-                                f'Generic publish failed for {device_type}@{addr}: {exc}'
-                            )
                         # try:
-                        #     self._publish_specialized_sample(bus_name, addr, device_type, frame_id, sample, devinfo)
+                        #     self._publish_generic_sample(bus_name, addr, device_type, group_name, sample)
                         # except Exception as exc:  # noqa: BLE001
-                        #     self.get_logger().debug(
-                        #         f'Specialized publish skipped for {device_type}@{addr}: {exc}'
+                        #     self.get_logger().warn(
+                        #         f'Generic publish failed for {device_type}@{addr}: {exc}'
                         #     )
+                        try:
+                            self._publish_specialized_sample(bus_name, addr, device_type, frame_id, sample, devinfo)
+                        except Exception as exc:  # noqa: BLE001
+                            self.get_logger().debug(
+                                f'Specialized publish skipped for {device_type}@{addr}: {exc}'
+                            )
 
     # ----------- Firmware metadata helpers -----------
 
@@ -468,31 +469,53 @@ class SensorPayloadMixin:
             pub.publish(msg)
             return
 
-        if dtype in ('VL53L4CD', 'VL53', 'DIST'):
+        if dtype == 'VL53L4CD':
             dist_entry = values.get('dist') or values.get('distance')
             if not dist_entry:
                 return
+
+            # Check validity flag (if present)
             valid_entry = values.get('valid')
             if valid_entry is not None and not bool(valid_entry.get('value')):
+                # Still publish custom msg with valid=false if you want visibility,
+                # or early-return to suppress any output on invalid.
+                # Here we continue and mark valid=false.
+                is_valid = bool(valid_entry.get('value'))
+            else:
+                is_valid = True
+
+            # Pull SI (meters) and raw (mm) if available
+            def pick(entry, key):
+                return entry.get(key) if entry is not None else None
+
+            si_m = pick(dist_entry, 'si_value')
+            raw_mm = pick(dist_entry, 'value')
+            if si_m is None and raw_mm is None:
                 return
+
             try:
-                from sensor_msgs.msg import Range
+                from axiom_interfaces.msg import VL53L4CDReading
             except ImportError:
-                self.get_logger().warn('sensor_msgs/Range not available')
+                self.get_logger().warn('VL53L4CDReading message type not available')
                 return
-            msg = Range()
-            msg.header.frame_id = frame_id
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.radiation_type = Range.INFRARED
-            msg.range = float(self._select_si(dist_entry))
-            min_range, max_range = self._range_limits_si(dist_entry)
-            msg.min_range = min_range
-            msg.max_range = max_range
-            msg.field_of_view = math.nan
-            topic = f'{device_type}_{addr}/range/front'
-            pub = self.publisher_cache.get(topic, Range)
-            pub.publish(msg)
-            return
+
+            # --- Publish custom reading ---
+            msg_raw = VL53L4CDReading()
+            msg_raw.header.frame_id = frame_id
+            msg_raw.header.stamp = self.get_clock().now().to_msg()
+            msg_raw.valid = bool(is_valid)
+            if si_m is not None:
+                msg_raw.distance_m = float(si_m)
+            elif raw_mm is not None:
+                msg_raw.distance_m = float(raw_mm) / 1000.0
+            else:
+                msg_raw.distance_m = float('nan')
+
+            msg_raw.distance_mm = int(raw_mm) if raw_mm is not None else 0
+
+            topic_raw = f'{device_type}_{addr}/range/raw'
+            pub_raw = self.publisher_cache.get(topic_raw, VL53L4CDReading)
+            pub_raw.publish(msg_raw)
 
         if dtype == 'AHT20':
             temp_entry = (
@@ -535,6 +558,43 @@ class SensorPayloadMixin:
                 topic = f'{device_type}_{addr}/environment/humidity'
                 pub = self.publisher_cache.get(topic, RelativeHumidity)
                 pub.publish(msg)
+
+        if dtype == 'AXIOMPOWERV1':
+            try:
+                from axiom_interfaces.msg import AxiomPowerState
+            except ImportError:
+                self.get_logger().warn('AxiomPowerState message type not available')
+                return
+
+            # helper to get numeric/boolean from your {value, unit, si_value, si_unit} dicts
+            def pick(entry, cast):
+                if entry is None:
+                    return None
+                # prefer si_value if present
+                v = entry.get('si_value')
+                if v is None:
+                    v = entry.get('value')
+                try:
+                    return cast(v)
+                except Exception:
+                    return None
+
+            batt_v = pick(values.get('battV'), float)
+
+            # Require at least voltage; others can be optional
+            if batt_v is None:
+                return
+
+            msg = AxiomPowerState()
+            msg.header.frame_id = frame_id
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.batt_v = float(batt_v)
+
+            topic = f'{device_type}_{addr}/power/state'
+            pub = self.publisher_cache.get(topic, AxiomPowerState)
+            pub.publish(msg)
+            return
+        
 
     def _select_si(self, entry: Dict[str, Any]) -> float:
         si_val = entry.get('si_value')

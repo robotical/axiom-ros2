@@ -33,7 +33,8 @@ ros2 service call /publish_data_subscription axiom_interfaces/srv/PublishedDataS
 
 
 To see raw IMU data:
-ros2 topic echo /LSM6DS_76a/imu/data_raw
+<!-- no limit on the output -->
+ros2 topic echo /LSM6DS_76a/imu/data_raw --full-length
 
 
 create package with:

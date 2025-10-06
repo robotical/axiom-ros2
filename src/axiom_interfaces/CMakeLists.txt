@@ -11,6 +11,8 @@ find_package(std_msgs REQUIRED)
 
 set(msg_files
   "msg/Imu6.msg"
+  "msg/AxiomPowerState.msg"
+  "msg/VL53L4CDReading.msg"
 )
 
 set(srv_files
