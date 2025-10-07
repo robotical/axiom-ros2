@@ -8,7 +8,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from numpy import dtype
+from .attr_decoder import AttrBlockDecoder
+from .custom_attr_handler import CustomAttrHandler
 
 
 class SensorPayloadMixin:
@@ -53,12 +54,12 @@ class SensorPayloadMixin:
                         continue
 
                     for sample in samples:
-                        # try:
-                        #     self._publish_generic_sample(bus_name, addr, device_type, group_name, sample)
-                        # except Exception as exc:  # noqa: BLE001
-                        #     self.get_logger().warn(
-                        #         f'Generic publish failed for {device_type}@{addr}: {exc}'
-                        #     )
+                        try:
+                            self._publish_generic_sample(bus_name, addr, device_type, group_name, sample)
+                        except Exception as exc:  # noqa: BLE001
+                            self.get_logger().warn(
+                                f'Generic publish failed for {device_type}@{addr}: {exc}'
+                            )
                         try:
                             self._publish_specialized_sample(bus_name, addr, device_type, frame_id, sample, devinfo)
                         except Exception as exc:  # noqa: BLE001
@@ -147,6 +148,7 @@ class SensorPayloadMixin:
                 f'Device type info request failed for bus={bus_name} type={device_type}: rslt={rslt}'
             )
             return None
+        self.get_logger().info(f'Device type info response for bus={bus_name} type={device_type}: {json.dumps(data, separators=(",", ":"))}')
         devinfo = data.get('devinfo') or data.get('deviceTypeInfo') or data.get('info')
         if devinfo is None and 'rslt' not in data:
             devinfo = data
@@ -178,6 +180,38 @@ class SensorPayloadMixin:
 
     # ----------- Sample decoding -----------
 
+    def _get_attr_decoder(self) -> AttrBlockDecoder:
+        decoder = getattr(self, '_attr_block_decoder', None)
+        if decoder is None:
+            decoder = AttrBlockDecoder()
+            self._attr_block_decoder = decoder
+        return decoder
+
+    def _get_custom_attr_handler(self) -> CustomAttrHandler:
+        handler = getattr(self, '_custom_attr_handler', None)
+        if handler is None:
+            handler = CustomAttrHandler()
+            self._custom_attr_handler = handler
+        return handler
+
+    def _infer_timestamp_size(self, sample_bytes: int, payload_len: int) -> int:
+        if sample_bytes <= 0 or payload_len <= 0:
+            return 0
+
+        # Prefer the standard 2-byte timestamp used by the JS implementation
+        candidate_sizes = (2, 4, 6, 8, 0)
+        for candidate in candidate_sizes:
+            chunk = sample_bytes + candidate
+            if chunk <= 0:
+                continue
+            if payload_len >= chunk and payload_len % chunk == 0:
+                return candidate
+
+        if payload_len >= sample_bytes + 2:
+            return 2
+
+        return 0
+
     def _decode_samples_from_hex(
         self,
         bus_name: str,
@@ -207,16 +241,49 @@ class SensorPayloadMixin:
                     except Exception:
                         pass
 
-        tb_value = resp_meta.get('tb')
-        ts_bytes = int(tb_value) if tb_value is not None else 0
-        ts_fmt = resp_meta.get('tf') or '>H'
-        wrap_mod = 1 << (ts_bytes * 8) if ts_bytes else 0
+        payload_len = len(payload_bytes)
+
+        ts_value = resp_meta.get('tb')
+        if ts_value is None:
+            ts_bytes = self._infer_timestamp_size(sample_bytes, payload_len)
+        else:
+            try:
+                ts_bytes = int(ts_value)
+            except Exception:
+                ts_bytes = 0
+        if ts_bytes < 0:
+            ts_bytes = 0
+
+        resolution_field = resp_meta.get('tr') or resp_meta.get('timestamp_resolution_us')
+        try:
+            resolution_us = int(resolution_field) if resolution_field is not None else 1000
+        except Exception:
+            resolution_us = 1000
+        if ts_bytes == 0:
+            resolution_us = 0
+
+        ts_fmt = resp_meta.get('tf')
+        if ts_bytes:
+            if not ts_fmt:
+                default_ts_fmt = {
+                    1: '>B',
+                    2: '>H',
+                    3: '>3s',
+                    4: '>I',
+                    6: '>6s',
+                    8: '>Q',
+                }
+                ts_fmt = default_ts_fmt.get(ts_bytes, f'>{ts_bytes}s')
+        else:
+            ts_fmt = None
+
+        wrap_mod = (1 << (ts_bytes * 8)) if ts_bytes else 0
         chunk_bytes = sample_bytes + ts_bytes
         if chunk_bytes <= 0:
             return []
 
         self.get_logger().debug(
-            f'Decode start {device_type}@{addr}: len={len(payload_bytes)} '
+            f'Decode start {device_type}@{addr}: len={payload_len} '
             f'sample_bytes={sample_bytes} ts_bytes={ts_bytes} chunk_bytes={chunk_bytes}'
         )
 
@@ -231,27 +298,44 @@ class SensorPayloadMixin:
             offset += chunk_bytes
 
             ts_wrapped = 0
-            ts_unwrapped = None
+            timestamp_us = None
             payload = chunk
-            if ts_bytes:
+            if ts_bytes and ts_fmt:
                 ts_part = chunk[:ts_bytes]
                 payload = chunk[ts_bytes:]
                 try:
                     ts_tuple = struct.unpack(ts_fmt, ts_part)
-                    ts_wrapped = ts_tuple[0] if ts_tuple else 0
+                    raw_component = ts_tuple[0] if ts_tuple else 0
+                    if isinstance(raw_component, (bytes, bytearray)):
+                        ts_wrapped = int.from_bytes(raw_component, 'big')
+                    else:
+                        ts_wrapped = int(raw_component)
                 except Exception:
                     ts_wrapped = int.from_bytes(ts_part, 'big')
-                if wrap_mod:
-                    ts_unwrapped = self._unwrap_device_timestamp(key, ts_wrapped, wrap_mod)
+                timestamp_us = self._unwrap_device_timestamp(
+                    key,
+                    ts_wrapped,
+                    wrap_mod,
+                    resolution_us,
+                )
             else:
                 payload = chunk
 
-            values = self._decode_attribute_block(payload, attr_defs)
+            if resp_meta.get('c'):
+                values = self._decode_custom_attribute_block(payload, resp_meta)
+            else:
+                values = self._decode_attribute_block(payload, attr_defs)
+            ts_ms = None
+            if timestamp_us is not None:
+                ts_ms = timestamp_us / 1000.0
             self.get_logger().debug(
-                f'Decoded sample {device_type}@{addr}: ts={ts_unwrapped} '
+                f'Decoded sample {device_type}@{addr}: ts_us={timestamp_us} '
                 f'values={json.dumps(values, default=str)}'
             )
-            samples.append({'timestamp_ms': ts_unwrapped, 'values': values})
+            sample_entry = {'timestamp_ms': ts_ms, 'values': values}
+            if timestamp_us is not None:
+                sample_entry['timestamp_us'] = timestamp_us
+            samples.append(sample_entry)
 
         if offset < len(payload_bytes):
             remainder = payload_bytes[offset:]
@@ -262,115 +346,208 @@ class SensorPayloadMixin:
 
         return samples
 
-    def _unwrap_device_timestamp(self, key, ts_wrapped: int, wrap_mod: int) -> int:
+    def _unwrap_device_timestamp(
+        self,
+        key,
+        ts_wrapped: int,
+        wrap_mod: int,
+        resolution_us: int,
+    ) -> int:
         state = getattr(self, '_device_ts_state', None)
         if state is None:
             self._device_ts_state = {}
             state = self._device_ts_state
-        last, offset = state.get(key, (0, 0))
-        if ts_wrapped < last:
-            offset += wrap_mod
-        state[key] = (ts_wrapped, offset)
-        return offset + ts_wrapped
+
+        entry = state.get(key)
+        if not isinstance(entry, dict):
+            if isinstance(entry, tuple) and len(entry) == 2:
+                last_raw, raw_offset = entry
+                offset_us = raw_offset * (resolution_us or 1)
+                entry = {
+                    'last_base_us': last_raw * (resolution_us or 1),
+                    'offset_us': offset_us,
+                    'last_raw': last_raw,
+                }
+            else:
+                entry = {'last_base_us': None, 'offset_us': 0, 'last_raw': None}
+
+        base_us = ts_wrapped * resolution_us if resolution_us else ts_wrapped
+        last_base_us = entry.get('last_base_us')
+        offset_us = entry.get('offset_us', 0)
+
+        if wrap_mod:
+            if resolution_us:
+                # Treat a backwards jump greater than 100 ms as a wrap event (matches JS logic)
+                threshold_us = 100_000
+                if last_base_us is not None and base_us + threshold_us < last_base_us:
+                    offset_us += wrap_mod * resolution_us
+            else:
+                last_raw = entry.get('last_raw')
+                if last_raw is not None and ts_wrapped < last_raw:
+                    offset_us += wrap_mod
+
+        entry['last_base_us'] = base_us
+        entry['offset_us'] = offset_us
+        entry['last_raw'] = ts_wrapped
+        state[key] = entry
+        return base_us + offset_us
 
     def _decode_attribute_block(self, payload: bytes, attr_defs: List[Dict[str, Any]]):
-        cursor = 0
+        logger = self.get_logger()
+        decoder = self._get_attr_decoder()
+        decoded_attrs = decoder.decode_block(payload, attr_defs, logger=logger)
+
         results: Dict[str, Dict[str, Any]] = {}
+        for entry in decoded_attrs:
+            processed = self._post_process_value(entry.value, entry.meta)
+            si_value, si_unit = self._to_si_units(processed, entry.meta.get('u'))
+            results[entry.name] = {
+                'value': processed,
+                'unit': entry.meta.get('u'),
+                'si_value': si_value,
+                'si_unit': si_unit,
+                'raw': entry.raw_value,
+                'meta': entry.meta,
+            }
+            logger.debug(
+                f'Attr decoded {entry.name}: raw={entry.raw_bytes.hex()} fmt={entry.meta.get("t")} '
+                f'si={si_value} unit={entry.meta.get("u")}'
+            )
+        self._apply_validation_links(attr_defs, results)
+        return results
+
+    def _apply_validation_links(
+        self,
+        attr_defs: List[Dict[str, Any]],
+        results: Dict[str, Dict[str, Any]],
+    ) -> None:
         for attr in attr_defs:
-            fmt = attr.get('t')
-            name = attr.get('n') or f'field_{cursor}'
-            if not fmt:
+            validator_name = attr.get('vft')
+            target_name = attr.get('n')
+            if not validator_name or not target_name:
                 continue
-            try:
-                size = struct.calcsize(fmt)
-            except Exception:
+            target_entry = results.get(target_name)
+            validator_entry = results.get(validator_name)
+            if not target_entry or not validator_entry:
                 continue
-            if cursor + size > len(payload):
-                break
-            raw_bytes = payload[cursor : cursor + size]
-            cursor += size
-            try:
-                raw_value = struct.unpack(fmt, raw_bytes)
-            except Exception:
+
+            validator_value = validator_entry.get('value')
+            validator_series = (
+                list(validator_value)
+                if isinstance(validator_value, list)
+                else [validator_value]
+            )
+            validator_flags = [bool(v) for v in validator_series]
+
+            target_value = target_entry.get('value')
+            target_series = (
+                list(target_value)
+                if isinstance(target_value, list)
+                else [target_value]
+            )
+            target_si = target_entry.get('si_value')
+            target_si_series = (
+                list(target_si)
+                if isinstance(target_si, list)
+                else [target_si]
+            )
+
+            changed = False
+            count = min(len(target_series), len(validator_flags))
+            for idx in range(count):
+                if not validator_flags[idx]:
+                    target_series[idx] = math.nan
+                    if idx < len(target_si_series):
+                        target_si_series[idx] = math.nan
+                    changed = True
+
+            if not changed:
                 continue
-            value = raw_value if len(raw_value) > 1 else raw_value[0]
-            processed = self._post_process_value(value, attr)
+
+            if isinstance(target_value, list):
+                target_entry['value'] = target_series
+            else:
+                target_entry['value'] = target_series[0]
+
+            if isinstance(target_si, list):
+                target_entry['si_value'] = target_si_series
+            else:
+                target_entry['si_value'] = target_si_series[0]
+
+    def _decode_custom_attribute_block(
+        self,
+        payload: bytes,
+        resp_meta: Dict[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        handler = self._get_custom_attr_handler()
+        attr_values = handler.handle_attr(resp_meta, payload)
+        if not attr_values:
+            return {}
+
+        attr_defs = resp_meta.get('a') or []
+        results: Dict[str, Dict[str, Any]] = {}
+
+        for attr in attr_defs:
+            name = attr.get('n')
+            if not name:
+                continue
+
+            raw_values = attr_values.get(name, [])
+            if isinstance(raw_values, list):
+                raw_collapsed: Any
+                if len(raw_values) == 1:
+                    raw_collapsed = raw_values[0]
+                else:
+                    raw_collapsed = list(raw_values)
+            else:
+                raw_collapsed = raw_values
+
+            processed = self._post_process_value(raw_collapsed, attr)
             si_value, si_unit = self._to_si_units(processed, attr.get('u'))
+
             results[name] = {
                 'value': processed,
                 'unit': attr.get('u'),
                 'si_value': si_value,
                 'si_unit': si_unit,
-                'raw': value,
+                'raw': raw_collapsed,
                 'meta': attr,
             }
-            self.get_logger().debug(
-                f'Attr decoded {name}: raw={raw_bytes.hex()} fmt={fmt} '
-                f'si={si_value} unit={attr.get("u")}'
-            )
+
+        self._apply_validation_links(attr_defs, results)
         return results
 
     def _post_process_value(self, value: Any, attr: Dict[str, Any]) -> Any:
         if isinstance(value, tuple):
             value = list(value)
 
-        if isinstance(value, int):
-            mask = self._parse_numeric(attr.get('m'))
-            xor = self._parse_numeric(attr.get('x'))
-            if mask is not None:
-                xor_val = xor or 0
-                value = (value ^ int(xor_val)) & int(mask)
-            shift = self._parse_numeric(attr.get('s'))
-            if shift:
-                value = value >> int(shift)
-
-        divisor = attr.get('d')
-        if divisor:
-            try:
-                divisor = float(divisor)
-                if divisor:
-                    if isinstance(value, list):
-                        value = [v / divisor for v in value]
-                    else:
-                        value = value / divisor
-            except Exception:
-                pass
-
         output = str(attr.get('o') or '').lower()
         if output == 'bool':
-            value = bool(value)
-        elif output in ('float', 'double'):
             if isinstance(value, list):
-                value = [float(v) for v in value]
-            else:
-                value = float(value)
-        elif output.startswith('uint') or output.startswith('int'):
+                return [bool(v) for v in value]
+            return bool(value)
+        if output in ('float', 'double'):
             if isinstance(value, list):
-                value = [int(v) for v in value]
-            else:
-                value = int(value)
+                try:
+                    return [float(v) for v in value]
+                except Exception:
+                    return value
+            try:
+                return float(value)
+            except Exception:
+                return value
+        if output.startswith('uint') or output.startswith('int'):
+            if isinstance(value, list):
+                try:
+                    return [int(v) for v in value]
+                except Exception:
+                    return value
+            try:
+                return int(value)
+            except Exception:
+                return value
 
         return value
-
-    def _parse_numeric(self, value: Any):
-        if value is None:
-            return None
-        if isinstance(value, (int, float)):
-            return value
-        if isinstance(value, str):
-            text = value.strip()
-            if not text:
-                return None
-            try:
-                if text.lower().startswith('0x'):
-                    return int(text, 16)
-                return int(text)
-            except ValueError:
-                try:
-                    return float(text)
-                except ValueError:
-                    return None
-        return None
 
     _SI_CONVERSIONS = {
         '&deg;/s': ('rad/s', lambda v: float(v) * math.pi / 180.0),
