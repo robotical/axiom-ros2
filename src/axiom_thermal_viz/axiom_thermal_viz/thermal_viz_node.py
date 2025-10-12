@@ -221,3 +221,4 @@ def main(args: Optional[Sequence[str]] = None) -> None:
 
 
 __all__ = ['ThermalGridVisualizer', 'main']
+ 
