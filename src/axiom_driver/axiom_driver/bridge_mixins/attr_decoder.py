@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import struct
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
@@ -44,6 +45,8 @@ class DecodedAttribute:
 class AttrBlockDecoder:
     """Decode attribute blocks described by Raft device metadata."""
 
+    _ARRAY_FORMAT_PATTERN = re.compile(r'([xcbB?hHiIlLqQnNefdspP])\[(\d+)\]')
+
     def decode_block(
         self,
         payload: bytes,
@@ -68,8 +71,10 @@ class AttrBlockDecoder:
         if not fmt:
             return _SKIP
 
+        normalized_fmt = self._normalize_format(fmt)
+
         try:
-            size = struct.calcsize(fmt)
+            size = struct.calcsize(normalized_fmt)
         except struct.error:
             if logger:
                 logger.debug(f"Skip attr {attr.get('n')} invalid format: {fmt}")
@@ -122,7 +127,7 @@ class AttrBlockDecoder:
             return _BREAK if not uses_absolute else _SKIP
 
         try:
-            raw_tuple = struct.unpack(fmt, raw_bytes)
+            raw_tuple = struct.unpack(normalized_fmt, raw_bytes)
         except struct.error:
             if logger:
                 logger.debug(
@@ -130,8 +135,8 @@ class AttrBlockDecoder:
                 )
             return _SKIP
 
-        mask_on_signed = attr.get('m') is not None and self._is_format_signed(fmt)
-        ops_fmt = self._format_for_operations(fmt, mask_on_signed)
+        mask_on_signed = attr.get('m') is not None and self._is_format_signed(normalized_fmt)
+        ops_fmt = self._format_for_operations(normalized_fmt, mask_on_signed)
 
         try:
             ops_tuple = struct.unpack(ops_fmt, raw_bytes)
@@ -140,7 +145,7 @@ class AttrBlockDecoder:
             ops_tuple = raw_tuple
 
         values_for_ops = list(ops_tuple)
-        item_width = self._infer_item_width(fmt)
+        item_width = self._infer_item_width(normalized_fmt)
         processed_values = self._apply_operations(values_for_ops, attr, mask_on_signed, item_width)
 
         raw_value = self._collapse_values(raw_tuple)
@@ -315,6 +320,14 @@ class AttrBlockDecoder:
         if len(seq) == 1:
             return seq[0]
         return seq
+
+    def _normalize_format(self, fmt: str) -> str:
+        if '[' not in fmt:
+            return fmt
+        return self._ARRAY_FORMAT_PATTERN.sub(
+            lambda match: f'{match.group(2)}{match.group(1)}',
+            fmt,
+        )
 
     def _parse_numeric(self, value: Any) -> Optional[float]:
         if value is None:

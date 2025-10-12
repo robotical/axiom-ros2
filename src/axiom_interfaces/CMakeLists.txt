@@ -13,6 +13,7 @@ set(msg_files
   "msg/Imu6.msg"
   "msg/AxiomPowerState.msg"
   "msg/VL53L4CDReading.msg"
+  "msg/ThermalGrid.msg"
 )
 
 set(srv_files

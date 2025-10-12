@@ -736,6 +736,62 @@ class SensorPayloadMixin:
                 pub = self.publisher_cache.get(topic, RelativeHumidity)
                 pub.publish(msg)
 
+        if dtype == 'AMG8833':
+            temp_attr_name = None
+            temp_entry: Optional[Dict[str, Any]] = None
+            for candidate in ('temp', 'temperature', 'tempC', 't'):
+                entry = values.get(candidate)
+                if entry:
+                    temp_attr_name = candidate
+                    temp_entry = entry
+                    break
+
+            if not temp_entry or not temp_attr_name:
+                return
+
+            temps = self._extract_numeric_series(temp_entry)
+
+            if not temps:
+                return
+
+            temps = self._convert_series_to_celsius(temps, temp_entry.get('unit'))
+
+            width, height = self._resolve_thermal_dimensions(
+                temp_attr_name,
+                temp_entry,
+                devinfo,
+                len(temps),
+            )
+
+            if width <= 0 or height <= 0:
+                width = len(temps)
+                height = 1
+
+            if width * height != len(temps):
+                self.get_logger().debug(
+                    f'AMG8833 grid mismatch len={len(temps)} width={width} height={height}; flattening row'
+                )
+                width = len(temps)
+                height = 1
+
+            try:
+                from axiom_interfaces.msg import ThermalGrid
+            except ImportError:
+                self.get_logger().warn('ThermalGrid message type not available')
+                return
+
+            msg = ThermalGrid()
+            msg.header.frame_id = frame_id
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.width = int(width)
+            msg.height = int(height)
+            msg.temperature_c = [float(v) for v in temps]
+
+            topic = f'{device_type}_{addr}/thermal/grid'
+            pub = self.publisher_cache.get(topic, ThermalGrid)
+            pub.publish(msg)
+            return
+
         if dtype == 'AXIOMPOWERV1':
             try:
                 from axiom_interfaces.msg import AxiomPowerState
@@ -771,7 +827,97 @@ class SensorPayloadMixin:
             pub = self.publisher_cache.get(topic, AxiomPowerState)
             pub.publish(msg)
             return
-        
+
+    def _extract_numeric_series(self, entry: Dict[str, Any]) -> List[float]:
+        if not isinstance(entry, dict):
+            return []
+
+        for key in ('si_value', 'value', 'raw'):
+            series = entry.get(key)
+            values = self._coerce_float_list(series)
+            if values:
+                return values
+        return []
+
+    def _coerce_float_list(self, series: Any) -> List[float]:
+        if isinstance(series, (list, tuple)):
+            result: List[float] = []
+            for item in series:
+                try:
+                    result.append(float(item))
+                except (TypeError, ValueError):
+                    continue
+            return result
+        if series is None:
+            return []
+        try:
+            return [float(series)]
+        except (TypeError, ValueError):
+            return []
+
+    def _convert_series_to_celsius(self, series: List[float], unit: Any) -> List[float]:
+        if not series:
+            return []
+        if not isinstance(unit, str):
+            return series
+
+        normalized = unit.replace('&deg;', '°').strip().lower()
+        if not normalized or normalized in {'°c', 'c', 'celsius', 'degc'}:
+            return series
+        if normalized in {'°f', 'f', 'fahrenheit', 'degf'}:
+            return [(val - 32.0) * (5.0 / 9.0) for val in series]
+        if normalized in {'k', 'kelvin'}:
+            return [val - 273.15 for val in series]
+        return series
+
+    def _resolve_thermal_dimensions(
+        self,
+        attr_name: str,
+        entry: Dict[str, Any],
+        devinfo: Optional[Dict[str, Any]],
+        sample_len: int,
+    ) -> tuple[int, int]:
+        meta_candidates: List[Dict[str, Any]] = []
+        if isinstance(entry.get('meta'), dict):
+            meta_candidates.append(entry['meta'])
+
+        if isinstance(devinfo, dict):
+            resp = devinfo.get('resp')
+            if isinstance(resp, dict):
+                attr_defs = resp.get('a')
+                if isinstance(attr_defs, list):
+                    for attr in attr_defs:
+                        if not isinstance(attr, dict):
+                            continue
+                        if attr.get('n') == attr_name:
+                            meta_candidates.append(attr)
+                            break
+
+        for meta in meta_candidates:
+            width, height = self._parse_resolution_spec(meta.get('resolution') or meta.get('res'))
+            if width > 0 and height > 0:
+                return width, height
+
+        if sample_len > 0:
+            side = int(math.isqrt(sample_len))
+            if side * side == sample_len:
+                return side, side
+
+        return 0, 0
+
+    def _parse_resolution_spec(self, spec: Any) -> tuple[int, int]:
+        if not isinstance(spec, str):
+            return 0, 0
+        text = spec.replace('×', 'x').lower()
+        if 'x' not in text:
+            return 0, 0
+        left, right = text.split('x', 1)
+        try:
+            width = int(left.strip())
+            height = int(right.strip())
+        except ValueError:
+            return 0, 0
+        return width, height
 
     def _select_si(self, entry: Dict[str, Any]) -> float:
         si_val = entry.get('si_value')
