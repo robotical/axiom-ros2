@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence, Tuple
 
@@ -54,6 +55,7 @@ class ThermalGridVisualizer(Node):
         self.declare_parameter('max_temperature', float('nan'))
         self.declare_parameter('use_dynamic_range', True)
         self.declare_parameter('frame_fallback', 'thermal_link')
+        self.declare_parameter('interpolation_factor', 1)
 
         input_topic = self.get_parameter('input_topic').value
         output_topic = self.get_parameter('output_topic').value
@@ -110,6 +112,14 @@ class ThermalGridVisualizer(Node):
             self.get_logger().debug('Unable to determine temperature range for color scaling')
             return
 
+        interpolation = self._interpolation_factor(
+            self.get_parameter('interpolation_factor').value
+        )
+        if interpolation > 1:
+            temps, width, height = self._upsample_temperatures(
+                temps, width, height, interpolation
+            )
+
         marker = Marker()
         marker.header = msg.header
         if not marker.header.frame_id:
@@ -119,7 +129,8 @@ class ThermalGridVisualizer(Node):
         marker.type = Marker.CUBE_LIST
         marker.action = Marker.ADD
 
-        cell_size = float(self.get_parameter('cell_size').value)
+        base_cell_size = float(self.get_parameter('cell_size').value)
+        cell_size = base_cell_size / interpolation if interpolation > 1 else base_cell_size
         cell_height = float(self.get_parameter('cell_height').value)
         marker.scale.x = cell_size
         marker.scale.y = cell_size
@@ -207,6 +218,69 @@ class ThermalGridVisualizer(Node):
             return False
         return hi > lo
 
+    @staticmethod
+    def _interpolation_factor(raw_value: object) -> int:
+        try:
+            value = int(round(float(raw_value)))
+        except (TypeError, ValueError):
+            return 1
+        if value < 1:
+            return 1
+        return value
+
+    def _upsample_temperatures(
+        self,
+        temps: Sequence[float],
+        width: int,
+        height: int,
+        factor: int,
+    ) -> Tuple[List[float], int, int]:
+        if factor <= 1 or width <= 0 or height <= 0:
+            return list(temps), width, height
+
+        rows: List[Sequence[float]] = [
+            temps[row * width: (row + 1) * width]
+            for row in range(height)
+        ]
+
+        new_width = width * factor
+        new_height = height * factor
+        upsampled: List[float] = [0.0] * (new_width * new_height)
+
+        for new_row in range(new_height):
+            if height == 1:
+                src_y = 0.0
+            else:
+                src_y = (
+                    (new_row / (new_height - 1)) * (height - 1)
+                    if new_height > 1
+                    else 0.0
+                )
+            y0 = int(math.floor(src_y))
+            y1 = min(y0 + 1, height - 1)
+            fy = clamp(src_y - y0, 0.0, 1.0)
+
+            for new_col in range(new_width):
+                if width == 1:
+                    src_x = 0.0
+                else:
+                    src_x = (
+                        (new_col / (new_width - 1)) * (width - 1)
+                        if new_width > 1
+                        else 0.0
+                    )
+                x0 = int(math.floor(src_x))
+                x1 = min(x0 + 1, width - 1)
+                fx = clamp(src_x - x0, 0.0, 1.0)
+
+                top = self._lerp(rows[y0][x0], rows[y0][x1], fx)
+                bottom = self._lerp(rows[y1][x0], rows[y1][x1], fx)
+                value = self._lerp(top, bottom, fy)
+
+                upsampled[new_row * new_width + new_col] = value
+
+        return upsampled, new_width, new_height
+
 
 def main(args: Optional[Sequence[str]] = None) -> None:
     rclpy.init(args=args)
@@ -221,4 +295,3 @@ def main(args: Optional[Sequence[str]] = None) -> None:
 
 
 __all__ = ['ThermalGridVisualizer', 'main']
- 

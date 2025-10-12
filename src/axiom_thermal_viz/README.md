@@ -31,7 +31,8 @@
 | `input_topic`        | `AMG8833_169/thermal/grid`        | Source topic with `ThermalGrid` messages. |
 | `output_topic`       | `thermal_heatmap`                 | Marker topic published for RViz. |
 | `marker_namespace`   | `thermal_grid`                    | Namespace used for the marker message. |
-| `cell_size`          | `0.02`                            | Side length (metres) of each grid cell. |
+| `cell_size`          | `0.02`                            | Side length (metres) of each base grid cell. |
+| `interpolation_factor` | `1`                             | Bilinear upsampling factor for smoother visualisation (`1` keeps the raw grid). |
 | `cell_height`        | `0.001`                           | Z scale (metres) of each cube marker. |
 | `alpha`              | `0.95`                            | Alpha component applied to all cubes. |
 | `min_temperature`    | `nan`                             | Fixed minimum (°C) for colour mapping. Ignored when `use_dynamic_range` is `true`. |
