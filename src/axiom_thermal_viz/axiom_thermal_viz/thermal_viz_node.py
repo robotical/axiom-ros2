@@ -14,6 +14,8 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
+from rclpy.qos import DurabilityPolicy
+
 
 @dataclass(frozen=True)
 class ColorStop:
@@ -55,14 +57,16 @@ class ThermalGridVisualizer(Node):
 
         input_topic = self.get_parameter('input_topic').value
         output_topic = self.get_parameter('output_topic').value
-        qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+        
+        pub_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
+        sub_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
 
-        self._publisher = self.create_publisher(Marker, output_topic, qos)
-        self._subscription = self.create_subscription(  # noqa: F841
+        self._publisher = self.create_publisher(Marker, output_topic, pub_qos)
+        self._subscription = self.create_subscription(
             ThermalGrid,
             input_topic,
             self._handle_grid,
-            qos,
+            sub_qos,
         )
 
         self.get_logger().info(
