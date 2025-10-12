@@ -40,3 +40,12 @@ ros2 topic echo /LSM6DS_76a/imu/data_raw --full-length
 create package with:
 go to the src in root and:
 ros2 pkg create --build-type ament_python <package_name> --dependencies rclpy
+
+
+<!-- thermal cam viz -->
+
+in rviz under global options change map to axiom_link
+have the driver running and subscribe to published data
+run the axiom_thermal_viz node:
+ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p interpolation_factor:=4 ( don't specify interpolation_factor if you want raw 8x8 grid)
+open up rviz2 and add a marker display and set the topic to /thermal_heatmap
