@@ -66,9 +66,8 @@ class ThermalGridVisualizer(Node):
         )
 
         self.get_logger().info(
-            'Listening for ThermalGrid on %s → publishing heatmap markers on %s',
-            input_topic,
-            output_topic,
+            f'Listening for ThermalGrid on {input_topic} '
+            f'→ publishing heatmap markers on {output_topic}'
         )
 
     def _handle_grid(self, msg: ThermalGrid) -> None:
@@ -82,7 +81,7 @@ class ThermalGridVisualizer(Node):
 
         temps = list(msg.temperature_c)
         if len(temps) < total:
-            self.get_logger().warn(
+            self.get_logger().warning(
                 f'ThermalGrid sample mismatch: expected {total} points but received {len(temps)}'
             )
             return
