@@ -1,0 +1,15 @@
+# Replace the USB paths with each board's /dev/serial/by-id path on Linux.
+# This starts two disconnected drivers; connect and enable acquisition yourself.
+axioms:
+  axiom/front:
+    transport: serial
+    serial.port: /dev/ttyACM0
+    topic_aliases:
+      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      range: {type: VL53L4CD, source: range}
+  axiom/rear:
+    transport: serial
+    serial.port: /dev/ttyACM1
+    topic_aliases:
+      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      range: {type: VL53L4CD, source: range}

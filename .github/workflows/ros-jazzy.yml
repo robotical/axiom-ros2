@@ -1,0 +1,10 @@
+name: ROS Jazzy firmware alignment
+on: [push, pull_request]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clean ROS build and firmware-peer integration
+        run: ./scripts/validate_ros.sh

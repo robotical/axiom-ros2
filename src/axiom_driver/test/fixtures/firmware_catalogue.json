@@ -1,0 +1,3017 @@
+{
+  "source_commit": "0941576",
+  "sources": [
+    {
+      "path": "RoboticalAxiom1/AxiomDevTypes/DeviceTypeRecords.json",
+      "sha256": "303a23aaa1ccbde404637ab67ae3bc6415a4b5e1b4dbd97aaf61584244654f07"
+    },
+    {
+      "path": "RoboticalAxiom1/AxiomDevTypes/RSAOTypeRecords.json",
+      "sha256": "8ee67837ae0d5f616c4dff73a6f5bd9742420f7ce17ac84c64117003cffdbac1"
+    }
+  ],
+  "records": {
+    "VCNL4040": {
+      "name": "Light Sensor (ambient & proximity)",
+      "desc": "",
+      "manu": "Vishay",
+      "type": "VCNL4040",
+      "clas": [
+        "PROX",
+        "LGHT"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "prox",
+            "t": "<H",
+            "u": "",
+            "r": [
+              0,
+              65535
+            ],
+            "d": 0,
+            "f": "5d",
+            "o": "uint16"
+          },
+          {
+            "n": "als",
+            "t": "<H",
+            "u": "lux",
+            "r": [
+              0,
+              65535
+            ],
+            "d": 10,
+            "f": "5.2f",
+            "o": "float"
+          },
+          {
+            "n": "white",
+            "t": "<H",
+            "u": "lux",
+            "r": [
+              0,
+              65535
+            ],
+            "d": 10,
+            "f": "5.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "VL6180": {
+      "name": "Distance Sensor",
+      "desc": "",
+      "manu": "ST",
+      "type": "VL6180",
+      "clas": [
+        "DIST"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool",
+            "vs": false
+          },
+          {
+            "n": "dist",
+            "t": "B",
+            "u": "mm",
+            "r": [
+              0,
+              255
+            ],
+            "f": "3d",
+            "o": "float",
+            "vft": "valid"
+          }
+        ]
+      }
+    },
+    "VL53L0X": {
+      "name": "Distance Sensor",
+      "desc": "",
+      "manu": "ST",
+      "type": "VL53L0X",
+      "clas": [
+        "DIST"
+      ],
+      "resp": {
+        "b": 12,
+        "a": [
+          {
+            "n": "valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool",
+            "m": "0x78",
+            "s": 3,
+            "vs": false,
+            "lut": [
+              {
+                "r": "11",
+                "v": 1
+              },
+              {
+                "r": "",
+                "v": 0
+              }
+            ]
+          },
+          {
+            "n": "status",
+            "t": "B",
+            "at": 0,
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "vs": false
+          },
+          {
+            "n": "dist",
+            "at": 10,
+            "t": ">H",
+            "u": "mm",
+            "r": [
+              0,
+              2000
+            ],
+            "f": "4d",
+            "o": "uint16",
+            "vft": "valid"
+          }
+        ]
+      }
+    },
+    "VL53L1X": {
+      "name": "Distance Sensor",
+      "desc": "",
+      "manu": "ST",
+      "type": "VL53L1X",
+      "clas": [
+        "DIST"
+      ],
+      "resp": {
+        "b": 3,
+        "a": [
+          {
+            "n": "valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x04",
+            "x": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool",
+            "vs": false
+          },
+          {
+            "n": "dist",
+            "t": ">H",
+            "u": "mm",
+            "r": [
+              0,
+              4000
+            ],
+            "f": "4d",
+            "o": "uint16",
+            "vft": "valid"
+          }
+        ]
+      }
+    },
+    "VL53L4CD": {
+      "name": "Distance Sensor",
+      "desc": "",
+      "manu": "ST",
+      "type": "VL53L4CD",
+      "clas": [
+        "DIST"
+      ],
+      "resp": {
+        "b": 3,
+        "a": [
+          {
+            "n": "valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x04",
+            "x": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool",
+            "vs": false
+          },
+          {
+            "n": "dist",
+            "t": ">H",
+            "u": "mm",
+            "r": [
+              0,
+              1000
+            ],
+            "f": "3d",
+            "o": "uint16",
+            "vft": "valid"
+          }
+        ]
+      }
+    },
+    "MAX30101": {
+      "name": "Heart Sensor",
+      "desc": "Rate and SpO2",
+      "manu": "Vishay",
+      "type": "MAX30101",
+      "clas": [
+        "HRM"
+      ],
+      "resp": {
+        "b": 51,
+        "a": [
+          {
+            "n": "Red",
+            "t": ">I",
+            "u": "Red",
+            "r": [
+              0,
+              16777215
+            ],
+            "f": "6d",
+            "o": "uint32"
+          },
+          {
+            "n": "IR",
+            "t": ">I",
+            "u": "IR",
+            "r": [
+              0,
+              16777215
+            ],
+            "f": "6d",
+            "o": "uint32"
+          }
+        ],
+        "c": {
+          "n": "max30101_fifo",
+          "c": "int N=(buf[0]+32-buf[2])%32;int k=3;int i=0;while(i<N){out.Red=(buf[k]<<16)|(buf[k+1]<<8)|buf[k+2];out.IR=(buf[k+3]<<16)|(buf[k+4]<<8)|buf[k+5];k+=6;i++;next;}"
+        },
+        "us": 40000
+      }
+    },
+    "ADXL313": {
+      "name": "Accelerometer",
+      "desc": "3-Axis Accel",
+      "manu": "Analog Devices",
+      "type": "ADXL313",
+      "clas": [
+        "ACC"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "ax",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 1024,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ay",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 1024,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "az",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 1024,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "MXC400xXC": {
+      "name": "Accelerometer",
+      "desc": "3-Axis Accel",
+      "manu": "Memsic",
+      "type": "MXC400xXC",
+      "clas": [
+        "ACC"
+      ],
+      "resp": {
+        "b": 7,
+        "a": [
+          {
+            "n": "ax",
+            "t": ">h",
+            "u": "g",
+            "r": [
+              -2.0,
+              2.0
+            ],
+            "d": 16384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ay",
+            "t": ">h",
+            "u": "g",
+            "r": [
+              -2.0,
+              2.0
+            ],
+            "d": 16384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "az",
+            "t": ">h",
+            "u": "g",
+            "r": [
+              -2.0,
+              2.0
+            ],
+            "d": 16384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "temperature",
+            "t": "b",
+            "u": "&deg;C",
+            "r": [
+              -10,
+              40
+            ],
+            "d": 0.586,
+            "a": 25,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "MMC5603": {
+      "name": "Magnetometer",
+      "desc": "3-Axis Mag",
+      "manu": "MEMSIC",
+      "type": "MMC5603",
+      "clas": [
+        "MAG"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "x",
+            "t": ">H",
+            "u": "&micro;T",
+            "r": [
+              -3000,
+              3000
+            ],
+            "d": 10,
+            "a": -3276.8,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "y",
+            "t": ">H",
+            "u": "&micro;T",
+            "r": [
+              -3000,
+              3000
+            ],
+            "d": 10,
+            "a": -3276.8,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "z",
+            "t": ">H",
+            "u": "&micro;T",
+            "r": [
+              -3000,
+              3000
+            ],
+            "d": 10,
+            "a": -3276.8,
+            "f": ".1f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "LSM6DS": {
+      "name": "Accelerometer & Gyroscope",
+      "desc": "6-Axis IMU",
+      "manu": "ST",
+      "type": "LSM6DS",
+      "clas": [
+        "ACC",
+        "GYRO"
+      ],
+      "resp": {
+        "b": 244,
+        "a": [
+          {
+            "n": "gx",
+            "t": "<h",
+            "u": "&deg;/s",
+            "r": [
+              -2000,
+              2000
+            ],
+            "d": 16.384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "gy",
+            "t": "<h",
+            "u": "&deg;/s",
+            "r": [
+              -2000,
+              2000
+            ],
+            "d": 16.384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "gz",
+            "t": "<h",
+            "u": "&deg;/s",
+            "r": [
+              -2000,
+              2000
+            ],
+            "d": 16.384,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ax",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 8192,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ay",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 8192,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "az",
+            "t": "<h",
+            "u": "g",
+            "r": [
+              -4.0,
+              4.0
+            ],
+            "d": 8192,
+            "f": ".2f",
+            "o": "float"
+          }
+        ],
+        "c": {
+          "n": "lsm6ds_fifo",
+          "c": "int W=((buf[1]&0x0F)<<8)|buf[0];int P=((buf[3]&0x03)<<8)|buf[2];int skip=(6-P%6)%6;int N=(W-skip)/6;int maxN=(240-skip*2)/12;if(N>maxN){N=maxN;}if(N<1){N=0;}int k=4+skip*2;int i=0;while(i<N){out.gx=(buf[k+1]<<8)|buf[k];out.gy=(buf[k+3]<<8)|buf[k+2];out.gz=(buf[k+5]<<8)|buf[k+4];out.ax=(buf[k+7]<<8)|buf[k+6];out.ay=(buf[k+9]<<8)|buf[k+8];out.az=(buf[k+11]<<8)|buf[k+10];k+=12;i++;next;}"
+        },
+        "us": 9615
+      },
+      "actions": [
+        {
+          "n": "_conf.rate",
+          "t": "B",
+          "r": [
+            12.5,
+            416
+          ],
+          "d": 104,
+          "desc": "Sensor ODR (Hz)",
+          "map": {
+            "12.5": {
+              "w": "0a00&1018&111C&0630&0700&0a0E",
+              "i": 100000,
+              "s": 5
+            },
+            "26": {
+              "w": "0a00&1028&112C&0630&0700&0a16",
+              "i": 100000,
+              "s": 5
+            },
+            "52": {
+              "w": "0a00&1038&113C&0630&0700&0a1E",
+              "i": 50000,
+              "s": 10
+            },
+            "104": {
+              "w": "0a00&1048&114C&0630&0700&0a26",
+              "i": 50000,
+              "s": 20
+            },
+            "208": {
+              "w": "0a00&1058&115C&0630&0700&0a2E",
+              "i": 25000,
+              "s": 30
+            },
+            "416": {
+              "w": "0a00&1068&116C&06c0&0700&0a36",
+              "i": 15000,
+              "s": 50
+            }
+          }
+        }
+      ]
+    },
+    "TMP117": {
+      "name": "Temperature Sensor",
+      "desc": "",
+      "manu": "Texas Instruments",
+      "type": "TMP117",
+      "clas": [
+        "TEMP"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "temperature",
+            "t": ">h",
+            "u": "&deg;C",
+            "r": [
+              -256,
+              256
+            ],
+            "d": 128,
+            "a": 0,
+            "f": "3.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "SHT40": {
+      "name": "Temperature & Humidity Sensor",
+      "desc": "",
+      "manu": "Sensirion",
+      "type": "SHT40",
+      "clas": [
+        "TEMP",
+        "RH"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "temperature",
+            "t": ">H",
+            "u": "&deg;C",
+            "r": [
+              -45,
+              130
+            ],
+            "d": 374.48571428571427,
+            "a": -45,
+            "f": "3.2f",
+            "o": "float"
+          },
+          {
+            "n": "humidity",
+            "at": 3,
+            "t": ">H",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "d": 524.28,
+            "a": -6,
+            "f": "3.1f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "SGP30": {
+      "name": "Gas Sensor (VOC)",
+      "desc": "",
+      "manu": "Sensirion",
+      "type": "SGP30",
+      "clas": [
+        "VOC"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "eCO2",
+            "t": ">H",
+            "u": "ppm",
+            "r": [
+              400,
+              60000
+            ],
+            "f": "5d",
+            "o": "uint16"
+          },
+          {
+            "n": "VOC",
+            "t": ">H",
+            "u": "ppb",
+            "r": [
+              0,
+              60000
+            ],
+            "f": "5d",
+            "o": "uint16"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "setBaseline",
+          "t": ">HH",
+          "w": "201e",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 0
+        },
+        {
+          "n": "setHumidity",
+          "t": ">H",
+          "w": "2061",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 0
+        }
+      ]
+    },
+    "SGP40": {
+      "name": "SGP40",
+      "desc": "Gas Sensor",
+      "manu": "Sensirion",
+      "type": "SGP40",
+      "clas": [
+        "VOC"
+      ],
+      "resp": {
+        "b": 3,
+        "a": [
+          {
+            "n": "vocTicks",
+            "t": ">H",
+            "u": "ticks",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "5d",
+            "o": "uint16"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "setHumidity",
+          "t": ">H",
+          "w": "2601",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 32768
+        },
+        {
+          "n": "setTemperature",
+          "t": ">H",
+          "w": "2602",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 26214
+        }
+      ]
+    },
+    "AHT20": {
+      "name": "Temperature & Humidity Sensor",
+      "desc": "",
+      "manu": "Asair",
+      "type": "AHT20",
+      "clas": [
+        "TEMP",
+        "RH"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "status",
+            "t": "B",
+            "u": "",
+            "f": "02x",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "humidity",
+            "t": ">I",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "m": "0xfffff000",
+            "s": 12,
+            "d": 10485.76,
+            "f": "3.1f",
+            "o": "float"
+          },
+          {
+            "n": "temperature",
+            "at": 2,
+            "t": ">I",
+            "u": "&deg;C",
+            "r": [
+              -40,
+              80
+            ],
+            "m": "0x000fffff",
+            "d": 5242.88,
+            "a": -50,
+            "f": "3.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "MCP9808": {
+      "name": "Temperature Sensor",
+      "desc": "",
+      "manu": "Microchip",
+      "type": "MCP9808",
+      "clas": [
+        "TEMP"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "temp",
+            "t": ">H",
+            "u": "&deg;C",
+            "r": [
+              -40,
+              125
+            ],
+            "m": "0x1fff",
+            "d": 16,
+            "sb": 12,
+            "ss": 4096,
+            "f": "3.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "LPS25": {
+      "name": "Pressure Sensor",
+      "desc": "",
+      "manu": "ST",
+      "type": "LPS25",
+      "clas": [
+        "PRES",
+        "TEMP"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "status",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "m": "0xff",
+            "f": "02x",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "pressure",
+            "at": 0,
+            "t": "<I",
+            "u": "hPa",
+            "r": [
+              260,
+              1260
+            ],
+            "s": 8,
+            "d": 4096,
+            "f": "4.2f",
+            "o": "float"
+          },
+          {
+            "n": "temperature",
+            "at": 4,
+            "t": "<h",
+            "u": "&deg;C",
+            "r": [
+              -30,
+              105
+            ],
+            "d": 480,
+            "a": 42.5,
+            "f": "3.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "MPRLS": {
+      "name": "Pressure Sensor",
+      "desc": "",
+      "manu": "Honeywell",
+      "type": "MPRLS",
+      "clas": [
+        "PRES"
+      ],
+      "resp": {
+        "b": 4,
+        "a": [
+          {
+            "n": "status",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "m": "0xff",
+            "f": "02x",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "pressure",
+            "at": 0,
+            "m": "0x00ffffff",
+            "t": ">I",
+            "u": "Pa",
+            "r": [
+              0,
+              173
+            ],
+            "a": -21625,
+            "d": 77.583,
+            "f": "4.2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "CAP1203": {
+      "name": "Capacitive Touch",
+      "desc": "",
+      "manu": "Sparkfun",
+      "type": "CAP1203",
+      "clas": [
+        "TCH"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "A",
+            "at": 1,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x01",
+            "s": 0,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "B",
+            "at": 1,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x02",
+            "s": 1,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "C",
+            "at": 1,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "status",
+            "t": ">H",
+            "vs": false,
+            "f": "04x",
+            "o": "uint16"
+          }
+        ]
+      }
+    },
+    "QwiicButton": {
+      "name": "QWIIC Button",
+      "desc": "",
+      "manu": "Sparkfun",
+      "type": "QwiicButton",
+      "clas": [
+        "BTN"
+      ],
+      "resp": {
+        "b": 1,
+        "a": [
+          {
+            "n": "press",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "m": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "brightness",
+          "t": "B",
+          "w": "19",
+          "r": [
+            0,
+            255
+          ]
+        },
+        {
+          "n": "granularity",
+          "t": "B",
+          "w": "1a",
+          "r": [
+            1,
+            255
+          ]
+        },
+        {
+          "n": "cycle time",
+          "t": "<H",
+          "w": "1b",
+          "r": [
+            0,
+            65535
+          ]
+        },
+        {
+          "n": "off time",
+          "t": "<H",
+          "w": "1d",
+          "r": [
+            0,
+            65535
+          ]
+        }
+      ]
+    },
+    "MAX17048": {
+      "name": "Battery Fuel Gauge",
+      "desc": "",
+      "manu": "Analog Devices",
+      "type": "MAX17048",
+      "clas": [
+        "FUEL",
+        "BATT"
+      ],
+      "resp": {
+        "b": 7,
+        "a": [
+          {
+            "n": "voltage",
+            "t": ">H",
+            "u": "V",
+            "r": [
+              0,
+              5.12
+            ],
+            "d": 12800,
+            "f": ".3f",
+            "o": "float"
+          },
+          {
+            "n": "charge",
+            "t": ">H",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "d": 256,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "chargeRate",
+            "t": ">h",
+            "u": "%/hr",
+            "r": [
+              -100,
+              100
+            ],
+            "d": 4.808,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "status",
+            "t": "B",
+            "at": 6,
+            "r": [
+              0,
+              255
+            ],
+            "m": "0xff",
+            "f": "02x",
+            "o": "uint8",
+            "vs": false
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "config",
+          "t": ">H",
+          "w": "0c",
+          "f": "B",
+          "r": [
+            0,
+            65536
+          ],
+          "d": 38656
+        },
+        {
+          "n": "reset config",
+          "w": "0c9700"
+        }
+      ]
+    },
+    "AS5600": {
+      "name": "Magnetic Encoder",
+      "desc": "",
+      "manu": "AMS",
+      "type": "AS5600",
+      "clas": [
+        "ANG"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "angle",
+            "t": ">H",
+            "u": "degrees",
+            "r": [
+              0,
+              360
+            ],
+            "f": "3.1f",
+            "o": "float",
+            "d": 11.377777777777778
+          }
+        ]
+      }
+    },
+    "M5Encoder": {
+      "name": "Rotary Encoder",
+      "desc": "",
+      "manu": "M5Stack",
+      "type": "M5Encoder",
+      "clas": [
+        "ROT"
+      ],
+      "resp": {
+        "b": 4,
+        "a": [
+          {
+            "n": "rotation",
+            "t": "<H",
+            "u": "steps",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "04x",
+            "o": "uint16"
+          },
+          {
+            "n": "press",
+            "t": "<H",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x01",
+            "m": "0x01",
+            "f": "b",
+            "o": "bool"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "pixels",
+          "t": "BBBB",
+          "w": "30",
+          "f": "LEDPIX",
+          "NX": 2,
+          "NY": 1,
+          "concat": false,
+          "r": [
+            0,
+            255
+          ]
+        }
+      ]
+    },
+    "AdafruitGamepad": {
+      "name": "Adafruit Gamepad",
+      "desc": "",
+      "manu": "Adafruit",
+      "type": "Gamepad",
+      "clas": [
+        "GAME"
+      ],
+      "resp": {
+        "b": 8,
+        "a": [
+          {
+            "n": "x",
+            "t": ">H",
+            "r": [
+              0,
+              65535
+            ],
+            "d": -1,
+            "a": 1023,
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "y",
+            "t": ">H",
+            "r": [
+              0,
+              65535
+            ],
+            "d": -1,
+            "a": 1023,
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "SELECT",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x01",
+            "m": "0x01",
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "B",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x02",
+            "m": "0x02",
+            "s": 1,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "Y",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x04",
+            "m": "0x04",
+            "s": 2,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "A",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x20",
+            "m": "0x20",
+            "s": 5,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "X",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x40",
+            "m": "0x40",
+            "s": 6,
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "START",
+            "at": 5,
+            "t": "B",
+            "r": [
+              0,
+              1
+            ],
+            "x": "0x01",
+            "m": "0x01",
+            "f": "b",
+            "o": "bool"
+          }
+        ]
+      }
+    },
+    "QwiicLEDStick": {
+      "name": "RGB LED Stick",
+      "desc": "",
+      "manu": "Sparkfun",
+      "type": "QwiicLEDStick",
+      "clas": [
+        "PIX"
+      ],
+      "actions": [
+        {
+          "n": "pixels",
+          "t": "BBBB",
+          "w": "71",
+          "f": "LEDPIX",
+          "NX": 10,
+          "NY": 1,
+          "concat": false,
+          "r": [
+            0,
+            255
+          ]
+        },
+        {
+          "n": "brightness",
+          "t": "B",
+          "w": "76",
+          "r": [
+            0,
+            255
+          ],
+          "d": 50
+        },
+        {
+          "n": "off",
+          "w": "78"
+        }
+      ]
+    },
+    "HX711": {
+      "name": "Force Sensor",
+      "desc": "",
+      "manu": "Avia",
+      "type": "HX711",
+      "clas": [
+        "FRCE"
+      ],
+      "resp": {
+        "b": 5,
+        "a": [
+          {
+            "n": "force",
+            "t": ">I",
+            "u": "N",
+            "r": [
+              -10000,
+              10000
+            ],
+            "m": "0x00ffffff",
+            "d": 44000,
+            "sb": 23,
+            "f": ".3f",
+            "o": "float"
+          },
+          {
+            "n": "valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    "AdafruitSoilSensor": {
+      "name": "Soil Moisture Sensor",
+      "desc": "",
+      "manu": "Adafruit",
+      "type": "AdafruitSoilSensor",
+      "clas": [
+        "SOIL"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "moisture",
+            "t": ">H",
+            "u": "",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "temperature",
+            "t": ">I",
+            "u": "\u00b0C",
+            "r": [
+              -45,
+              175
+            ],
+            "d": 65535,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "SCD30": {
+      "name": "CO2 Sensor",
+      "desc": "",
+      "manu": "Sensirion",
+      "type": "SCD30",
+      "clas": [
+        "CO2",
+        "TEMP",
+        "RH"
+      ],
+      "resp": {
+        "b": 24,
+        "a": [
+          {
+            "n": "CO2",
+            "t": ">f",
+            "at": [
+              6,
+              7,
+              9,
+              10
+            ],
+            "u": "ppm",
+            "r": [
+              0,
+              40000
+            ],
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "temperature",
+            "t": ">f",
+            "at": [
+              12,
+              13,
+              15,
+              16
+            ],
+            "u": "C",
+            "r": [
+              -40,
+              125
+            ],
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "humidity",
+            "t": ">f",
+            "at": [
+              18,
+              19,
+              21,
+              22
+            ],
+            "u": "%RH",
+            "r": [
+              0,
+              100
+            ],
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      }
+    },
+    "SCD40": {
+      "name": "CO2 Sensor",
+      "desc": "",
+      "manu": "Sensirion",
+      "type": "SCD40",
+      "clas": [
+        "CO2",
+        "TEMP",
+        "RH"
+      ],
+      "resp": {
+        "b": 9,
+        "a": [
+          {
+            "n": "CO2",
+            "t": ">H",
+            "u": "ppm",
+            "r": [
+              0,
+              40000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "temperature",
+            "t": ">H",
+            "u": "\u00b0C",
+            "r": [
+              -45,
+              175
+            ],
+            "d": 65535,
+            "a": -45,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "humidity",
+            "t": ">H",
+            "u": "%RH",
+            "r": [
+              0,
+              100
+            ],
+            "d": 65535,
+            "f": ".2f",
+            "o": "float"
+          }
+        ],
+        "c": {
+          "n": "scd40_calc",
+          "c": "out.CO2 = buf[0]; out.temperature = -45.0 + (175.0 * buf[1] / 65535.0); out.humidity = (100.0 * buf[2] / 65535.0);"
+        }
+      },
+      "actions": [
+        {
+          "n": "temperatureOffset",
+          "t": ">H",
+          "w": "241d",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 1498
+        },
+        {
+          "n": "altitude",
+          "t": ">H",
+          "w": "2427",
+          "r": [
+            0,
+            3000
+          ],
+          "d": 0
+        },
+        {
+          "n": "ambientPressure",
+          "t": ">H",
+          "w": "e000",
+          "r": [
+            700,
+            1200
+          ],
+          "d": 1013
+        },
+        {
+          "n": "autoCalibration",
+          "t": ">H",
+          "w": "2416",
+          "r": [
+            0,
+            1
+          ],
+          "d": 1
+        },
+        {
+          "n": "calibrationTarget",
+          "t": ">H",
+          "w": "243a",
+          "r": [
+            0,
+            65535
+          ],
+          "d": 400
+        }
+      ]
+    },
+    "STCC4": {
+      "name": "CO2 Sensor",
+      "desc": "CO2, Temp & Humidity",
+      "manu": "Sensirion",
+      "type": "STCC4",
+      "clas": [
+        "CO2",
+        "TEMP",
+        "RH"
+      ],
+      "resp": {
+        "b": 12,
+        "a": [
+          {
+            "n": "CO2",
+            "at": 0,
+            "t": ">H",
+            "u": "ppm",
+            "r": [
+              0,
+              40000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "temperature",
+            "at": 3,
+            "t": ">H",
+            "u": "&deg;C",
+            "r": [
+              -45,
+              130
+            ],
+            "d": 374.48571428571427,
+            "a": -45,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "humidity",
+            "at": 6,
+            "t": ">H",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "d": 524.28,
+            "a": -6,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "status",
+            "at": 9,
+            "t": ">H",
+            "u": "",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "04x",
+            "o": "uint16",
+            "vs": false
+          }
+        ]
+      }
+    },
+    "GravityO2": {
+      "name": "Oxygen Sensor",
+      "desc": "",
+      "manu": "DFRobot",
+      "type": "GravityO2",
+      "clas": [
+        "O2"
+      ],
+      "resp": {
+        "b": 3,
+        "a": [
+          {
+            "n": "oxygen",
+            "t": "BBB",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "f": ".2f",
+            "o": "float"
+          }
+        ],
+        "c": {
+          "n": "gravity_o2_calc",
+          "c": "float key = 20.9/120.0; float val = key * (buf[0] + (buf[1]/10.0) + (buf[2]/100.0)); out.oxygen = val;"
+        }
+      },
+      "actions": [
+        {
+          "n": "calibrate",
+          "t": "B",
+          "w": "08",
+          "r": [
+            0,
+            255
+          ],
+          "d": 209
+        }
+      ]
+    },
+    "AMG8833": {
+      "name": "Thermal Camera",
+      "desc": "",
+      "manu": "Panasonic",
+      "type": "AMG8833",
+      "clas": [
+        "TCAM"
+      ],
+      "resp": {
+        "b": 128,
+        "a": [
+          {
+            "n": "temperature",
+            "t": "<h[64]",
+            "resolution": "8x8",
+            "u": "&deg;C",
+            "r": [
+              -55,
+              125
+            ],
+            "s": -4,
+            "d": 64,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "LTR-329": {
+      "name": "Light Sensor (IR and visible)",
+      "desc": "",
+      "manu": "Lite On",
+      "type": "LTR-329",
+      "clas": [
+        "LGHT"
+      ],
+      "resp": {
+        "b": 4,
+        "a": [
+          {
+            "n": "ir",
+            "t": "<h",
+            "u": "lux",
+            "r": [
+              0,
+              64000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "visible",
+            "t": "<h",
+            "u": "lux",
+            "r": [
+              0,
+              64000
+            ],
+            "f": "d",
+            "o": "uint16"
+          }
+        ],
+        "c": {
+          "n": "ltr329_light_calc",
+          "c": "int combined = buf[2] + (((uint16_t)buf[3])<<8); out.ir = buf[0] + (((uint16_t)buf[1])<<8); out.visible = combined - out.ir;",
+          "j": "let combined = buf[2] + (buf[3]<<8); let ir = buf[0] + (buf[1]<<8); attrValues['ir'].push(ir); attrValues['visible'].push(combined-ir);"
+        }
+      },
+      "actions": []
+    },
+    "LTR-390": {
+      "name": "Light Sensor (UV and visible)",
+      "desc": "",
+      "manu": "Lite On",
+      "type": "LTR-390",
+      "clas": [
+        "LGHT"
+      ],
+      "resp": {
+        "b": 5,
+        "a": [
+          {
+            "n": "ambient",
+            "t": "<H",
+            "u": "lux",
+            "r": [
+              0,
+              64000
+            ],
+            "d": 1.25,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "UVI",
+            "at": 3,
+            "t": "<H",
+            "u": "index",
+            "r": [
+              0,
+              64000
+            ],
+            "d": 24,
+            "f": ".3f",
+            "o": "float"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "M5-Weight": {
+      "name": "Weight Sensor",
+      "desc": "",
+      "manu": "M5 Stack",
+      "type": "M5-Weight",
+      "clas": [
+        "WGHT"
+      ],
+      "resp": {
+        "b": 8,
+        "a": [
+          {
+            "n": "weight",
+            "t": "<f",
+            "u": "g",
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ADC",
+            "t": "<I",
+            "u": "",
+            "f": ".3f",
+            "o": "int"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "RoboticalLightSensor": {
+      "name": "Light Sensor",
+      "desc": "",
+      "manu": "Robotical",
+      "type": "RoboticalLightSensor",
+      "clas": [
+        "LGHT"
+      ],
+      "resp": {
+        "b": 7,
+        "a": [
+          {
+            "n": "status",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "x",
+            "o": "uint8"
+          },
+          {
+            "n": "right",
+            "t": ">H",
+            "r": [
+              0,
+              1023
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "center",
+            "t": ">H",
+            "r": [
+              0,
+              1023
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "left",
+            "t": ">H",
+            "r": [
+              0,
+              1023
+            ],
+            "f": "d",
+            "o": "uint16"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "RoboticalServo": {
+      "name": "Servo Motor",
+      "desc": "",
+      "manu": "Robotical",
+      "type": "RoboticalServo",
+      "clas": [
+        "SRVO"
+      ],
+      "resp": {
+        "b": 6,
+        "a": [
+          {
+            "n": "angle",
+            "t": ">h",
+            "r": [
+              -180.0,
+              180.0
+            ],
+            "f": ".1f",
+            "d": 10,
+            "o": "int16",
+            "u": "degrees"
+          },
+          {
+            "n": "current",
+            "t": "b",
+            "r": [
+              -128,
+              127
+            ],
+            "f": "d",
+            "o": "int8"
+          },
+          {
+            "n": "state",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8"
+          },
+          {
+            "n": "velocity",
+            "t": ">h",
+            "r": [
+              -32768,
+              32767
+            ],
+            "f": "d",
+            "o": "int16"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "angle",
+          "t": ">h",
+          "w": "0001",
+          "wz": "0064",
+          "f": ".1f",
+          "mul": 10,
+          "sub": 0,
+          "r": [
+            -180.0,
+            180.0
+          ],
+          "d": 0
+        },
+        {
+          "n": "enable",
+          "t": "B",
+          "w": "20",
+          "f": "b",
+          "r": [
+            0,
+            1
+          ],
+          "d": 1
+        }
+      ]
+    },
+    "RoboticalWaterPump": {
+      "name": "Water Pump",
+      "desc": "",
+      "manu": "Robotical",
+      "type": "RoboticalWaterPump",
+      "clas": [
+        "PUMP"
+      ],
+      "resp": {
+        "b": 4,
+        "a": [
+          {
+            "n": "angle",
+            "t": ">h",
+            "r": [
+              -180.0,
+              180.0
+            ],
+            "f": ".1f",
+            "d": 10,
+            "o": "int16",
+            "u": "degrees"
+          },
+          {
+            "n": "current",
+            "t": "b",
+            "r": [
+              -128,
+              127
+            ],
+            "f": "d",
+            "o": "int8"
+          },
+          {
+            "n": "state",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "power",
+          "t": ">h",
+          "w": "0001",
+          "wz": "0064",
+          "f": ".1f",
+          "mul": 10,
+          "sub": 0,
+          "r": [
+            -180.0,
+            180.0
+          ],
+          "d": 0
+        },
+        {
+          "n": "enable",
+          "t": "B",
+          "w": "20",
+          "f": "b",
+          "r": [
+            0,
+            1
+          ],
+          "d": 1
+        }
+      ]
+    },
+    "RoboticalDCMotor": {
+      "name": "DC Motor",
+      "desc": "",
+      "manu": "Robotical",
+      "type": "RoboticalDCMotor",
+      "clas": [
+        "MOTR"
+      ],
+      "resp": {
+        "b": 4,
+        "a": [
+          {
+            "n": "angle",
+            "t": ">h",
+            "r": [
+              -180.0,
+              180.0
+            ],
+            "f": ".1f",
+            "d": 10,
+            "o": "int16",
+            "u": "degrees"
+          },
+          {
+            "n": "current",
+            "t": "b",
+            "r": [
+              -128,
+              127
+            ],
+            "f": "d",
+            "o": "int8"
+          },
+          {
+            "n": "state",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "power",
+          "t": ">h",
+          "w": "0001",
+          "wz": "0064",
+          "f": ".1f",
+          "mul": 10,
+          "sub": 0,
+          "r": [
+            -180.0,
+            180.0
+          ],
+          "d": 0
+        },
+        {
+          "n": "enable",
+          "t": "B",
+          "w": "20",
+          "f": "b",
+          "r": [
+            0,
+            1
+          ],
+          "d": 1
+        }
+      ]
+    },
+    "RoboticalAngleSensor": {
+      "name": "Angle Sensor",
+      "desc": "Potentiometer",
+      "manu": "Robotical",
+      "type": "RoboticalAngleSensor",
+      "clas": [
+        "ANGL"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "angle",
+            "t": ">h",
+            "r": [
+              -180.0,
+              180.0
+            ],
+            "f": ".1f",
+            "d": 10,
+            "o": "int16",
+            "u": "degrees"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "RoboticalLEDRing": {
+      "name": "RGB LED Ring",
+      "desc": "12 RGB",
+      "manu": "Robotical",
+      "type": "RoboticalLEDRing",
+      "clas": [
+        "LED"
+      ],
+      "resp": {
+        "b": 1,
+        "a": [
+          {
+            "n": "status",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "pixels",
+          "t": "BBBB",
+          "w": "04",
+          "f": "LEDPIX",
+          "NX": 3,
+          "NY": 1,
+          "concat": false,
+          "r": [
+            0,
+            255
+          ]
+        },
+        {
+          "n": "brightness",
+          "t": "B",
+          "w": "FF01",
+          "wz": "&p100",
+          "f": "b",
+          "r": [
+            0,
+            255
+          ],
+          "d": 100
+        }
+      ]
+    },
+    "RoboticalThermocoupleAmp": {
+      "name": "Temperature Probe",
+      "desc": "",
+      "manu": "Robotical",
+      "type": "Thermocouple",
+      "clas": [
+        "TEMP"
+      ],
+      "resp": {
+        "b": 2,
+        "a": [
+          {
+            "n": "temperature",
+            "t": ">h",
+            "u": "&deg;C",
+            "r": [
+              -270,
+              1372
+            ],
+            "d": 16,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "RoboticalVCP": {
+      "name": "Voltage/Current/Power",
+      "desc": "4-channel V/I sensor (3 voltage + 1 current), FIFO",
+      "manu": "Robotical",
+      "type": "RoboticalVCP",
+      "clas": [
+        "POWR"
+      ],
+      "resp": {
+        "b": 132,
+        "us": 10000,
+        "a": [
+          {
+            "n": "V1",
+            "t": ">h",
+            "u": "V",
+            "r": [
+              -32.768,
+              32.767
+            ],
+            "d": 1000,
+            "f": ".3f",
+            "o": "int16"
+          },
+          {
+            "n": "V2",
+            "t": ">h",
+            "u": "V",
+            "r": [
+              -32.768,
+              32.767
+            ],
+            "d": 1000,
+            "f": ".3f",
+            "o": "int16"
+          },
+          {
+            "n": "V3",
+            "t": ">h",
+            "u": "V",
+            "r": [
+              -32.768,
+              32.767
+            ],
+            "d": 1000,
+            "f": ".3f",
+            "o": "int16"
+          },
+          {
+            "n": "I",
+            "t": ">h",
+            "u": "A",
+            "r": [
+              -32.768,
+              32.767
+            ],
+            "d": 1000,
+            "f": ".3f",
+            "o": "int16"
+          },
+          {
+            "n": "ovf",
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "vs": 0,
+            "desc": "Samples the board dropped since the previous poll - non-zero means the poll interval is too long for the FIFO to hold a full interval of samples, and the gaps are not visible in the traces"
+          }
+        ],
+        "c": {
+          "n": "vcp_fifo",
+          "c": "int N=buf[0];int M=buf[1];int CH=buf[2];int OV=buf[3];int k=4;int s=0;if(M==1){while(s<N){out.V1=(buf[k]<<8)|buf[k+1];out.V2=(buf[k+2]<<8)|buf[k+3];out.V3=(buf[k+4]<<8)|buf[k+5];out.I=(buf[k+6]<<8)|buf[k+7];out.ovf=OV;k+=8;s++;next;}}if(M==2){while(s<N){int x=(buf[k]<<8)|buf[k+1];int a1=0;int a2=0;int a3=0;int a4=0;if(CH==0){a1=x;}if(CH==1){a2=x;}if(CH==2){a3=x;}if(CH==3){a4=x;}out.V1=a1;out.V2=a2;out.V3=a3;out.I=a4;out.ovf=OV;k+=2;s++;next;}}"
+        }
+      },
+      "actions": [
+        {
+          "n": "mode",
+          "t": "B",
+          "w": "30",
+          "r": [
+            0,
+            2
+          ],
+          "f": "d",
+          "d": 1
+        },
+        {
+          "n": "channel",
+          "t": "B",
+          "w": "31",
+          "r": [
+            0,
+            3
+          ],
+          "f": "d",
+          "d": 1,
+          "desc": "Channel measured in mode 2 (single-channel). LOGICAL channel: 0=V1, 1=V2, 2=V3, 3=I. Not an ADS1120 AIN number - the board wires the voltage senses in the opposite order (V1 on AIN2, V3 on AIN0), which the firmware hides behind VCP_CHANNEL_AIN_MAP."
+        },
+        {
+          "n": "_conf.rate",
+          "t": ">H",
+          "r": [
+            10,
+            1000
+          ],
+          "d": 100,
+          "desc": "Output sample rate per channel (SPS). The ADC always runs flat out; this sets how many conversions are averaged into each output sample, so a lower rate is quieter, not coarser. Named _conf.rate so the master moves its poll interval with it - a device rate change alone would silently drop frames, since one poll carries at most 16 frames in mode 1 (4-channel, 8-byte frames) or 64 samples in mode 2 (single channel, 2-byte samples). Rates must divide 1000 exactly and not exceed 1000 - the device rejects anything else rather than rounding, so e.g. 400 is not available. 125/200/250 work in either mode; 500 and 1000 are above the ~440 SPS/ch mode-1 ADC ceiling and are mode 2 only. Each map entry picks the poll interval giving ~28% catch-up headroom over the production rate, with s holding ~1s of history.",
+          "map": {
+            "10": {
+              "w": "3b000a",
+              "i": 500000,
+              "s": 2
+            },
+            "20": {
+              "w": "3b0014",
+              "i": 500000,
+              "s": 2
+            },
+            "25": {
+              "w": "3b0019",
+              "i": 500000,
+              "s": 2
+            },
+            "50": {
+              "w": "3b0032",
+              "i": 250000,
+              "s": 4
+            },
+            "100": {
+              "w": "3b0064",
+              "i": 125000,
+              "s": 8
+            },
+            "125": {
+              "w": "3b007d",
+              "i": 100000,
+              "s": 10
+            },
+            "200": {
+              "w": "3b00c8",
+              "i": 40000,
+              "s": 20
+            },
+            "250": {
+              "w": "3b00fa",
+              "i": 32000,
+              "s": 20
+            },
+            "500": {
+              "w": "3b01f4",
+              "i": 64000,
+              "s": 16
+            },
+            "1000": {
+              "w": "3b03e8",
+              "i": 32000,
+              "s": 20
+            }
+          }
+        },
+        {
+          "n": "flush",
+          "t": "B",
+          "w": "34",
+          "r": [
+            0,
+            1
+          ],
+          "f": "b",
+          "d": 0
+        },
+        {
+          "n": "start",
+          "t": "B",
+          "w": "35",
+          "r": [
+            0,
+            1
+          ],
+          "f": "b",
+          "d": 1
+        },
+        {
+          "n": "stop",
+          "t": "B",
+          "w": "36",
+          "r": [
+            0,
+            1
+          ],
+          "f": "b",
+          "d": 0
+        },
+        {
+          "n": "isenseEn",
+          "t": "B",
+          "w": "39",
+          "r": [
+            0,
+            1
+          ],
+          "f": "b",
+          "d": 1,
+          "desc": "Current-sense front-end enable (EN_ISENSE)"
+        },
+        {
+          "n": "calibrate",
+          "w": "3800",
+          "vt": "vcpcal",
+          "desc": "Per-channel linear calibration from an Excel fit (reading = k*true + c)"
+        }
+      ]
+    },
+    "RoboticalSoundSensor": {
+      "name": "Sound Sensor",
+      "desc": "Audio statistics (levels/spectral), no recording",
+      "manu": "Robotical",
+      "type": "RoboticalSoundSensor",
+      "clas": [
+        "SND"
+      ],
+      "resp": {
+        "b": 32,
+        "a": [
+          {
+            "n": "splSlow",
+            "at": 18,
+            "t": ">h",
+            "u": "dBA",
+            "r": [
+              -120.0,
+              130.0
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "splFast",
+            "at": 31,
+            "t": "B",
+            "u": "dBA",
+            "r": [
+              -100,
+              155
+            ],
+            "a": -100,
+            "f": "d",
+            "o": "int16"
+          },
+          {
+            "n": "rms",
+            "at": 2,
+            "t": ">h",
+            "u": "dB",
+            "r": [
+              -120.0,
+              130.0
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "peak",
+            "at": 4,
+            "t": ">h",
+            "u": "dB",
+            "r": [
+              -120.0,
+              130.0
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "crest",
+            "at": 6,
+            "t": "B",
+            "u": "dB",
+            "r": [
+              0.0,
+              63.75
+            ],
+            "d": 4,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "zcr",
+            "at": 7,
+            "t": "B",
+            "r": [
+              0.0,
+              1.0
+            ],
+            "d": 255,
+            "f": ".3f",
+            "o": "float"
+          },
+          {
+            "n": "centroid",
+            "at": 8,
+            "t": ">H",
+            "u": "Hz",
+            "r": [
+              0,
+              8000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "spread",
+            "at": 10,
+            "t": ">H",
+            "u": "Hz",
+            "r": [
+              0,
+              8000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "flatness",
+            "at": 12,
+            "t": "B",
+            "r": [
+              0.0,
+              1.0
+            ],
+            "d": 255,
+            "f": ".3f",
+            "o": "float"
+          },
+          {
+            "n": "rolloff85",
+            "at": 13,
+            "t": ">H",
+            "u": "Hz",
+            "r": [
+              0,
+              8000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "flux",
+            "at": 15,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "o": "uint8"
+          },
+          {
+            "n": "f0",
+            "at": 16,
+            "t": ">H",
+            "u": "Hz",
+            "r": [
+              0,
+              8000
+            ],
+            "f": "d",
+            "o": "uint16"
+          },
+          {
+            "n": "bands",
+            "at": 20,
+            "t": "B[9]",
+            "u": "dB",
+            "eu": "Hz",
+            "el": [
+              "31.5",
+              "63",
+              "125",
+              "250",
+              "500",
+              "1k",
+              "2k",
+              "4k",
+              "8k"
+            ],
+            "r": [
+              -100,
+              155
+            ],
+            "a": -100,
+            "f": "d",
+            "o": "int16",
+            "vs": false,
+            "vt": "spectrum"
+          },
+          {
+            "n": "seq",
+            "at": 0,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "status",
+            "at": 1,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "clipCount",
+            "at": 30,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "o": "uint8"
+          }
+        ]
+      },
+      "actions": []
+    },
+    "RoboticalLiquidSensor": {
+      "name": "Liquid Sensor",
+      "desc": "pH or ORP, dissolved oxygen, conductivity, temperature",
+      "manu": "Robotical",
+      "type": "RoboticalLiquidSensor",
+      "clas": [
+        "LIQD"
+      ],
+      "resp": {
+        "b": 20,
+        "a": [
+          {
+            "n": "status",
+            "at": 0,
+            "t": ">H",
+            "f": "d",
+            "o": "uint16",
+            "desc": "bit0 temp valid, bit1 pH cal, bit2 DO cal, bit3 EC cal, bit4 DS18B20 present, bit5 EC drive active, bit6 cal capture pending, bits 8-11 phase (0 idle 1 temp 2 pH 3 DO 4 EC), bit12 phase held, bit15 fault"
+          },
+          {
+            "n": "temperature",
+            "at": 2,
+            "t": ">h",
+            "u": "&deg;C",
+            "r": [
+              -55,
+              125
+            ],
+            "d": 16,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "pH",
+            "at": 4,
+            "t": ">H",
+            "r": [
+              0,
+              14
+            ],
+            "d": 1000,
+            "f": ".3f",
+            "o": "float"
+          },
+          {
+            "n": "doSat",
+            "at": 6,
+            "t": ">H",
+            "u": "%",
+            "r": [
+              0,
+              200
+            ],
+            "d": 10,
+            "f": ".1f",
+            "o": "float"
+          },
+          {
+            "n": "doMgL",
+            "at": 8,
+            "t": ">H",
+            "u": "mg/L",
+            "r": [
+              0,
+              20
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "ec",
+            "at": 10,
+            "t": ">H",
+            "u": "uS/cm",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "d",
+            "o": "uint16",
+            "desc": "conductivity compensated to 25 degC"
+          },
+          {
+            "n": "phRawMv",
+            "at": 12,
+            "t": ">h",
+            "u": "mV",
+            "r": [
+              -32768,
+              32767
+            ],
+            "f": "d",
+            "o": "int16",
+            "desc": "pH amplifier output at the ADC pin, absolute mV (unity gain, centred on the 1.500 V reference at pH 7)"
+          },
+          {
+            "n": "orp",
+            "at": 12,
+            "t": ">h",
+            "u": "mV",
+            "r": [
+              -1000,
+              1000
+            ],
+            "a": -1500,
+            "f": "d",
+            "o": "int16",
+            "desc": "ORP when an ORP probe is on the pH BNC: the same amplifier output minus the 1.500 V reference (Pt electrode vs Ag/AgCl, uncompensated). Reads ~0 mV with a pH probe at pH 7"
+          },
+          {
+            "n": "doRawMv",
+            "at": 14,
+            "t": ">h",
+            "u": "mV",
+            "r": [
+              -32768,
+              32767
+            ],
+            "f": "d",
+            "o": "int16"
+          },
+          {
+            "n": "ecRawStep",
+            "at": 16,
+            "t": ">H",
+            "r": [
+              0,
+              4095
+            ],
+            "f": "d",
+            "o": "uint16",
+            "desc": "cell current step at the drive edges, 12-bit ADC counts through the transimpedance stage"
+          },
+          {
+            "n": "ecBias",
+            "at": 18,
+            "t": ">h",
+            "r": [
+              -32768,
+              32767
+            ],
+            "f": "d",
+            "o": "int16",
+            "desc": "EC amplifier bias level, 12-bit counts"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "phaseHold",
+          "t": "B",
+          "w": "3301",
+          "r": [
+            0,
+            4
+          ],
+          "f": "d",
+          "d": 1,
+          "desc": "Bench: hold one measurement phase (0 idle 1 temp 2 pH 3 DO 4 EC); send phaseAuto to resume the cycle"
+        },
+        {
+          "n": "phaseAuto",
+          "t": "B",
+          "w": "3300",
+          "r": [
+            0,
+            0
+          ],
+          "f": "d",
+          "d": 1,
+          "desc": "Resume the automatic measurement cycle"
+        }
+      ]
+    },
+    "RoboticalSoloServo": {
+      "name": "Solo Servo",
+      "desc": "Single-joint servo (STM32C011)",
+      "manu": "Robotical",
+      "type": "RoboticalSoloServo",
+      "clas": [
+        "SRVO"
+      ],
+      "resp": {
+        "b": 11,
+        "a": [
+          {
+            "n": "angle",
+            "at": 0,
+            "t": ">h",
+            "r": [
+              -180.0,
+              180.0
+            ],
+            "f": ".1f",
+            "d": 10,
+            "o": "int16",
+            "u": "degrees"
+          },
+          {
+            "n": "current",
+            "at": 2,
+            "t": "b",
+            "r": [
+              -128,
+              127
+            ],
+            "f": "d",
+            "o": "int8"
+          },
+          {
+            "n": "state",
+            "at": 3,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8",
+            "desc": "bit0 enabled, bit1 inst current limit, bit2 sustained limit, bit3 busy, bit4 restricted, bit5 paused, bit6 fault"
+          },
+          {
+            "n": "velocity",
+            "at": 4,
+            "t": ">h",
+            "r": [
+              -32768,
+              32767
+            ],
+            "f": "d",
+            "o": "int16"
+          },
+          {
+            "n": "leak",
+            "at": 6,
+            "t": ">H",
+            "r": [
+              0,
+              65535
+            ],
+            "f": "d",
+            "o": "uint16",
+            "desc": "leaky-integrator (sustained current) value"
+          },
+          {
+            "n": "posRaw",
+            "at": 8,
+            "t": ">H",
+            "r": [
+              0,
+              4095
+            ],
+            "f": "d",
+            "o": "uint16",
+            "desc": "raw position sensor reading"
+          },
+          {
+            "n": "fault",
+            "at": 10,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "02x",
+            "o": "uint8",
+            "desc": "bit0 pot intermittent, bit1 pot disconnect, bit2 drive disconnect, bit3 horn position"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "n": "angle",
+          "t": ">h",
+          "w": "0001",
+          "wz": "0064",
+          "f": ".1f",
+          "mul": 10,
+          "sub": 0,
+          "r": [
+            -180.0,
+            180.0
+          ],
+          "d": 0,
+          "desc": "MOVE_NOW, one keypoint, 100 ms"
+        },
+        {
+          "n": "enable",
+          "t": "B",
+          "w": "20",
+          "f": "b",
+          "r": [
+            0,
+            1
+          ],
+          "d": 1,
+          "desc": "CONTROL: 1 enable, 0 disable"
+        }
+      ]
+    }
+  }
+}

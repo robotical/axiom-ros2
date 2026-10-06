@@ -1,0 +1,188 @@
+{
+  "source": "Axiom018 0.1.16-devlib USB capture on 2026-09-29; power record only",
+  "metadata": {
+    "req": "devman/typeinfo?deviceid=0_1",
+    "devinfo": {
+      "name": "Axiom Power Status",
+      "desc": "Power Status",
+      "manu": "Robotical",
+      "type": "RoboAxiomPowerV1",
+      "resp": {
+        "b": 17,
+        "a": [
+          {
+            "n": "battV",
+            "t": ">H",
+            "u": "V",
+            "r": [
+              0,
+              5
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "pmState",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              4
+            ],
+            "f": "d",
+            "o": "uint8_t"
+          },
+          {
+            "n": "powerBtn",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "busPwrSrc",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              3
+            ],
+            "f": "d",
+            "o": "uint8_t"
+          },
+          {
+            "n": "fgSOC",
+            "t": ">H",
+            "u": "%",
+            "r": [
+              0,
+              100
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "fgSOC_valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "fgChgRate",
+            "t": ">h",
+            "u": "%/hr",
+            "r": [
+              -100,
+              100
+            ],
+            "d": 100,
+            "f": ".2f",
+            "o": "float"
+          },
+          {
+            "n": "fgChgRate_valid",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "fgStatus",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              255
+            ],
+            "f": "x",
+            "o": "uint8_t"
+          },
+          {
+            "n": "batteryPresent",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "newBattery",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "usbRequired",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "chargeEn",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          },
+          {
+            "n": "usbPresent",
+            "t": "B",
+            "u": "",
+            "r": [
+              0,
+              1
+            ],
+            "f": "b",
+            "o": "bool"
+          }
+        ]
+      }
+    },
+    "dtIdx": 29,
+    "rslt": "ok",
+    "name": "Power",
+    "role": "system"
+  },
+  "publication": {
+    "_t": 0,
+    "_v": 1,
+    "0": {
+      "1": {
+        "x": "461701a4010001271001000001400100000101",
+        "_t": "AxiomPowerV1"
+      }
+    }
+  }
+}

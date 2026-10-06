@@ -2,7 +2,7 @@
 # Returns the raw JSON text from CMDRESPJSON (with any trailing NUL removed).
 string url_path
 float32 timeout        # seconds (0 = node default)
-string ws_pcol         # optional override: "RICSerial" | "RICFrame" | "RICJSON"
+string ws_pcol         # empty or match session: "RICSerial" | "RICFrame"
 ---
 bool   success
 string json_text

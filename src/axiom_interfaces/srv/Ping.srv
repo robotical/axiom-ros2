@@ -1,4 +1,4 @@
-uint32 payload_size   # optional echo payload size (bytes)
+uint32 payload_size   # optional version-request padding bytes; not an echo test
 ---
 bool success
 float32 rtt_ms

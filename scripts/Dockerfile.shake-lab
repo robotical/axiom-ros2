@@ -1,0 +1,9 @@
+FROM ros:jazzy-ros-base@sha256:c3706ef0a0aa45413c07803cf433602f543b22e45b4855f6fca955c2d8ecc4e8
+ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    python3-serial python3-websocket python3-websockets python3-pytest \
+    python3-matplotlib python3-numpy ros-jazzy-diagnostic-msgs \
+    ros-jazzy-ament-lint-common ros-jazzy-ament-lint-auto \
+    ros-jazzy-rosbag2-storage-mcap \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /ws

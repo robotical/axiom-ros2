@@ -1,51 +1,56 @@
+"""Launch one board, with a parameter file and typed command-line overrides."""
+
+from axiom_driver.config import DEFAULT_PARAMETERS
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description():
-    return LaunchDescription([
-        # Core
-        DeclareLaunchArgument('transport', default_value='ws'),
-        DeclareLaunchArgument('device_uri', default_value='ws://192.168.1.7/devjson'),
-        DeclareLaunchArgument('auto_connect', default_value='true'),
-        DeclareLaunchArgument('frame_id', default_value='axiom_link'),
-        DeclareLaunchArgument('namespace', default_value=''),  # optional namespace
-
-        # Serial
-        DeclareLaunchArgument('serial.port', default_value='/dev/cu.usbmodem2101'),
-        DeclareLaunchArgument('serial.baud', default_value='115200'),
-        DeclareLaunchArgument('serial.timeout', default_value='0.02'),
-        DeclareLaunchArgument('serial.mode', default_value='overascii'),
-        DeclareLaunchArgument('autosub', default_value='false'),
-        DeclareLaunchArgument('serial.devjson_rate_hz', default_value='0.1'),
-
-        # WebSocket (WS)
-        DeclareLaunchArgument('use_dual_ws', default_value='true'),
-        DeclareLaunchArgument('ws_path', default_value='/ws'),
-        DeclareLaunchArgument('ws_pcol', default_value='RICSerial'),  
-
+def runtime_node(context):
+    overrides = {}
+    for name, default in DEFAULT_PARAMETERS.items():
+        value = LaunchConfiguration(name).perform(context)
+        if value == '':
+            continue
+        if isinstance(default, bool):
+            if value.lower() not in ('true', 'false'):
+                raise ValueError(f'{name} must be true or false')
+            overrides[name] = value.lower() == 'true'
+        else:
+            overrides[name] = type(default)(value)
+        # Keep JSON configuration strings as strings when launch evaluates YAML.
+        overrides[name] = ParameterValue(overrides[name], value_type=type(default))
+    return [
         Node(
             package='axiom_driver',
             executable='axiom_bridge_node',
             name='axiom_bridge_node',
             namespace=LaunchConfiguration('namespace'),
-            parameters=[{
-                'transport': LaunchConfiguration('transport'),
-                'device_uri': LaunchConfiguration('device_uri'),
-                'auto_connect': LaunchConfiguration('auto_connect'),
-                'autosub': LaunchConfiguration('autosub'),
-                'frame_id': LaunchConfiguration('frame_id'),
-                'serial.port': LaunchConfiguration('serial.port'),
-                'serial.baud': LaunchConfiguration('serial.baud'),
-                'serial.timeout': LaunchConfiguration('serial.timeout'),
-                'serial.mode': LaunchConfiguration('serial.mode'),
-                'serial.devjson_rate_hz': LaunchConfiguration('serial.devjson_rate_hz'),
-                'use_dual_ws': LaunchConfiguration('use_dual_ws'),
-                'ws_path': LaunchConfiguration('ws_path'),
-                'ws_pcol': LaunchConfiguration('ws_pcol'),
-            }],
-            arguments=['--ros-args', '--log-level', 'INFO'],
+            parameters=[LaunchConfiguration('params_file'), overrides],
+            output='screen',
+        )
+    ]
+
+
+def generate_launch_description():
+    arguments = [
+        DeclareLaunchArgument('namespace', default_value='axiom'),
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=PathJoinSubstitution(
+                [FindPackageShare('axiom_driver'), 'config', 'axiom.yaml']
+            ),
         ),
-    ])
+    ]
+    for name in DEFAULT_PARAMETERS:
+        arguments.append(
+            DeclareLaunchArgument(
+                name,
+                default_value='',
+                description='Override the parameter file value',
+            )
+        )
+    return LaunchDescription(arguments + [OpaqueFunction(function=runtime_node)])

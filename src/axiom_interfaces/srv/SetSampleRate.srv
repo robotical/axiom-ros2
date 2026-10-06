@@ -1,0 +1,10 @@
+# Device identity from the devices inventory. Address is hexadecimal without 0x.
+string bus
+string address
+float64 sample_rate_hz
+---
+bool success
+string message
+float64 sample_rate_hz
+uint64 poll_interval_us
+uint32 retained_poll_results

@@ -6,6 +6,10 @@
   <description>Plotting package for Axiom</description>
   <maintainer email="nikos@robotical.io">NikTheGeek1</maintainer>
   <license>MIT</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <depend>rclpy</depend>
   

@@ -1,4 +1,4 @@
-float32 rate_hz   # frequency of published data (Hz)
+float32 rate_hz   # devjson delivery rate (Hz); zero unsubscribes; not sensor sample rate
 ---
 bool success
 string message

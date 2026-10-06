@@ -7,9 +7,12 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(std_msgs REQUIRED) 
+find_package(std_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
 set(msg_files
+  "msg/ShakeEvent.msg"
+  "msg/DeviceSample.msg"
   "msg/Imu6.msg"
   "msg/AxiomPowerState.msg"
   "msg/VL53L4CDReading.msg"
@@ -17,6 +20,8 @@ set(msg_files
 )
 
 set(srv_files
+  "srv/DeviceCommand.srv"
+  "srv/SetSampleRate.srv"
   "srv/Connect.srv"
   "srv/Disconnect.srv"
   "srv/GetConnectionState.srv"
@@ -28,8 +33,8 @@ set(srv_files
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
-  DEPENDENCIES std_msgs          
+  DEPENDENCIES std_msgs builtin_interfaces
 )
 
-ament_export_dependencies(rosidl_default_runtime std_msgs)  
+ament_export_dependencies(rosidl_default_runtime std_msgs builtin_interfaces)
 ament_package()

@@ -1,6 +1,9 @@
 def find_json_fragments(txt: str):
-    """Return list of (start, end) indices for complete {...} JSON segments.
-    Properly ignores braces inside JSON strings with escapes."""
+    """
+    Return list of (start, end) indices for complete {...} JSON segments.
+
+    Properly ignores braces inside JSON strings with escapes.
+    """
     frags = []
     depth = 0
     start = -1

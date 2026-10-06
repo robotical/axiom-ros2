@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
+import math
 from typing import Iterable, List, Optional, Sequence, Tuple
-
-import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 from axiom_interfaces.msg import ThermalGrid
 from geometry_msgs.msg import Point
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
-
-from rclpy.qos import DurabilityPolicy
 
 
 @dataclass(frozen=True)
@@ -45,7 +42,7 @@ class ThermalGridVisualizer(Node):
 
     def __init__(self) -> None:
         super().__init__('thermal_grid_visualizer')
-        self.declare_parameter('input_topic', 'AMG8833_169/thermal/grid')
+        self.declare_parameter('input_topic', 'bus_1/device_169/thermal/grid')
         self.declare_parameter('output_topic', 'thermal_heatmap')
         self.declare_parameter('marker_namespace', 'thermal_grid')
         self.declare_parameter('cell_size', 0.02)
@@ -59,7 +56,7 @@ class ThermalGridVisualizer(Node):
 
         input_topic = self.get_parameter('input_topic').value
         output_topic = self.get_parameter('output_topic').value
-        
+
         pub_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
         sub_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
 
@@ -116,9 +113,7 @@ class ThermalGridVisualizer(Node):
             self.get_parameter('interpolation_factor').value
         )
         if interpolation > 1:
-            temps, width, height = self._upsample_temperatures(
-                temps, width, height, interpolation
-            )
+            temps, width, height = self._upsample_temperatures(temps, width, height, interpolation)
 
         marker = Marker()
         marker.header = msg.header
@@ -168,10 +163,7 @@ class ThermalGridVisualizer(Node):
         span = max_temp - min_temp
         if span <= 1e-6:
             span = 1e-6
-        return [
-            self._color_from_value((temp - min_temp) / span, alpha)
-            for temp in temps
-        ]
+        return [self._color_from_value((temp - min_temp) / span, alpha) for temp in temps]
 
     def _color_from_value(self, norm: float, alpha: float) -> ColorRGBA:
         norm = clamp(norm)
@@ -239,8 +231,7 @@ class ThermalGridVisualizer(Node):
             return list(temps), width, height
 
         rows: List[Sequence[float]] = [
-            temps[row * width: (row + 1) * width]
-            for row in range(height)
+            temps[row * width: (row + 1) * width] for row in range(height)
         ]
 
         new_width = width * factor
@@ -251,11 +242,7 @@ class ThermalGridVisualizer(Node):
             if height == 1:
                 src_y = 0.0
             else:
-                src_y = (
-                    (new_row / (new_height - 1)) * (height - 1)
-                    if new_height > 1
-                    else 0.0
-                )
+                src_y = (new_row / (new_height - 1)) * (height - 1) if new_height > 1 else 0.0
             y0 = int(math.floor(src_y))
             y1 = min(y0 + 1, height - 1)
             fy = clamp(src_y - y0, 0.0, 1.0)
@@ -264,11 +251,7 @@ class ThermalGridVisualizer(Node):
                 if width == 1:
                     src_x = 0.0
                 else:
-                    src_x = (
-                        (new_col / (new_width - 1)) * (width - 1)
-                        if new_width > 1
-                        else 0.0
-                    )
+                    src_x = (new_col / (new_width - 1)) * (width - 1) if new_width > 1 else 0.0
                 x0 = int(math.floor(src_x))
                 x1 = min(x0 + 1, width - 1)
                 fx = clamp(src_x - x0, 0.0, 1.0)

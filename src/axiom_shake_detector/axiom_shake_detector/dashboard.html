@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom · Movement lab</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#101721;color:#edf3fb}*{box-sizing:border-box}body{margin:0}main{max-width:1120px;margin:auto;padding:44px 28px}header{display:flex;justify-content:space-between;align-items:start;gap:20px}.eyebrow{color:#9eb3c9;font-size:12px;letter-spacing:.16em;text-transform:uppercase}h1{font-weight:650;font-size:38px;letter-spacing:-.04em;margin:10px 0}p{color:#aab9ca;line-height:1.65}#status{padding:9px 14px;border:1px solid #455362;border-radius:30px;font-size:13px;white-space:nowrap}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:28px 0}.card,.chart,.guide{background:#182331;border:1px solid #2b3a4d;border-radius:16px;padding:22px}.label{font-size:13px;color:#aab9ca}.value{font-size:34px;letter-spacing:-.04em;margin-top:10px}.unit{font-size:15px;color:#9eb3c9}.chart{margin-bottom:18px}h2{font-size:17px;font-weight:600;margin:0}.chart-top{display:flex;justify-content:space-between;gap:20px}.legend{display:flex;gap:14px;font-size:12px;flex-wrap:wrap;color:#aab9ca}.legend span:before{content:'●';margin-right:6px;color:var(--c)}canvas{display:block;width:100%;height:220px;margin-top:14px}.lower{display:grid;grid-template-columns:1fr 1fr;gap:18px}.guide p,.guide li{font-size:14px;line-height:1.7;color:#b6c5d6}ol{padding-left:20px}#events{list-style:none;padding:0;margin-bottom:0}#events li{padding:8px 0;border-bottom:1px solid #2b3a4d}code{font-size:12px;overflow-wrap:anywhere;color:#91d8c8}footer{margin-top:22px;font-size:12px;color:#7f94ad}button{background:#24374b;color:#e1ecf9;border:1px solid #405a74;border-radius:8px;padding:8px 12px;cursor:pointer}#flash{color:#70e5b7;min-height:22px;font-size:14px}.hint{font-size:12px;margin-bottom:0}@media(max-width:700px){main{padding:24px 16px}h1{font-size:30px}.cards{gap:8px}.card{padding:15px}.value{font-size:26px}.lower{grid-template-columns:1fr}header{display:block}#status{display:inline-block;margin-top:10px}.legend{gap:8px}}
+</style>
+</head>
+<body><main>
+<header><div><div class="eyebrow">Robotical Axiom / ROS 2</div><h1>Movement lab</h1><p>Move the board. See the measurements. Detect a shake.</p></div><div id="status" role="status">Waiting for IMU</div></header>
+<div class="cards"><div class="card"><div class="label">Shakes detected</div><div class="value" id="count">0</div></div><div class="card"><div class="label">Motion now</div><div class="value"><span id="motion">—</span> <span class="unit">m/s²</span></div></div><div class="card"><div class="label">IMU readings</div><div class="value" id="samples">0</div></div></div>
+<div id="flash" aria-live="polite"></div>
+<section class="chart"><div class="chart-top"><h2>Acceleration</h2><div class="legend"><span style="--c:#6cbcff">X</span><span style="--c:#e4bc73">Y</span><span style="--c:#b997ff">Z</span></div></div><canvas id="accel" aria-label="Acceleration on three axes over the last ten seconds"></canvas><p class="hint">Includes gravity. A still board usually has about 9.8 m/s² along one axis.</p></section>
+<section class="chart"><div class="chart-top"><h2>Angular velocity</h2><div class="legend"><span style="--c:#6cbcff">X</span><span style="--c:#e4bc73">Y</span><span style="--c:#b997ff">Z</span></div></div><canvas id="gyro" aria-label="Angular velocity on three axes in radians per second"></canvas><p class="hint">Rotation speed in rad/s. The shake detector uses acceleration; this graph helps compare the two.</p></section>
+<section class="chart"><div class="chart-top"><h2>Motion after removing slow gravity changes</h2><button id="pause">Pause graph</button></div><canvas id="energy" aria-label="Motion magnitude and shake threshold"></canvas><p class="hint">Dashed line: pulse threshold. Three separate pulses within 0.8 seconds trigger a shake, followed by a 1.5-second cooldown.</p></section>
+<div class="lower"><section class="guide"><h2>Try an experiment</h2><ol><li>Keep the board still for a second.</li><li>Move it back and forth a few times.</li><li>Look for a shake event, then let it settle.</li></ol><p>The detector is a tunable heuristic. Fast rotations, bumps and cable movement can also produce acceleration pulses.</p></section><section class="guide"><h2>Recent events</h2><ul id="events"><li>No shakes detected yet.</li></ul></section></div>
+<footer><div>Input topic: <code id="topic">Waiting…</code></div><p>Graphs show live or replayed ROS messages. Pausing the graph does not pause recording or detection.</p></footer>
+</main><script>
+let paused=false,lastCount=0;
+document.querySelector('#pause').onclick=()=>{paused=!paused;document.querySelector('#pause').textContent=paused?'Resume graph':'Pause graph';};
+function chart(id,points,series,threshold,extent=11){
+ const canvas=document.getElementById(id),dpr=window.devicePixelRatio||1,w=canvas.clientWidth,h=220;
+ canvas.width=w*dpr;canvas.height=h*dpr;const c=canvas.getContext('2d');c.scale(dpr,dpr);
+ const left=45,right=w-12,top=12,bottom=h-26;const end=points.length?points.at(-1)[0]:10,start=end-10;
+ const rows=points.filter(p=>p[0]>=start);let vals=rows.flatMap(p=>series.map(s=>p[s.index])).filter(Number.isFinite);
+ let min=threshold==null?Math.min(-extent,...vals):0,max=threshold==null?Math.max(extent,...vals):Math.max(5,threshold*1.5,...vals);
+ const pad=(max-min)*.08;max+=pad;if(threshold==null)min-=pad;
+ const x=t=>left+(t-start)/10*(right-left),y=v=>bottom-(v-min)/(max-min)*(bottom-top);
+ c.font='11px system-ui';c.lineWidth=1;
+ for(let i=0;i<=4;i++){const v=min+(max-min)*i/4,yy=y(v);c.strokeStyle='#2b3a4d';c.beginPath();c.moveTo(left,yy);c.lineTo(right,yy);c.stroke();c.fillStyle='#8ba1bb';c.fillText(v.toFixed(1),2,yy+4);}
+ c.fillStyle='#8ba1bb';c.fillText('−10 s',left,bottom+20);c.fillText('now',right-24,bottom+20);
+ if(threshold!=null){c.strokeStyle='#e4bc73';c.setLineDash([5,5]);c.beginPath();c.moveTo(left,y(threshold));c.lineTo(right,y(threshold));c.stroke();c.setLineDash([]);}
+ for(const s of series){c.strokeStyle=s.color;c.lineWidth=1.7;c.beginPath();let drawing=false;rows.forEach((p,i)=>{if(!Number.isFinite(p[s.index])){drawing=false;return;}if(!drawing||i===0||p[0]-rows[i-1][0]>.5)c.moveTo(x(p[0]),y(p[s.index]));else c.lineTo(x(p[0]),y(p[s.index]));drawing=true;});c.stroke();}
+}
+async function refresh(){try{
+ const response=await fetch('/api/state');if(!response.ok)throw Error('HTTP '+response.status);const s=await response.json();
+ const status=document.getElementById('status');status.textContent=s.connected?(s.warming_up?'Settling filter':'Receiving IMU'):(s.samples?'IMU stream paused':'Waiting for IMU');status.style.borderColor=s.connected?'#3b987c':'#755a3b';
+ document.getElementById('count').textContent=s.count;document.getElementById('samples').textContent=s.samples.toLocaleString();document.getElementById('topic').textContent=s.topic;
+ document.getElementById('motion').textContent=s.connected&&s.points.length?s.points.at(-1)[4].toFixed(2):'—';
+ if(s.count>lastCount){document.getElementById('flash').textContent='Shake detected · event #'+s.count;setTimeout(()=>document.getElementById('flash').textContent='',1800);}lastCount=s.count;
+ const events=document.getElementById('events');events.replaceChildren();for(const event of [...s.events].reverse().slice(0,4)){const li=document.createElement('li');li.textContent='Shake #'+event.id+' · '+event.motion.toFixed(2)+' m/s²';events.appendChild(li);}if(!s.events.length){const li=document.createElement('li');li.textContent='No shakes detected yet.';events.appendChild(li);}
+ if(!paused){chart('accel',s.points,[{index:1,color:'#6cbcff'},{index:2,color:'#e4bc73'},{index:3,color:'#b997ff'}],null);chart('gyro',s.points,[{index:5,color:'#6cbcff'},{index:6,color:'#e4bc73'},{index:7,color:'#b997ff'}],null,1);chart('energy',s.points,[{index:4,color:'#70e5b7'}],s.threshold);}
+}catch(error){document.getElementById('status').textContent='Dashboard disconnected';}finally{setTimeout(refresh,250);}}
+refresh();
+</script></body></html>

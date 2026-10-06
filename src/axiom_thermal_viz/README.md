@@ -20,7 +20,7 @@
    ```
 3. Launch the visualiser (update the topic if required):
    ```bash
-   ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p input_topic:=AMG8833_169/thermal/grid
+   ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p input_topic:=bus_1/device_169/thermal/grid
    ```
 4. In RViz, add a *Marker* display pointed at the `thermal_heatmap` topic. Adjust the marker size/colour as desired.
 
@@ -28,7 +28,7 @@
 
 | Parameter            | Default value                     | Description |
 |----------------------|-----------------------------------|-------------|
-| `input_topic`        | `AMG8833_169/thermal/grid`        | Source topic with `ThermalGrid` messages. |
+| `input_topic`        | `bus_1/device_169/thermal/grid`        | Source topic with `ThermalGrid` messages. |
 | `output_topic`       | `thermal_heatmap`                 | Marker topic published for RViz. |
 | `marker_namespace`   | `thermal_grid`                    | Namespace used for the marker message. |
 | `cell_size`          | `0.02`                            | Side length (metres) of each base grid cell. |

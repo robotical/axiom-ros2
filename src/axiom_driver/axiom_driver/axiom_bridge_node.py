@@ -1,497 +1,534 @@
-"""ROS2 node providing a bridge between Axiom device transports and ROS topics.
+"""ROS 2 adapter for one acknowledged Axiom firmware session."""
 
-This file used to be a large monolithic implementation. It has been split
-into smaller modules located in:
-  - bridge_connection.py (ConnectionState)
-  - bridge_mixins.py (Serial / WebSocket / Publish / Sensor payload logic)
-
-Behaviour is intentionally unchanged.
-"""
-
-import time
-import threading
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 import json
-from typing import Optional, Tuple
+import math
+import queue
+import threading
+import time
 
+from axiom_interfaces.srv import (
+    Connect,
+    Disconnect,
+    GetConnectionState,
+    Ping,
+    PublishedDataSubscription,
+    RicRestUrl,
+    SetSampleRate,
+)
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
-from rclpy.executors import ExternalShutdownException
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
-from .bridge_connection import ConnectionState
-from .bridge_mixins.ws_mixin import WebSocketMixin
-from .bridge_mixins.serial_mixin import SerialMixin 
-from .bridge_mixins.publish_mixin import PublishMixin 
-from .bridge_mixins.sensor_payload_mixin import SensorPayloadMixin
-from .ric_consts import (
-    TYPE_COMMAND,
-    PROTO_RICREST, PROTO_BRIDGE_RICREST,
-    ELEM_URL,
-    pack_type_proto,
-)
-from .mini_hdlc import MiniHDLC, FLAG_DEFAULT, ESC_DEFAULT, XOR_DEFAULT
-from .publisher_cache import PublisherCache
-from .protocols.dispatcher import Dispatcher
-from .protocols.ric_frame import RICFrame
-from .protocols.ric_serial import RICSerial
-from .protocols.overascii import Decoder as OverAsciiDecoder, encode as overascii_encode
-from .ric_consts import TYPE_PUBLISH, PROTO_RAWCMDFRAME, PROTO_ROSSERIAL
-from axiom_interfaces.srv import (
-    Connect, Disconnect, Ping, GetConnectionState, RicRestUrl, PublishedDataSubscription
-)
+from .config import DEFAULT_PARAMETERS
+from .core.aliases import validate_aliases
+from .core.pipeline import Pipeline
+from .core.registry import DeviceKey
+from .core.rpc import SessionError
+from .core.session import Session
+from .core.timing import Receipt
+from .descriptor_services import DescriptorServices
+from .ros_adapters import json_text, RosAdapters
 
 
-class AxiomBridgeNode(Node, WebSocketMixin, SerialMixin, PublishMixin, SensorPayloadMixin):
-    def __init__(self):
-        super().__init__('axiom_bridge_node')
-
-        # ===== Parameters =====
-        # Core
-        self.declare_parameter('transport', 'ws')            # 'ws' | 'serial' | 'ble'(future)
-        self.declare_parameter('device_uri', 'ws://')        # e.g. ws://192.168.1.7/devjson
-        self.declare_parameter('auto_connect', False)
-        self.declare_parameter('frame_id', 'axiom_link')
-
-        # WS control channel
-        self.declare_parameter('use_dual_ws', True)
-        self.declare_parameter('ws_path', '/ws')             # control WS path if control_uri not set
-        self.declare_parameter('control_uri', '')            # optional absolute control ws uri
-        self.declare_parameter('ws_pcol', 'RICSerial')       # RICSerial | RICFrame | RICJSON
-        self.declare_parameter('ricrest_proto', 'RICREST')   # RICREST | BRIDGE_RICREST
-
-        # RPC / HDLC
-        self.declare_parameter('rpc_default_timeout', 3.0)
-        self.declare_parameter('hdlc_flag', FLAG_DEFAULT)
-        self.declare_parameter('hdlc_escape', ESC_DEFAULT)
-        self.declare_parameter('hdlc_xor', XOR_DEFAULT)
-
-        # Serial params
-        self.declare_parameter('serial.port', '/dev/ttyUSB0')
-        self.declare_parameter('serial.baud', 115200)
-        self.declare_parameter('serial.timeout', 0.02)
-        self.declare_parameter('autosub', False)
-        self.declare_parameter('serial.devjson_rate_hz', 0.1)
-        # Serial mode:
-        #   'auto'      → detect OverAscii vs ASCII by inbound stream
-        #   'overascii' → use OverAscii+HDLC (RICSerial tunneled)
-        #   'ascii'     → send "url\n" and parse console JSON
-        self.declare_parameter('serial.mode', 'auto')
-
-        # Debug
-        self.declare_parameter('debug_hex', True)
-
-        # ===== Members =====
-        self.state = ConnectionState()
-        self.publisher_cache = PublisherCache(self)
-
-        # RIC/REST tracking (WS code path)
-        self._ric_msgnum = 1
-        self._ric_lock = threading.Lock()
-        self._ric_wait = {}
-        self._ric_resp = {}
-
-        # HDLC (MiniHDLC) for both WS(RICSerial) and serial (inner framing)
-        self._mini_hdlc = MiniHDLC(
-            self.get_parameter('hdlc_flag').value,
-            self.get_parameter('hdlc_escape').value,
-            self.get_parameter('hdlc_xor').value,
+class AxiomBridgeNode(Node):
+    def __init__(self, **kwargs):
+        super().__init__('axiom_bridge_node', **kwargs)
+        defaults = DEFAULT_PARAMETERS
+        for name, value in defaults.items():
+            self.declare_parameter(name, value, ParameterDescriptor(read_only=True))
+        self.config = {name: self.get_parameter(name).value for name in defaults}
+        self._validate_config()
+        qos = QoSProfile(
+            depth=self.config['sensor_qos.depth'],
+            reliability=(
+                ReliabilityPolicy.RELIABLE
+                if self.config['sensor_qos.reliability'] == 'reliable'
+                else ReliabilityPolicy.BEST_EFFORT
+            ),
+        )
+        inventory_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.inventory_pub = self.create_publisher(String, 'devices', inventory_qos)
+        self.metadata_pub = self.create_publisher(String, 'device_metadata', inventory_qos)
+        self.raw_pub = self.create_publisher(String, 'raw/devjson', 10)
+        self.console_pub = self.create_publisher(String, 'serial_console', 10)
+        self.diagnostic_pub = self.create_publisher(DiagnosticArray, 'diagnostics', 10)
+        self.adapters = RosAdapters(
+            self,
+            qos,
+            self.config['frame_id'],
+            json.loads(self.config['sensor_frames']),
+            self.config['publish_custom_messages'],
+            self.config['range.field_of_view'],
+            json.loads(self.config['sensor_qos.overrides']),
+            json.loads(self.config['topic_aliases']),
+        )
+        self._state_lock = threading.Lock()
+        self._connection_lock = threading.Lock()
+        self._rpc_slots = threading.BoundedSemaphore(2)
+        self._data = queue.Queue(maxsize=self.config['receive_queue_depth'])
+        self._commands = queue.Queue(maxsize=16)
+        self._stop = threading.Event()
+        self._desired_connection = self.config['auto_connect']
+        self._desired_rate = self.config['publish_rate_hz'] if self.config['autosub'] else 0.0
+        self._subscribed = False
+        self._next_reconnect = 0.0
+        self._connect_task = None
+        self._last_rx = None
+        self._last_issue = ''
+        self._last_issue_time = 0.0
+        self._queue_drops = 0
+        self._inventory = []
+        self._metadata_text = ''
+        self._counts = {}
+        self._active_generation = -1
+        self._next_inventory = 0.0
+        self._connector = ThreadPoolExecutor(max_workers=1, thread_name_prefix='axiom-connect')
+        self.session = Session(
+            self._receive,
+            self._session_state,
+            self._issue,
+            lambda line: self.console_pub.publish(String(data=line)),
+        )
+        self.pipeline = Pipeline(
+            self.session.request,
+            self.adapters.publish,
+            self._inventory_changed,
+            self._issue,
+            self.config['metadata_refresh_s'],
+        )
+        self.descriptor_services = DescriptorServices(self)
+        self._worker = threading.Thread(target=self._work, name='axiom-decode', daemon=True)
+        self._worker.start()
+        group = ReentrantCallbackGroup()
+        for srv, name, callback in (
+            (Connect, 'connect', self.handle_connect),
+            (Disconnect, 'disconnect', self.handle_disconnect),
+            (GetConnectionState, 'get_connection_state', self.handle_get_state),
+            (Ping, 'ping', self.handle_ping),
+            (RicRestUrl, 'ric_rest_url', self.handle_ric_rest_url),
+            (PublishedDataSubscription, 'publish_data_subscription', self.handle_subscription),
+            (SetSampleRate, 'set_sample_rate', self.handle_sample_rate),
+        ):
+            self.create_service(srv, name, callback, callback_group=group)
+        self.create_timer(0.25, self._maintain_connection, callback_group=group)
+        self.create_timer(1.0, self._diagnostics, callback_group=group)
+        self.get_logger().info(
+            'One upstream acquisition stream; use ROS topics for additional consumers'
         )
 
-        # Dispatcher (matches responses by msgnum, can handle publish later)
-        self._dispatcher = Dispatcher()
+    def _validate_config(self):
+        cfg = self.config
+        if cfg['transport'] not in ('serial', 'ws'):
+            raise ValueError('transport must be serial or ws')
+        if cfg['sensor_qos.reliability'] not in ('reliable', 'best_effort'):
+            raise ValueError('sensor_qos.reliability must be reliable or best_effort')
+        if (
+            not 1 <= cfg['sensor_qos.depth'] <= 10000
+            or not 1 <= cfg['receive_queue_depth'] <= 10000
+        ):
+            raise ValueError('Queue depths must be 1..10000')
+        for name in (
+            'rpc_default_timeout',
+            'reconnect_interval',
+            'metadata_refresh_s',
+            'stale_after_s',
+        ):
+            if not math.isfinite(cfg[name]) or cfg[name] <= 0:
+                raise ValueError(f'{name} must be positive and finite')
+        if cfg['rpc_default_timeout'] > 60:
+            raise ValueError('rpc_default_timeout exceeds 60 seconds')
+        if not math.isfinite(cfg['publish_rate_hz']) or not 0 <= cfg['publish_rate_hz'] <= 1000:
+            raise ValueError('publish_rate_hz must be 0..1000')
+        if cfg['publish_trigger'] not in ('time', 'change', 'timeorchange'):
+            raise ValueError('Invalid publish_trigger')
+        if (
+            not math.isfinite(cfg['range.field_of_view'])
+            or not 0 <= cfg['range.field_of_view'] <= math.pi
+        ):
+            raise ValueError('range.field_of_view must be 0..pi radians')
+        overrides = json.loads(cfg['sensor_qos.overrides'])
+        if not isinstance(overrides, dict):
+            raise ValueError('sensor_qos.overrides must be a JSON object')
+        for topic, policy in overrides.items():
+            if not topic or topic.startswith('/') or not isinstance(policy, dict):
+                raise ValueError('QoS overrides require relative topic names and policy objects')
+            if set(policy) - {'depth', 'reliability'}:
+                raise ValueError('QoS overrides support depth and reliability')
+            if policy.get('reliability', 'best_effort') not in ('best_effort', 'reliable'):
+                raise ValueError('Invalid QoS override reliability')
+            depth = policy.get('depth', cfg['sensor_qos.depth'])
+            if type(depth) is not int or not 1 <= depth <= 10000:
+                raise ValueError('Invalid QoS override depth')
+        frames = json.loads(cfg['sensor_frames'])
+        validate_aliases(json.loads(cfg['topic_aliases']))
+        if not isinstance(frames, dict) or any(
+            not isinstance(v, str) or not v for v in frames.values()
+        ):
+            raise ValueError('sensor_frames must map bus:hex-address to nonempty frame names')
 
-        # RICSerial (HDLC deframer for inner RIC frames)
-        self._ric_serial = RICSerial(self._mini_hdlc)
-        self._ric_serial.on_frame = self._on_serial_frame
-        self._ric_serial.on_error = lambda m: self.get_logger().warn(f'RICSerial: {m}')
+    def _issue(self, message):
+        now = time.monotonic()
+        with self._state_lock:
+            report = message != self._last_issue or now - self._last_issue_time >= 5
+            self._last_issue, self._last_issue_time = str(message), now
+        if report:
+            self.get_logger().warning(str(message))
 
-        # Forward non-response frames to a publish handler
-        self._dispatcher.on_publish = self._handle_publish_frame
+    def _session_state(self, ready, reason):
+        if not ready:
+            self._subscribed = False
+            self._last_rx = None
+        # The worker observes generation changes even when no measurements arrive.
+        self.get_logger().info(reason)
 
-        # Serial mode helpers
-        self._serial_mode = str(self.get_parameter('serial.mode').value or 'auto')
-        self._oa = OverAsciiDecoder()
-        self._oa.on_binary = self._ric_serial.feed_bytes         # OverAscii → HDLC layer
-        self._console_buf = bytearray()                          # for ASCII console JSON
-        self._console_wait_ev = None  # type: Optional[threading.Event]
-        self._console_resp_buf = None  # type: Optional[bytes]
-        self._serial_debug = bool(self.get_parameter('debug_hex').value)
+    def _receive(self, data):
+        # A board can still send a previous client's stream. Only forward sensor
+        # packets after this node has acknowledged its own acquisition request.
+        if self._stop.is_set() or not self._subscribed:
+            return
+        receipt = Receipt(time.monotonic(), self.get_clock().now().nanoseconds)
+        self._last_rx = receipt.monotonic
+        try:
+            self._data.put_nowait((self.session.generation, data, receipt))
+        except queue.Full:
+            with self._state_lock:
+                self._queue_drops += 1
+            self._issue('Receive queue full; dropped devjson message')
 
-        # Publishers
-        self._console_pub = self.create_publisher(
-            msg_type=String,
-            topic='serial_console',
-            qos_profile=10
+    def _inventory_changed(self, devices):
+        for device in devices:
+            device['stale'] = device['age_s'] > self.config['stale_after_s']
+        self.adapters.sync(devices)
+        self.descriptor_services.sync(devices)
+        self._inventory = devices
+        self.inventory_pub.publish(String(data=json_text(devices)))
+        metadata = {
+            f'{d.key.bus}:{d.key.address}': {
+                'type_ref': d.type_ref,
+                'revision': d.revision,
+                'metadata': d.metadata,
+            }
+            for d in self.pipeline.registry.devices.values()
+            if d.metadata
+        }
+        text = json_text(
+            {
+                'firmware': self.session.firmware,
+                'generation': self.session.generation,
+                'devices': metadata,
+            }
         )
+        if text != self._metadata_text:
+            self.metadata_pub.publish(String(data=text))
+            self._metadata_text = text
 
-        # Device type information cache (for dynamic decoder discovery)
-        self._device_typeinfo_cache = {}
-        self._device_typeinfo_lock = threading.Lock()
-        self._device_typeinfo_retry_window = 5.0
-        self._device_typeinfo_request_timeout = 2.0
-
-        # Subscription tracking
-
-        # WS helpers
-        self.ws_data_opened = False
-
-        # ===== Services =====
-        self.create_service(Connect, 'connect', self.handle_connect)
-        self.create_service(Disconnect, 'disconnect', self.handle_disconnect)
-        self.create_service(Ping, 'ping', self.handle_ping)
-        self.create_service(GetConnectionState, 'get_connection_state', self.handle_get_state)
-        self.create_service(RicRestUrl, 'ric_rest_url', self.handle_ric_rest_url)
-        self.create_service(PublishedDataSubscription, 'publish_data_subscription', self.handle_published_data_subscription)
-
-        # ===== Autoconnect =====
-        if self.get_parameter('auto_connect').get_parameter_value().bool_value:
-            transport = self.get_parameter('transport').get_parameter_value().string_value
-            if transport == 'serial':
-                self._connect_serial()
+    def _work(self):
+        while not self._stop.is_set():
+            generation = self.session.generation
+            if generation != self._active_generation:
+                self._active_generation = generation
+                self.pipeline.reset()
+                self.adapters.cache.clear()
+            now = time.monotonic()
+            if now >= self._next_inventory:
+                self._inventory_changed(
+                    self.pipeline.registry.snapshot(now, self.config['stale_after_s'])
+                )
+                self._next_inventory = now + 1.0
+            try:
+                job_generation, deadline, function, future = self._commands.get_nowait()
+            except queue.Empty:
+                pass
             else:
-                uri = self.get_parameter('device_uri').get_parameter_value().string_value
-                self._connect_ws(uri)
-    # ============================ Connect / Disconnect ============================
+                if not future.set_running_or_notify_cancel():
+                    continue
+                if job_generation != generation or time.monotonic() > deadline:
+                    future.set_exception(SessionError('Queued request expired or session changed'))
+                    continue
+                try:
+                    future.set_result(function())
+                except Exception as exc:
+                    future.set_exception(exc)
+                continue
+            try:
+                event_generation, data, receipt = self._data.get(timeout=0.05)
+            except queue.Empty:
+                continue
+            # A new session may start while get() waits. Keep its first packet,
+            # but discard queued packets belonging to previous sessions.
+            generation = self.session.generation
+            if event_generation != generation or not self._subscribed:
+                continue
+            if generation != self._active_generation:
+                self._active_generation = generation
+                self.pipeline.reset()
+                self.adapters.cache.clear()
+            try:
+                self.raw_pub.publish(
+                    String(
+                        data=json_text(
+                            {
+                                'generation': generation,
+                                'received_ns': receipt.ros_ns,
+                                'payload': data,
+                            }
+                        )
+                    )
+                )
+                self.pipeline.process(data, receipt, lambda: generation == self.session.generation)
+                self._counts = dict(self.pipeline.counts)
+            except Exception as exc:
+                self._issue(f'Pipeline failure: {exc}')
+        while True:
+            try:
+                _, _, _, future = self._commands.get_nowait()
+                if not future.done():
+                    future.set_exception(SessionError('Node shutting down'))
+            except queue.Empty:
+                break
 
-    def _disconnect(self):
+    def _worker_call(self, function, timeout=5.0):
+        future = Future()
         try:
-            if self.state.data_ws is not None:
-                self.state.data_ws.close()
-        except Exception as e:
-            self.get_logger().warn(f'Data WS close error: {e}')
-        finally:
-            thread = getattr(self.state, 'data_thread', None)
-            if thread is not None and thread.is_alive():
-                thread.join(timeout=1.0)
-            self.state.data_thread = None
-            self.state.data_ws = None
+            self._commands.put_nowait(
+                (self.session.generation, time.monotonic() + timeout, function, future)
+            )
+        except queue.Full as exc:
+            raise SessionError('Configuration queue full') from exc
         try:
-            if self.state.ctrl_ws is not None:
-                self.state.ctrl_ws.close()
-        except Exception as e:
-            self.get_logger().warn(f'Control WS close error: {e}')
-        finally:
-            thread = getattr(self.state, 'ctrl_thread', None)
-            if thread is not None and thread.is_alive():
-                thread.join(timeout=1.0)
-            self.state.ctrl_thread = None
-            self.state.ctrl_ws = None
+            return future.result(timeout)
+        except TimeoutError as exc:
+            future.cancel()
+            raise SessionError('Configuration request timed out') from exc
+
+    def _connect(self, uri=None):
+        if not self._connection_lock.acquire(blocking=False):
+            raise SessionError('Connection already in progress')
         try:
-            if self.state.serial_transport is not None:
-                self.state.serial_transport.stop()
-        except Exception as e:
-            self.get_logger().warn(f'Serial stop error: {e}')
+            cfg = self.config
+            target = uri or (
+                cfg['serial.port'] if cfg['transport'] == 'serial' else cfg['device_uri']
+            )
+            self.session.connect(
+                target,
+                transport=cfg['transport'],
+                ws_mode=cfg['ws_pcol'],
+                serial_mode=cfg['serial.mode'],
+                baud=cfg['serial.baud'],
+                serial_timeout=cfg['serial.timeout'],
+                timeout=cfg['rpc_default_timeout'],
+            )
+            if self._desired_rate > 0:
+                self.session.subscribe(
+                    self._desired_rate, cfg['publish_trigger'], cfg['rpc_default_timeout']
+                )
+                self._subscribed = True
+            if uri:
+                self.config['serial.port' if cfg['transport'] == 'serial' else 'device_uri'] = uri
+        except Exception:
+            self.session.close('Connection or subscription failed')
+            raise
         finally:
-            self.state.serial_transport = None
+            self._next_reconnect = time.monotonic() + self.config['reconnect_interval']
+            self._connection_lock.release()
 
-        self._dispatcher.reset_waiters('disconnect')
-        self.state.connected = False
-        self.ws_data_opened = False
-        return True, 'Disconnected'
+    def _maintain_connection(self):
+        if self._stop.is_set():
+            return
+        if self._connect_task and self._connect_task.done():
+            try:
+                self._connect_task.result()
+            except Exception as exc:
+                self._issue(f'Connect failed: {exc}')
+            self._connect_task = None
+        if (
+            self._desired_connection
+            and not self.session.connected
+            and not self.session.connecting
+            and self._connect_task is None
+            and time.monotonic() >= self._next_reconnect
+        ):
+            self._connect_task = self._connector.submit(self._connect)
+            if not self.config['auto_reconnect']:
+                self._desired_connection = False
 
-    # ============================ Services ============================
-
-    def handle_connect(self, request: Connect.Request, response: Connect.Response):
-        transport = self.get_parameter('transport').get_parameter_value().string_value
-        if transport == 'serial':
-            ok, msg = self._connect_serial()
-        else:
-            uri = request.device_uri or self.state.uri or self.get_parameter('device_uri').value
-            ok, msg = self._connect_ws(uri)
-        response.success = ok
-        response.message = msg
+    def handle_connect(self, request, response):
+        self._desired_connection = self.config['auto_reconnect']
+        try:
+            if not self.config['autosub'] and not self.session.connected:
+                # An explicit connection is a separate step from requesting data,
+                # including after a previous subscribed session was disconnected.
+                self._desired_rate = 0.0
+            self._connect(request.device_uri or None)
+            response.success, response.message = (
+                True,
+                'Firmware handshake acknowledged; '
+                + ('acquisition subscribed' if self._subscribed else 'acquisition stopped'),
+            )
+        except Exception as exc:
+            response.success, response.message = False, str(exc)
         return response
 
-    def handle_disconnect(self, _request: Disconnect.Request, response: Disconnect.Response):
-        ok, msg = self._disconnect()
-        response.success = ok
-        response.message = msg
+    def handle_disconnect(self, request, response):
+        self._desired_connection = False
+        self.session.close()
+        response.success, response.message = True, 'Disconnected; automatic reconnect disabled'
         return response
 
-    def handle_ping(self, request: Ping.Request, response: Ping.Response):
-    # Quick RTT estimate over the data channel
-        if not self.state.connected or self.state.data_ws is None:
-            response.success = False
-            response.rtt_ms = 0.0
-            response.message = 'Not connected'
+    def handle_get_state(self, request, response):
+        response.connected = self.session.connected
+        response.device_uri = self.session.uri
+        response.last_error = self.session.last_error if not self.session.connected else ''
+        return response
+
+    def _service(self, response, function):
+        if not self._rpc_slots.acquire(blocking=False):
+            response.success, response.message = False, 'RPC capacity busy; retry later'
             return response
         try:
-            payload = 'x' * int(request.payload_size)
-            t0 = time.time()
-            self.state.data_ws.send(json.dumps({'cmdName': 'ping', 'payload': payload}))
-            time.sleep(0.01)
-            response.success = True
-            response.rtt_ms = float((time.time() - t0) * 1000.0)
-            response.message = 'RTT estimated'
-        except Exception as e:
-            response.success = False
-            response.rtt_ms = 0.0
-            response.message = f'Ping failed: {e}'
+            function()
+            response.success, response.message = True, 'Acknowledged by firmware'
+        except Exception as exc:
+            response.success, response.message = False, str(exc)
+        finally:
+            self._rpc_slots.release()
         return response
 
-    def handle_get_state(self, _request: GetConnectionState.Request, response: GetConnectionState.Response):
-        response.connected = self.state.connected
-        response.device_uri = self.state.uri
-        response.last_error = self.state.last_error
-        return response
-
-    def handle_ric_rest_url(self, req: RicRestUrl.Request, res: RicRestUrl.Response):
-        """
-        Send a RICREST URL request and await CMDRESPJSON.
-        - WS: sends RICFrame (or HDLC-wrapped) over control WS
-        - Serial:
-            * ascii     → "url\n" and parse console JSON
-            * overascii → OverAscii(HDLC(RICFrame))
-            * auto      → if still 'auto', prefer ascii first (works with 'v'), OverAscii will auto-switch on RX
-        """
-        timeout = req.timeout if req.timeout > 0 else None
-        success, message, payload = self._send_ric_rest_url(
-            (req.url_path or '').strip(),
-            timeout=timeout,
-            ws_pcol_override=req.ws_pcol
+    def handle_ping(self, request, response):
+        return self._service(
+            response,
+            lambda: setattr(
+                response,
+                'rtt_ms',
+                self.session.ping(request.payload_size, self.config['rpc_default_timeout']),
+            ),
         )
 
-        res.success = success
-        res.message = message
-        res.json_text = (payload or b'').decode('utf-8', errors='replace') if payload else ''
-        return res
-
-    def _send_ric_rest_url(
-        self,
-        url_path: str,
-        *,
-        timeout: Optional[float] = None,
-        ws_pcol_override: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[bytes]]:
-        transport_kind = self.get_parameter('transport').get_parameter_value().string_value
-        timeout_s = timeout if timeout and timeout > 0 else float(self.get_parameter('rpc_default_timeout').value)
-        url_str = (url_path or '').strip()
-
-        # ---- Serial path ----
-        if transport_kind == 'serial':
-            st = self.state.serial_transport
-            if st is None:
-                return False, 'Serial transport not started', None
-
-            mode = self._serial_mode
-            # ---- Serial ASCII console request/response ----
-            if mode in ('ascii', 'auto'):
-                line = url_str
-
-                ev = threading.Event()
-                with self._ric_lock:
-                    self._console_wait_ev = ev
-                    self._console_resp_buf = None
-
-                try:
-                    st.send((line + '\n').encode('utf-8'))
-                except Exception as e:
-                    with self._ric_lock:
-                        self._console_wait_ev = None
-                        self._console_resp_buf = None
-                    return False, f'serial send failed: {e}', None
-
-                if not ev.wait(timeout_s):
-                    with self._ric_lock:
-                        self._console_wait_ev = None
-                        self._console_resp_buf = None
-                    return False, 'timeout', None
-
-                with self._ric_lock:
-                    data = self._console_resp_buf or b''
-                    self._console_wait_ev = None
-                    self._console_resp_buf = None
-
-                return True, 'OK', data
-
-            # OverAscii + RICSerial
-            msgnum = self._dispatcher.next_msgnum()
-            proto_name = str(self.get_parameter('ricrest_proto').value or 'RICREST').upper()
-            proto_id = PROTO_BRIDGE_RICREST if proto_name == 'BRIDGE_RICREST' else PROTO_RICREST
-            ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, proto_id), ELEM_URL, url_str.encode('utf-8'))
-            hdlc = self._ric_serial.encode(ric)
-
-            payload = overascii_encode(hdlc)
-
-            ev = self._dispatcher.register_waiter(msgnum)
-            self.get_logger().info(f'Sending RICREST(URL) over serial(OverAscii): msgnum={msgnum} path={url_str}')
-            self.get_logger().info('TX(serial,overascii+hdlc)[:40]= ' + payload[:40].hex() + ('...' if len(payload) > 40 else ''))
-            try:
-                st.send(payload)
-            except Exception as e:
-                return False, f'serial send failed: {e}', None
-
-            if not ev.wait(timeout_s):
-                self._dispatcher.pop_payload(msgnum)
-                return False, 'timeout', None
-
-            data = self._dispatcher.pop_payload(msgnum)
-            return True, 'OK', data
-
-        # ---- WebSocket path ----
-        if not self.state.connected:
-            return False, 'Not connected', None
-
-        ws = self.state.ctrl_ws if self.state.ctrl_ws is not None else self.state.data_ws
-        if ws is None:
-            return False, 'No WebSocket available', None
-
-        msgnum = self._next_msgnum()
-        proto_name = str(self.get_parameter('ricrest_proto').value or 'RICREST').upper()
-        proto_id = PROTO_BRIDGE_RICREST if proto_name == 'BRIDGE_RICREST' else PROTO_RICREST
-        ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, proto_id), ELEM_URL, url_str.encode('utf-8'))
-        mode = self._ws_mode(ws_pcol_override)
-        payload = self._mini_hdlc.encode(ric) if mode == 'RICSerial' else ric
-
-        # dump the inner RIC frame and the on-wire payload
-        self.get_logger().info(
-            f'WS TX: msgnum={msgnum} mode={mode} proto_id={proto_id} '
-            f'RIC(len={len(ric)}):{ric[:16].hex()}{"…" if len(ric)>16 else ""} '
-            f'ONWIRE(len={len(payload)}):{payload[:16].hex()}{"…" if len(payload)>16 else ""}'
-        )
-
-        ev = threading.Event()
-        t_send = time.time()
-        with self._ric_lock:
-            self._ric_wait[msgnum] = ev
-            self._ric_resp.pop(msgnum, None)
-
-        try:
-            ws.send(payload, opcode=0x2)  # binary
-            self.get_logger().info(f'WS TX sent: msgnum={msgnum} bytes={len(payload)}')
-        except Exception as e:
-            with self._ric_lock:
-                self._ric_wait.pop(msgnum, None)
-            self.get_logger().error(f'WS TX ERROR: msgnum={msgnum} err={e}')
-            return False, f'send failed: {e}', None
-
-        if not ev.wait(timeout_s):
-            dt = time.time() - t_send
-            with self._ric_lock:
-                still_waiting = list(self._ric_wait.keys())
-                self._ric_wait.pop(msgnum, None)
-            self.get_logger().error(
-                f'WS RPC TIMEOUT: msgnum={msgnum} waited={dt:.3f}s '
-                f'outstanding={still_waiting}'
+    def handle_ric_rest_url(self, request, response):
+        def run():
+            if request.ws_pcol and request.ws_pcol != self.config['ws_pcol']:
+                raise SessionError(
+                    'Framing is fixed for the session; reconnect with ws_pcol configured'
+                )
+            result = self.session.request(
+                request.url_path,
+                request.timeout if request.timeout > 0 else self.config['rpc_default_timeout'],
             )
-            return False, 'timeout', None
+            response.json_text = json_text(result)
+            if any(part in request.url_path for part in ('devconfig', 'devlib', 'reidentify')):
+                self._worker_call(self.pipeline.reset)
 
-        with self._ric_lock:
-            data = self._ric_resp.pop(msgnum, b'')
-            self._ric_wait.pop(msgnum, None)
+        return self._service(response, run)
 
-        return True, 'OK', data
+    def handle_subscription(self, request, response):
+        def configure():
+            self.session.subscribe(
+                request.rate_hz, self.config['publish_trigger'], self.config['rpc_default_timeout']
+            )
+            self._desired_rate = request.rate_hz
+            self._subscribed = request.rate_hz > 0
+            # Run on the decode worker so a successful stop response also means
+            # no earlier packet is still being decoded or waiting in the queue.
+            while True:
+                try:
+                    self._data.get_nowait()
+                except queue.Empty:
+                    break
 
-    def handle_published_data_subscription(self, req: PublishedDataSubscription.Request, res: PublishedDataSubscription.Response):
-        """
-        Subscribe the device to 'devjson' published data via the selected transport.
-        """
-        # ---------- Small helpers ----------
-        def set_res(success: bool, msg: str):
-            res.success = success
-            res.message = msg
-            return res
+        return self._service(response, lambda: self._worker_call(configure))
 
-        def transport_mode() -> str:
-            return self.get_parameter('transport').get_parameter_value().string_value
+    def handle_sample_rate(self, request, response):
+        def configure():
+            key = DeviceKey(request.bus, format(int(request.address, 16), 'x'))
+            result = self.pipeline.configure_rate(key, request.sample_rate_hz)
+            # Discard packets queued across a rate transition; interpreting them
+            # with the new period would fabricate sample timing.
+            self._discard_data()
+            return result
 
-        def subscribe_serial(rate_hz: float):
-            st = self.state.serial_transport
-            if st is None:
-                self.get_logger().warn('Serial transport not started')
-                return set_res(False, 'Serial transport not started')
+        def run():
+            result = self._worker_call(configure)
+            response.sample_rate_hz = float(result['sampleRateHz'])
+            response.poll_interval_us = int(result['pollIntervalUs'])
+            response.retained_poll_results = int(result['numSamples'])
+
+        return self._service(response, run)
+
+    def _discard_data(self):
+        while True:
             try:
-                # always send sub req OverAscii + RICSerial
-                line = f'subscription?action=update&name=devjson&rateHz={rate_hz}\n'
-                msgnum = self._dispatcher.next_msgnum()
-                proto_name = str(self.get_parameter('ricrest_proto').value or 'RICREST').upper()
-                proto_id = PROTO_BRIDGE_RICREST if proto_name == 'BRIDGE_RICREST' else PROTO_RICREST
-                ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, proto_id), ELEM_URL, line.encode('utf-8'))
-                hdlc = self._ric_serial.encode(ric)
+                self._data.get_nowait()
+                self._queue_drops += 1
+            except queue.Empty:
+                break
 
-                payload = overascii_encode(hdlc)
+    def _diagnostics(self):
+        now = time.monotonic()
+        status = DiagnosticStatus()
+        status.name = self.get_fully_qualified_name() + '/firmware_session'
+        status.hardware_id = self.session.uri
+        status.level = DiagnosticStatus.OK
+        status.message = 'Connected' if self.session.connected else 'Disconnected'
+        if self._desired_connection and not self.session.connected:
+            status.level = DiagnosticStatus.ERROR
+            status.message = self.session.last_error or 'Connecting'
+        elif self._last_issue and now - self._last_issue_time < 10:
+            status.level = DiagnosticStatus.WARN
+            status.message = self._last_issue
+        elif self._subscribed and (
+            self._last_rx is None or now - self._last_rx > self.config['stale_after_s']
+        ):
+            status.level = DiagnosticStatus.WARN
+            status.message = 'No recent firmware publications'
+        values = dict(
+            self._counts,
+            receive_queue_drops=self._queue_drops,
+            subscribed=self._subscribed,
+            generation=self.session.generation,
+            rx_age_s=None if self._last_rx is None else now - self._last_rx,
+            upstream_policy='single acquisition owner; other firmware clients may consume samples',
+            timestamp_policy='estimated acquisition time; not MCU clock synchronization',
+        )
+        status.values = [KeyValue(key=k, value=str(v)) for k, v in values.items()]
+        msg = DiagnosticArray()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.status = [status]
+        self.diagnostic_pub.publish(msg)
 
-                self.get_logger().info(f'Sending RICREST(URL) over serial(OverAscii): msgnum={msgnum} path={line}')
-                self.get_logger().info('TX(serial,overascii+hdlc)[:40]= ' + payload[:40].hex() + ('...' if len(payload) > 40 else ''))
-                st.send(payload)
+    def destroy_node(self):
+        self._desired_connection = False
+        self._stop.set()
+        self.session.close('Node shutting down')
+        self._worker.join(timeout=5)
+        self._connector.shutdown(wait=True, cancel_futures=True)
+        self.adapters.cache.clear()
+        self.descriptor_services.clear()
+        return super().destroy_node()
 
-
-                self.get_logger().info(f'Sent serial subscription for devjson (rate {rate_hz} Hz)')
-                return set_res(True, 'Subscription sent')
-            except Exception as e:
-                self.get_logger().warn(f'Failed to send serial auto-subscription: {e}')
-                return set_res(False, f'Failed to send subscription: {e}')
-
-        def subscribe_ws(rate_hz: float):
-            ws = self.state.data_ws
-            if ws is None or not self.ws_data_opened:
-                self.get_logger().warn('Data WS not open')
-                return set_res(False, 'Data WS not open')
-            try:
-                cmd = {
-                    'cmdName': 'subscription',
-                    'action': 'update',
-                    'pubRecs': [
-                        {'name': 'devjson', 'trigger': 'timeorchange', 'rateHz': rate_hz},
-                    ],
-                }
-                ws.send(json.dumps(cmd))
-                self.get_logger().info(f'Sent subscription: {cmd}')
-                return set_res(True, 'Subscription sent')
-            except Exception as e:
-                msg = f'Failed to send subscription: {e}'
-                self.get_logger().warn(msg)
-                return set_res(False, msg)
-
-        # ---------- Pre-checks ----------
-        if not self.state.connected:
-            return set_res(False, 'Not connected')
-
-        # ---------- Dispatch ----------
-        mode = transport_mode()
-        rate = float(req.rate_hz)
-
-        if mode == 'serial':
-            return subscribe_serial(rate)
-        if mode == 'ws':
-            return subscribe_ws(rate)
-
-        return set_res(False, f'Unsupported transport: {mode}')
-    # ============================ Helpers ============================
-
-    def _next_msgnum(self) -> int:
-        with self._ric_lock:
-            n = self._ric_msgnum
-            self._ric_msgnum = 1 if n >= 255 else n + 1
-            return n
-
-    def _ws_mode(self, override: Optional[str] = None) -> str:
-        return (override or self.get_parameter('ws_pcol').value or 'RICSerial').strip()
-
-    # ============================ Serial callbacks ============================
-
-    # Serial + publish handlers are supplied by mixins
-
-
-# ---------------------------- Entrypoint ----------------------------
 
 def main(args=None):
-    node: Optional[AxiomBridgeNode] = None
-    rclpy_initialized = False
+    rclpy.init(args=args)
+    node = None
+    executor = MultiThreadedExecutor(num_threads=4)
     try:
-        rclpy.init(args=args)
-        rclpy_initialized = True
         node = AxiomBridgeNode()
-        rclpy.spin(node)
+        executor.add_node(node)
+        executor.spin()
     except (KeyboardInterrupt, ExternalShutdownException):
-        if node is not None:
-            node.get_logger().info('Shutting down')
+        pass
     finally:
-        if node is not None:
-            try:
-                node._disconnect()
-            except Exception as exc:  # noqa: BLE001
-                node.get_logger().warn(f'Disconnect during shutdown failed: {exc}')
+        executor.shutdown()
+        if node:
             node.destroy_node()
-        if rclpy_initialized:
+        if rclpy.ok():
             rclpy.shutdown()

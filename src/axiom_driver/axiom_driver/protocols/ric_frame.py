@@ -3,9 +3,10 @@ from typing import Tuple
 
 class RICFrame:
     """
-        Pack/unpack the inner RIC frame:
-      [msgNum:1][type/proto:1][elem:1][payload...]
-        No CRC here; framing comes from the outer layer (e.g., Mini-HDLC).
+    Pack and unpack the inner RIC frame.
+
+    [msgNum:1][type/proto:1][elem:1][payload...]   No CRC here; framing comes from the outer layer
+    (e.g., Mini-HDLC).
     """
 
     @staticmethod

@@ -9,3 +9,5 @@ __pycache__/
 .DS_Store
 
 CLI
+# Local movement lab runtime, ROS builds and experiment recordings
+.shake-lab/

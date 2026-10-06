@@ -9,7 +9,7 @@ It was designed to complement [`axiom_driver`](../axiom_driver) by providing a l
 ## Features
 
 - 🔍 **Dynamic topic discovery** — new topics matching a regex filter are auto-subscribed.
-- 📈 **Real-time plotting** using `matplotlib` (optionally switchable to `pyqtgraph`).
+- 📈 **Real-time plotting** using `matplotlib` .
 - 🔢 **Supports multiple message types:**
   - Standard numeric types (`std_msgs/Float32`, `Int32`, etc.)
   - Common sensor types (`sensor_msgs/Range`)
@@ -57,7 +57,7 @@ This will:
 
 ```bash
 ros2 run axiom_plotter dynamic_grapher \
-  --topic-regex "/VL53L4CD_129/range/front" \
+  --topic-regex "/axiom/bus_1/device_129/range$" \
   --sensor-qos --qos-depth 200 \
   --history-sec 60 \
   --rate-hz 10
@@ -67,12 +67,12 @@ Examples:
 - Plot **VL53L4CD range sensor**:
   ```bash
   ros2 run axiom_plotter dynamic_grapher \
-    --topic-regex "/VL53L4CD_129/range/front"
+    --topic-regex "/axiom/bus_1/device_129/range$"
   ```
 - Plot **IMU Z acceleration**:
   ```bash
   ros2 run axiom_plotter dynamic_grapher \
-    --topic-regex "/LSM6DS_76a/imu/data_raw" \
+    --topic-regex "/axiom/bus_1/device_76a/imu/data_raw$" \
     --field linear_acceleration.z
   ```
 
@@ -82,7 +82,7 @@ Examples:
 
 | Option               | Default  | Description |
 |----------------------|----------|-------------|
-| `--topic-regex`      | `""`     | Substring to match topic names (empty = all) |
+| `--topic-regex`      | `""`     | Regular expression searched in topic names (empty = all) |
 | `--field`            | `""`     | Dot-path to a numeric field inside complex messages (e.g. `pose.position.z`) |
 | `--discovery-interval` | `2.0`  | How often (sec) to check for new topics |
 | `--history-sec`      | `60.0`   | Time window to plot (seconds) |
@@ -118,3 +118,7 @@ source install/setup.bash
 ## License
 
 MIT © 2025
+
+History is measured in seconds using message stamps (receipt time if absent), not
+GUI frames. Idle data expires and clock resets clear history. `--max-points` defaults
+to 100000 per topic to bound memory; reduce the window or increase this cap if needed.

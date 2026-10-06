@@ -1,0 +1,8 @@
+# Numeric arguments in descriptor order and units. No-argument commands use [].
+# The service name identifies the device and descriptor command.
+float64[] values
+---
+# Success means firmware acknowledged the request, not physical completion.
+bool success
+string message
+string response_json

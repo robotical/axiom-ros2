@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 package_name = 'axiom_bringup'
 
@@ -12,13 +12,13 @@ setup(
         ('share/' + package_name + '/launch', ['launch/bringup.launch.py']),
     ],
     install_requires=['setuptools'],
+    extras_require={'test': ['pytest']},
     zip_safe=True,
     maintainer='Nikos',
     maintainer_email='nikos@robotical.io',
     description='Launch files and configs for Axiom.',
     license='MIT',
     entry_points={
-        'console_scripts': [
-        ],
+        'console_scripts': [],
     },
 )

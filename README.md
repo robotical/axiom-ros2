@@ -1,153 +1,163 @@
+# Axiom ROS 2
 
-## Protocols, Framing, Encoding & Transports
+Robotical's Axiom ROS 2 driver and tools.
 
-This driver layers several light protocols to move RIC (Robot Interface Controller) frames between the device and ROS 2.
+Tested stack: Ubuntu 24.04, ROS 2 Jazzy. Transports: USB serial and framed
+WebSocket (`/ws`). One driver instance per Axiom.
 
-### Layer Overview (outer → inner)
+## Build on Linux
 
-1. Physical / Transport  
-   - Serial: [`axiom_driver.transports.serial.SerialTransport`](src/axiom_driver/axiom_driver/transports/serial.py)  
-   - WebSocket (data + control): implemented in mixin [`axiom_driver.bridge_mixins.WebSocketMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py)  
-2. Optional ASCII-safe wrapper (serial only when using OverAscii)  
-   - ProtocolOverAscii: encoder [`axiom_driver.protocols.overascii.encode`](src/axiom_driver/axiom_driver/protocols/overascii.py), streaming decoder [`axiom_driver.protocols.overascii.Decoder`](src/axiom_driver/axiom_driver/protocols/overascii.py)  
-3. Mini-HDLC (framing + CRC16)  
-   - [`axiom_driver.mini_hdlc.MiniHDLC`](src/axiom_driver/axiom_driver/mini_hdlc.py) (methods: `encode()`, `try_decode()`)  
-4. Inner RIC frame (header + payload)  
-   - [`axiom_driver.protocols.ric_frame.RICFrame`](src/axiom_driver/axiom_driver/protocols/ric_frame.py)  
-     Format: `[msgNum:1][type/proto:1][elem:1][payload...]`  
-5. Dispacher / RPC correlation  
-   - [`axiom_driver.protocols.dispatcher.Dispatcher`](src/axiom_driver/axiom_driver/protocols/dispatcher.py) matches responses (CMDRESPJSON) by `msgNum`  
-6. Sensor payload JSON (devjson) → decoded using firmware-provided type metadata inside [`axiom_driver.bridge_mixins.SensorPayloadMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py)
+Requires ROS 2 Jazzy, `rosdep` and `colcon`. Run from the repository root:
 
-### Message Type & Protocol IDs
-
-Defined in [`axiom_driver.ric_consts`](src/axiom_driver/axiom_driver/ric_consts.py):
-
-- Types: `TYPE_COMMAND`, `TYPE_RESPONSE`, `TYPE_PUBLISH`
-- Protocols: `PROTO_ROSSERIAL` (devjson publish), `PROTO_RICREST`, `PROTO_BRIDGE_RICREST`, `PROTO_RAWCMDFRAME`
-- Elements: `ELEM_URL`, `ELEM_CMDRESPJSON`, etc.
-- Helper: [`axiom_driver.ric_consts.pack_type_proto`](src/axiom_driver/axiom_driver/ric_consts.py)
-
-### WebSocket Modes
-
-Parameter `ws_pcol` (see [`axiom_driver.axiom_bridge_node.AxiomBridgeNode._ws_mode`](src/axiom_driver/axiom_driver/axiom_bridge_node.py)):
-
-- `RICSerial`: Binary WS frames carry Mini-HDLC wrapped RIC frames
-- `RICFrame`: Binary WS frames carry raw RIC frames (no HDLC)
-- `RICJSON`: (future) plain JSON semantics
-
-Control channel receive path: [`axiom_driver.bridge_mixins.WebSocketMixin._on_message_ctrl`](src/axiom_driver/axiom_driver/bridge_mixins.py)
-
-### Serial Modes
-
-Parameter `serial.mode` (auto-detected in [`axiom_driver.bridge_mixins.SerialMixin._serial_on_bytes`](src/axiom_driver/axiom_driver/bridge_mixins.py)):
-
-- `ascii`: Lines of console text; JSON responses/publishes extracted in `_feed_console`
-- `overascii`: ProtocolOverAscii → Mini-HDLC → RIC frame
-- `auto`: Start ASCII, switch to OverAscii on high-bit / sentinel patterns
-
-OverAscii streaming decoder: [`axiom_driver.protocols.overascii.Decoder.feed`](src/axiom_driver/axiom_driver/protocols/overascii.py) → feeds HDLC deframer.
-
-### Framing & CRC
-
-Mini-HDLC: [`axiom_driver.mini_hdlc.MiniHDLC`](src/axiom_driver/axiom_driver/mini_hdlc.py)  
-- Flag (default 0x7E), Escape (0x7D), XOR (0x20) can be overridden via parameters `hdlc_flag`, `hdlc_escape`, `hdlc_xor` (declared in [`axiom_driver.axiom_bridge_node`](src/axiom_driver/axiom_driver/axiom_bridge_node.py)).  
-- CRC: `crc16_ccitt()` table-driven implementation (same file).
-
-Serial deframing (streaming): [`axiom_driver.protocols.ric_serial.RICSerial.feed_bytes`](src/axiom_driver/axiom_driver/protocols/ric_serial.py)  
-Single-shot decode (WebSocket control path): [`axiom_driver.mini_hdlc.MiniHDLC.try_decode`](src/axiom_driver/axiom_driver/mini_hdlc.py)
-
-### RPC Flow (RIC REST URL)
-
-Service handler: [`axiom_driver.axiom_bridge_node.AxiomBridgeNode.handle_ric_rest_url`](src/axiom_driver/axiom_driver/axiom_bridge_node.py)
-
-Steps (serial OverAscii path):
-1. Pack inner frame: [`axiom_driver.protocols.ric_frame.RICFrame.pack`](src/axiom_driver/axiom_driver/protocols/ric_frame.py)
-2. Wrap HDLC: [`axiom_driver.protocols.ric_serial.RICSerial.encode`](src/axiom_driver/axiom_driver/protocols/ric_serial.py)
-3. OverAscii encode: [`axiom_driver.protocols.overascii.encode`](src/axiom_driver/axiom_driver/protocols/overascii.py)
-4. Send via [`axiom_driver.transports.serial.SerialTransport.send`](src/axiom_driver/axiom_driver/transports/serial.py)
-5. Response matched by [`axiom_driver.protocols.dispatcher.Dispatcher`](src/axiom_driver/axiom_driver/protocols/dispatcher.py)
-
-WS RICSerial path skips OverAscii (HDLC only). WS RICFrame path skips both OverAscii + HDLC.
-
-### Publish (Sensor Data) Flow
-
-1. Device emits devjson:
-   - Serial ASCII: parsed in [`axiom_driver.bridge_mixins.SerialMixin._feed_console`](src/axiom_driver/axiom_driver/bridge_mixins.py)
-   - Serial OverAscii / WS: RIC publish frame handled in [`axiom_driver.bridge_mixins.PublishMixin._handle_publish_frame`](src/axiom_driver/axiom_driver/bridge_mixins.py) or serial frame handler.
-2. Payload dict dispatched via [`axiom_driver.bridge_mixins.SensorPayloadMixin._dispatch_sensor_payload`](src/axiom_driver/axiom_driver/bridge_mixins.py)
-3. Firmware-provided metadata drives decoding in [`axiom_driver.bridge_mixins.SensorPayloadMixin._decode_samples_from_hex`](src/axiom_driver/axiom_driver/bridge_mixins.py)
-4. Publishers cached by [`axiom_driver.publisher_cache.PublisherCache`](src/axiom_driver/axiom_driver/publisher_cache.py)
-
-### Encoding / Decoding Examples
-
-RIC URL command (WS, RICSerial):
-
-```python
-from axiom_driver.protocols.ric_frame import RICFrame
-from axiom_driver.ric_consts import TYPE_COMMAND, PROTO_RICREST, ELEM_URL, pack_type_proto
-# Given msgnum, url_str, and MiniHDLC instance hdlc
-ric = RICFrame.pack(msgnum, pack_type_proto(TYPE_COMMAND, PROTO_RICREST), ELEM_URL, url_str.encode())
-payload = hdlc.encode(ric)  # send as binary WS frame
+```bash
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source install/setup.bash
 ```
 
-OverAscii wrap (serial):
+Source ROS and `install/setup.bash` in each ROS terminal.
 
-```python
-from axiom_driver.protocols.overascii import encode as oa_encode
-hdlc_bytes = ric_serial.encode(ric_frame_bytes)
-ascii_safe = oa_encode(hdlc_bytes)
-serial_transport.send(ascii_safe)
+## Connect a board
+
+USB, Terminal 1:
+
+```bash
+ros2 launch axiom_bringup bringup.launch.py \
+  transport:=serial serial.port:=/dev/ttyACM0
 ```
 
-Mini-HDLC single frame decode:
+Replace the serial path as needed; prefer `/dev/serial/by-id/…`. Serial device
+permissions must allow access from the account running the driver.
 
-```python
-ok, inner = mini_hdlc.try_decode(framed_bytes)
-if ok:
-    # inner is RIC frame
-    ...
+Wi-Fi, Terminal 1 (replace the IP):
+
+```bash
+ros2 launch axiom_bringup bringup.launch.py \
+  transport:=ws device_uri:=ws://192.168.1.11/ws
 ```
 
-Streaming serial deframe (inside reader loop):
+Defaults: namespace `axiom`; `auto_connect`, `autosub` and `auto_reconnect` are
+false. `enable_plotter`, `enable_thermal` and `enable_rqt` are also false.
 
-```python
-ric_serial.feed_bytes(raw_chunk)  # internally accumulates, finds flags, CRC checks, invokes on_frame
+Connection and acquisition, Terminal 2:
+
+```bash
+ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
+ros2 service call /axiom/publish_data_subscription axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
+ros2 topic list -t --no-daemon
 ```
 
-### Error / Timeout Handling
+Inventory and IMU inspection. Run the echoes separately and use the topic path
+from the inventory or topic list:
 
-- WS control RPC timeout: logged in [`axiom_driver.axiom_bridge_node.AxiomBridgeNode.handle_ric_rest_url`](src/axiom_driver/axiom_driver/axiom_bridge_node.py)
-- Serial HDLC decode errors surfaced via `on_error` callback in [`axiom_driver.protocols.ric_serial.RICSerial`](src/axiom_driver/axiom_driver/protocols/ric_serial.py)
-- Dispatcher reset on disconnect: [`axiom_driver.protocols.dispatcher.Dispatcher.reset_waiters`](src/axiom_driver/axiom_driver/protocols/dispatcher.py)
+```bash
+ros2 topic echo /axiom/devices --qos-durability transient_local
+ros2 topic echo /axiom/bus_1/device_76a/imu/data_raw --qos-reliability best_effort
+```
 
-### Parameter Hooks (selected)
+Ctrl+C stops an echo subscriber; acquisition continues. Stop acquisition with
+rate zero, then disconnect:
 
-Declared in [`axiom_driver.axiom_bridge_node.AxiomBridgeNode.__init__`](src/axiom_driver/axiom_driver/axiom_bridge_node.py):
-- `ws_pcol` (RICSerial|RICFrame|RICJSON)
-- `hdlc_flag`, `hdlc_escape`, `hdlc_xor`
-- `serial.mode` (auto/ascii/overascii)
-- `serial.autosub`, `serial.devjson_rate_hz`
-- `ricrest_proto` (RICREST|BRIDGE_RICREST)
-- `rpc_default_timeout`
+```bash
+ros2 service call /axiom/publish_data_subscription axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 0.0}'
+ros2 service call /axiom/disconnect axiom_interfaces/srv/Disconnect '{}'
+```
 
-### Extending
+Automatic startup: `auto_connect:=true autosub:=true`. Connection retries:
+`auto_reconnect:=true`. These are independent startup parameters.
 
-Add support for a new sensor payload:
-1. Ensure the firmware exposes the device through `devman/typeinfo` with `resp` metadata describing each attribute.
-2. (Optional) extend `_publish_specialized_sample` in [`SensorPayloadMixin`](src/axiom_driver/axiom_driver/bridge_mixins.py) if the decoded values should be mapped onto specific ROS message types beyond the generic JSON topic.
+## Sensor discovery and hot plugging
 
-Add a new framing / protocol layer:
-- Wrap before Mini-HDLC (outer) or replace Mini-HDLC with alternate deframer, then adapt the receive path in `SerialMixin` / `WebSocketMixin`.
+During acquisition, firmware descriptors drive sensor discovery, decoding and
+creation of ROS topics and configuration/output services. Unplug retires the
+device's publishers and services; reconnect recreates them without a driver restart.
 
-### Quick Reference
+`topic_aliases` only adds names such as `/axiom/imu/data_raw`; it is not a sensor
+inventory or support list. Identity-based topics remain available. New standard
+descriptor profiles require no per-sensor YAML entry. Unsupported custom binary
+formats or ROS message mappings require driver changes.
 
-| Concern        | Component |
-| -------------- | --------- |
-| ASCII-safe tunnel | OverAscii (`encode()`, `Decoder.feed()`) |
-| Framing + CRC  | Mini-HDLC (`MiniHDLC.encode`, `.try_decode`) |
-| Inner frame    | RICFrame (`RICFrame.pack`) |
-| RPC matching   | Dispatcher (`Dispatcher.register_waiter`, `.handle_frame`) |
-| Serial stream  | RICSerial (`feed_bytes`) |
-| Sensor decode  | Firmware metadata & `SensorPayloadMixin` |
-| Dynamic pubs   | `PublisherCache` |
+Topic addresses are normalized hexadecimal extended firmware addresses. Use the
+inventory paths, not assumed physical I2C addresses. Services: `ros2 service list -t`.
+Descriptors: `/axiom/device_metadata`.
+
+## Multiple Axioms
+
+Each board has a separate driver, namespace, connection and frame prefix. Copy
+the example and edit the endpoints:
+
+```bash
+cp "$(ros2 pkg prefix --share axiom_driver)/config/two_axioms.yaml" ./axioms.yaml
+```
+
+USB + Wi-Fi configuration with automatic acquisition:
+
+```yaml
+axioms:
+  axiom/front:
+    transport: serial
+    serial.port: /dev/ttyACM0
+    auto_connect: true
+    autosub: true
+    publish_rate_hz: 20.0
+  axiom/rear:
+    transport: ws
+    device_uri: ws://192.168.1.11/ws
+    auto_connect: true
+    autosub: true
+    publish_rate_hz: 20.0
+```
+
+Save as `axioms.yaml` and launch:
+
+```bash
+ros2 launch axiom_driver multi_axiom.launch.py boards_file:="$PWD/axioms.yaml"
+```
+
+Topics and services are scoped under `/axiom/front` and `/axiom/rear`. Sensor
+addresses are independent across boards. Duplicate namespaces, frame prefixes and
+endpoints are rejected. Without the automatic startup flags, call each board's
+connection and acquisition services separately.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    FW["Axiom firmware: polling + FIFO"] --> S["Session: framed WS or serial"]
+    S --> Q["Bounded receive queue"]
+    Q --> P["Pipeline: registry + metadata + decoding + device time"]
+    P --> A["ROS adapters: standard messages + DeviceSample"]
+    A --> DDS["DDS: multiple consumers / rosbag"]
+    ROS["ROS services"] --> S
+    ROS --> P
+    S --> FW
+```
+
+| Package | Responsibility |
+|---|---|
+| `axiom_driver` | Pure Python firmware client, single ordered decode worker, ROS adapters and services |
+| `axiom_interfaces` | Generic timestamped sample and compatibility messages; connection/configuration services |
+| `axiom_bringup` | Namespace, parameter file and optional visualization launch |
+| `axiom_debug_tools` | IMU/range/environment monitoring |
+| `axiom_plotter` | Topic discovery and timestamp-based plot history |
+| `axiom_thermal_viz` | ThermalGrid to RViz markers |
+| `axiom_shake_detector` | Optional shake-event consumer for teaching examples |
+
+Details: [parameters and ROS interfaces](src/axiom_driver/README.md),
+[firmware compatibility](docs/firmware-alignment.md),
+[validation](docs/validation.md).
+
+Run one firmware acquisition client per board. Other direct firmware clients
+compete for the firmware publication queue. Additional consumers should subscribe
+to the ROS topics; they share the driver's DDS output.
+
+## Tests
+
+```bash
+colcon test --event-handlers console_direct+
+colcon test-result --verbose
+```
+
+Tests use WebSocket peers, POSIX virtual serial ports and ROS DDS with
+firmware-source fixtures. Hardware checks are recorded in `docs/validation.md`.

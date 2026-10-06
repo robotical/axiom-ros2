@@ -1,14 +1,15 @@
 FLAG_DEFAULT = 0xE7
-ESC_DEFAULT  = 0xD7
-XOR_DEFAULT  = 0x20
+ESC_DEFAULT = 0xD7
+XOR_DEFAULT = 0x20
 
 # CRC-16-CCITT (poly 0x1021, init 0xFFFF), big-endian transmit
-_CRC_TAB = [0]*256
+_CRC_TAB = [0] * 256
 for i in range(256):
     crc = i << 8
     for _ in range(8):
         crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
     _CRC_TAB[i] = crc
+
 
 def crc16_ccitt(data: bytes, init: int = 0xFFFF) -> int:
     crc = init
@@ -16,26 +17,34 @@ def crc16_ccitt(data: bytes, init: int = 0xFFFF) -> int:
         crc = _CRC_TAB[((crc >> 8) ^ b) & 0xFF] ^ ((crc << 8) & 0xFFFF)
     return crc & 0xFFFF
 
+
 class MiniHDLC:
     def __init__(self, flag: int = FLAG_DEFAULT, esc: int = ESC_DEFAULT, xo: int = XOR_DEFAULT):
-        """Minimal HDLC-like framing used by firmware.
-        Defaults match console firmware: flag=0x7E, esc=0x7D, xor=0x20.
         """
-        self.flag = flag; self.esc = esc; self.xo = xo
+        Minimal HDLC-like framing used by firmware.
+
+        Defaults match Axiom firmware: flag=0xE7, esc=0xD7, xor=0x20.
+        """
+        self.flag = flag
+        self.esc = esc
+        self.xo = xo
 
     def encode(self, payload: bytes) -> bytes:
         crc = crc16_ccitt(payload)
         out = bytearray([self.flag])
         for b in payload + bytes([(crc >> 8) & 0xFF, crc & 0xFF]):
             if b in (self.flag, self.esc):
-                out.append(self.esc); out.append(b ^ self.xo)
+                out.append(self.esc)
+                out.append(b ^ self.xo)
             else:
                 out.append(b)
         out.append(self.flag)
         return bytes(out)
 
     def try_decode(self, framed: bytes):
-        """Return (ok, payload) if a single full frame is present; else (False, b'').
+        """
+        Return (ok, payload) if a single full frame is present; else (False, b'').
+
         This simple decoder expects exactly one frame: flag ... flag.
         """
         if len(framed) < 4:  # min flag, 2 crc, flag

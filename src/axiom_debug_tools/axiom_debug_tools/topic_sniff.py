@@ -1,10 +1,12 @@
-import time
 import json
+import time
+
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from rosidl_runtime_py.utilities import get_message
+from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from rosidl_runtime_py.convert import message_to_ordereddict
+from rosidl_runtime_py.utilities import get_message
+
 
 class TopicSniff(Node):
     def __init__(self):
@@ -25,7 +27,7 @@ class TopicSniff(Node):
         self._count = 0
         self._topic = topic
         self.create_subscription(msg_type, topic, self._cb, qos)
-        self.get_logger().info(f"Sniffing {topic} [{type_str}]…")
+        self.get_logger().info(f'Sniffing {topic} [{type_str}]…')
 
     def _cb(self, msg):
         now = time.time()
@@ -37,7 +39,8 @@ class TopicSniff(Node):
         self._last_time = now
         self._count += 1
         pretty = json.dumps(message_to_ordereddict(msg), ensure_ascii=False)
-        self.get_logger().info(f"[{self._count}] {self._topic} @ ~{hz:.2f} Hz {pretty}")
+        self.get_logger().info(f'[{self._count}] {self._topic} @ ~{hz:.2f} Hz {pretty}')
+
 
 def main(args=None):
     rclpy.init(args=args)

@@ -1,4 +1,4 @@
-string device_uri   # e.g., ws://192.168.1.10/devjson
+string device_uri   # e.g., ws://192.168.1.10/ws
 ---
 bool success
 string message

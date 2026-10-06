@@ -1,0 +1,7 @@
+# Optional aliases. Identity-based topics are always preserved.
+/**:
+  ros__parameters:
+    auto_connect: false
+    auto_reconnect: false
+    autosub: false
+    topic_aliases: '{"imu/data_raw":{"type":"LSM6DS","source":"imu/data_raw"},"range":{"type":"VL53L4CD","source":"range"}}'
