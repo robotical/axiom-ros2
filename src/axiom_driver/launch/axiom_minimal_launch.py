@@ -1,15 +1,26 @@
 """Launch one board, with a parameter file and typed command-line overrides."""
 
-from axiom_driver.config import DEFAULT_PARAMETERS
+from axiom_driver.config import DEFAULT_PARAMETERS, load_boards
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
 def runtime_node(context):
+    parameters = [LaunchConfiguration('params_file')]
+    boards_file = LaunchConfiguration('boards_file').perform(context)
+    if boards_file:
+        namespace = '/' + LaunchConfiguration('namespace').perform(context).strip('/')
+        boards = load_boards(boards_file)
+        if namespace not in boards:
+            raise ValueError(f'{namespace} is not configured in {boards_file}')
+        parameters.append({
+            key: ParameterValue(value, value_type=type(DEFAULT_PARAMETERS[key]))
+            for key, value in boards[namespace].items()
+        })
     overrides = {}
     for name, default in DEFAULT_PARAMETERS.items():
         value = LaunchConfiguration(name).perform(context)
@@ -29,7 +40,7 @@ def runtime_node(context):
             executable='axiom_bridge_node',
             name='axiom_bridge_node',
             namespace=LaunchConfiguration('namespace'),
-            parameters=[LaunchConfiguration('params_file'), overrides],
+            parameters=parameters + [overrides],
             output='screen',
         )
     ]
@@ -38,6 +49,8 @@ def runtime_node(context):
 def generate_launch_description():
     arguments = [
         DeclareLaunchArgument('namespace', default_value='axiom'),
+        DeclareLaunchArgument('boards_file', default_value=EnvironmentVariable(
+            'AXIOM_ROS_BOARDS_FILE', default_value='')),
         DeclareLaunchArgument(
             'params_file',
             default_value=PathJoinSubstitution(

@@ -5,7 +5,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -13,6 +13,8 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     arguments = [
         DeclareLaunchArgument('namespace', default_value='axiom'),
+        DeclareLaunchArgument('boards_file', default_value=EnvironmentVariable(
+            'AXIOM_ROS_BOARDS_FILE', default_value='')),
         DeclareLaunchArgument(
             'params_file',
             default_value=PathJoinSubstitution(
@@ -42,7 +44,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             name: LaunchConfiguration(name)
-            for name in ['namespace', 'params_file'] + list(DEFAULT_PARAMETERS)
+            for name in ['namespace', 'params_file', 'boards_file'] + list(DEFAULT_PARAMETERS)
         }.items(),
     )
     plotter = Node(

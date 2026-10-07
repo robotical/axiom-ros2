@@ -18,6 +18,55 @@ source install/setup.bash
 
 Source ROS and `install/setup.bash` in each ROS terminal.
 
+## Machine and board configuration
+
+Keep local settings in two files, both ignored by Git:
+
+```bash
+cp config/machine.env.example config/machine.env
+cp config/boards.yaml.example config/boards.yaml
+```
+
+Edit `machine.env` for the ROS setup script, workspace, DDS domain and dashboard
+port. The workspace defaults to this checkout, independent of the terminal's
+current directory. Jazzy is the default underlay; set `ROS_SETUP_FILE` for a
+different installation path. All ROS terminals and the dashboard should use the
+same domain.
+
+Edit `boards.yaml` for each Axiom's namespace and USB path or WebSocket URI.
+Prefer `/dev/serial/by-id/…` for USB. For a Wi-Fi board:
+
+```yaml
+axioms:
+  axiom:
+    transport: ws
+    device_uri: ws://192.168.1.3/ws
+    auto_connect: false
+    auto_reconnect: false
+    autosub: false
+```
+
+Use the board's actual address. Optional aliases, sensor frames and other driver
+parameters can be added to each entry. Sensor discovery requires no sensor list.
+
+Prepare each terminal with:
+
+```bash
+source /path/to/axiom-ros2/scripts/setup_env.sh
+```
+
+This sources ROS and the workspace overlay, if built, and exports the local
+settings. Launch one configured board with `ros2 launch axiom_bringup
+bringup.launch.py namespace:=axiom`, or all entries with `ros2 launch axiom_driver
+multi_axiom.launch.py`. Both read `AXIOM_ROS_BOARDS_FILE`; an explicit
+`boards_file:=/path/to/boards.yaml` overrides it. Single-board launch arguments
+override that board's parameters. The example configuration leaves connection
+and acquisition as manual console steps.
+
+Set `AXIOM_MACHINE_CONFIG=/path/to/machine.env` before sourcing the setup script
+to keep the machine file elsewhere. It is a sourced shell file; use it for local
+settings you control. Restart consoles and the guide after editing configuration.
+
 ## Optional scenarios dashboard
 
 The console guide, ROS graph, scenarios and RViz examples are in
@@ -27,11 +76,11 @@ Build them alongside the driver from this repository:
 ```bash
 rosdep install --from-paths src examples/scenarios-dashboard/src --ignore-src -r -y
 colcon build --base-paths src examples/scenarios-dashboard/src --symlink-install
-source install/setup.bash
-ros2 run axiom_marty_dashboard dashboard
+source scripts/setup_env.sh
+bash examples/scenarios-dashboard/scripts/dashboard.sh
 ```
 
-Open http://127.0.0.1:8083. The dashboard observes ROS state and provides commands
+Open http://127.0.0.1:8083 (or your configured port). The dashboard observes ROS state and provides commands
 to run in the console. Drivers, acquisition and RViz work independently of it.
 `COLCON_IGNORE` excludes the example from default recursive builds; specifying
 its `src` directory includes it. Marty packages are needed only for Marty scenarios.

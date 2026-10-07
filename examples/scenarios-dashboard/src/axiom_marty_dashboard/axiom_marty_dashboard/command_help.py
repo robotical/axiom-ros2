@@ -104,7 +104,8 @@ DESCRIPTIONS = {
     "frequency until Ctrl+C. This measures delivery at this subscriber, not the firmware's "
     "configured sensor sampling rate.",
     "Browser guide": "Starts the optional teaching dashboard. It observes inventory and the ROS "
-    "graph and serves the guide at http://127.0.0.1:8083. It does not start driver nodes, connect "
+    "graph and serves the guide on AXIOM_DASHBOARD_PORT (default 8083). "
+    "It does not start driver nodes, connect "
     "devices or request sensor acquisition.",
     "Topic echo": "Creates a ROS subscription and prints received messages until Ctrl+C. Replace "
     "BUS and ADDRESS with an actual device identity from /axiom/devices. This command does not "
@@ -130,6 +131,9 @@ DESCRIPTIONS = {
 }
 
 PARAMETERS = {
+    "boards_file": "YAML board configuration shared with the guide. The namespace selects "
+    "one board in the single-driver launch; the multi-driver launch starts every entry. "
+    "Explicit launch arguments override the selected board's parameters.",
     "transport": "Axiom transport: serial for a Linux USB device, or ws for a WebSocket "
     "connection. Uses AXIOM_ROS_TRANSPORT when set, otherwise serial.",
     "device_uri": "Axiom WebSocket address. Uses AXIOM_ROS_URI when set, otherwise the shown "

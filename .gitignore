@@ -11,3 +11,6 @@ __pycache__/
 CLI
 # Local movement lab runtime, ROS builds and experiment recordings
 .shake-lab/
+# Per-machine paths and board connections; keep the example files in Git.
+config/machine.env
+config/boards.yaml

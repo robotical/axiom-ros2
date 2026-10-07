@@ -15,7 +15,7 @@ def test_bringup_exposes_driver_parameters_and_optional_tools():
     entities = module.generate_launch_description().entities
     arguments = {item.name for item in entities if isinstance(item, DeclareLaunchArgument)}
     assert set(DEFAULT_PARAMETERS) <= arguments
-    assert {'namespace', 'params_file', 'enable_plotter', 'enable_thermal'} <= arguments
+    assert {'namespace', 'params_file', 'boards_file', 'enable_plotter', 'enable_thermal'} <= arguments
     assert sum(isinstance(item, IncludeLaunchDescription) for item in entities) == 1
 
 

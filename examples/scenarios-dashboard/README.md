@@ -8,12 +8,14 @@ commands; the guide observes state and displays command examples.
 
 Stack: ROS 2 Jazzy on Ubuntu 24.04. Run these commands from the `axiom-ros2`
 repository root. The dashboard and RViz adapters are included in this clone.
+For machine paths and board connections, copy and edit the local configuration
+examples described in the [project README](../../README.md#machine-and-board-configuration).
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source scripts/setup_env.sh
 rosdep install --from-paths src examples/scenarios-dashboard/src --ignore-src -r -y
 colcon build --base-paths src examples/scenarios-dashboard/src --symlink-install
-source install/setup.bash
+source scripts/setup_env.sh
 ```
 
 Optional tmux consoles:
@@ -26,12 +28,17 @@ bash examples/scenarios-dashboard/scripts/ros_tmux.sh
 Guide, in a separate terminal:
 
 ```bash
-ros2 run axiom_marty_dashboard dashboard
+bash examples/scenarios-dashboard/scripts/dashboard.sh
 ```
 
-Guide: http://127.0.0.1:8083. Scenarios, command notes, interface inventory and
+Guide: http://127.0.0.1:8083, or the port in `machine.env`. Scenarios, command notes, interface inventory and
 current DDS graph. Board selection scopes the commands; the running graph covers
 all discovered nodes. Device connection and acquisition are controlled by the drivers.
+The tmux consoles and guide wrapper load the same `machine.env`. Configured boards
+are shown before their drivers start; their single-board launch commands use the
+same `boards.yaml` as the console. Guide scenarios explicitly keep connection and
+acquisition manual. The separate USB + Wi-Fi scenario uses its own generated
+configuration with automatic connection and acquisition, as shown in its steps.
 
 Scenarios show one expanded step, with Previous/Next navigation and an Expand all
 view. Each step pairs its expected result with read-only ROS evidence and a small

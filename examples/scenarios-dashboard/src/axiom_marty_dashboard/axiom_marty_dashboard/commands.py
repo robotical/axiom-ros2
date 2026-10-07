@@ -5,10 +5,12 @@ import os
 import re
 import shlex
 
+from axiom_driver.config import load_boards
+
 from .command_help import explain
 
 
-def recipes(state, axiom_namespace="/axiom"):
+def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     root = "/" + axiom_namespace.strip("/")
     rows = []
     thermal_topics = sorted({
@@ -34,18 +36,25 @@ def recipes(state, axiom_namespace="/axiom"):
             note,
         )
 
-    boards = json.loads(os.environ.get("AXIOM_ROS_BOARDS", "{}"))
-    board = boards.get(root.strip("/"), {})
+    if boards_file is None:
+        boards_file = os.environ.get("AXIOM_ROS_BOARDS_FILE", "")
+    if boards is None:
+        boards = (load_boards(boards_file) if boards_file else
+                  json.loads(os.environ.get("AXIOM_ROS_BOARDS", "{}")))
+    board = boards.get(root, boards.get(root.strip("/"), {}))
     transport = shlex.quote(board["transport"]) if board else '"${AXIOM_ROS_TRANSPORT:-serial}"'
     uri = shlex.quote(board["device_uri"]) if board else '"${AXIOM_ROS_URI:-ws://192.168.1.7/ws}"'
+    driver_settings = (
+        f"boards_file:={shlex.quote(boards_file)} " if boards_file and board else
+        'boards_file:="" params_file:="$(ros2 pkg prefix --share axiom_driver)/config/hotplug.yaml" '
+        f"transport:={transport} device_uri:={uri} "
+        'serial.port:="${AXIOM_ROS_SERIAL_PORT:-/dev/ttyACM0}" '
+    )
     add(
         "Start nodes",
         "Axiom driver",
         "ros2 launch axiom_driver axiom_minimal_launch.py "
-        f"namespace:={root} "
-        'params_file:="$(ros2 pkg prefix --share axiom_driver)/config/hotplug.yaml" '
-        f"transport:={transport} device_uri:={uri} "
-        'serial.port:="${AXIOM_ROS_SERIAL_PORT:-/dev/ttyACM0}" '
+        f"namespace:={root} " + driver_settings +
         "auto_connect:=false auto_reconnect:=false autosub:=false",
         "Keep running. The optional aliases are /imu/data_raw and /range beneath this board.",
     )
@@ -53,9 +62,11 @@ def recipes(state, axiom_namespace="/axiom"):
         "Start nodes",
         "Multiple Axiom drivers",
         "ros2 launch axiom_driver multi_axiom.launch.py "
-        'boards_file:="${AXIOM_ROS_BOARDS_FILE:-$(ros2 pkg prefix '
-        '--share axiom_driver)/config/two_axioms.yaml}"',
-        "Edit each board connection in YAML first. Every driver starts disconnected.",
+        + (f"boards_file:={shlex.quote(boards_file)}" if boards_file else
+           'boards_file:="${AXIOM_ROS_BOARDS_FILE:-$(ros2 pkg prefix '
+           '--share axiom_driver)/config/two_axioms.yaml}"'),
+        "Uses the board file's connection and acquisition settings. "
+        "The supplied example starts disconnected.",
     )
     add(
         "Start nodes",

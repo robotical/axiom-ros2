@@ -180,6 +180,10 @@ def start(args):
             "-e",
             "AXIOM_ROS_BOARDS_FILE=/ws/axioms.yaml",
             "-e",
+            "AXIOM_ROS_ROOT=/axiom",
+            "-e",
+            "ROS_WORKSPACE=/ws",
+            "-e",
             "AXIOM_ROS_BOARDS="
             + json.dumps(
                 {

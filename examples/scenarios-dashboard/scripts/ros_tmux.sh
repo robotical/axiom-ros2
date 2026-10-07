@@ -2,7 +2,8 @@
 # Four empty ROS consoles. No drivers, connections or acquisition are started.
 set -euo pipefail
 demo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-export ROS_WORKSPACE=${ROS_WORKSPACE:-$PWD}
+repo_root=${AXIOM_ROS_ROOT:-$(cd "$demo_root/../.." && pwd)}
+source "$repo_root/scripts/setup_env.sh"
 session=axiom
 tmux_cmd=(tmux -L axiom-ros -f "$demo_root/scripts/tmux.conf")
 if ! "${tmux_cmd[@]}" has-session -t "$session" 2>/dev/null; then

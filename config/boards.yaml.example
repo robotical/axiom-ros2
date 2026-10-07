@@ -1,0 +1,14 @@
+# Copy to boards.yaml and edit the connections for this machine.
+# Every board needs a unique namespace and connection.
+axioms:
+  axiom:
+    transport: serial
+    serial.port: /dev/serial/by-id/REPLACE_WITH_AXIOM_DEVICE
+    # For Wi-Fi, use transport: ws and device_uri: ws://192.168.1.3/ws
+    auto_connect: false
+    auto_reconnect: false
+    autosub: false
+    # Optional aliases used by the guide; other sensors are discovered normally.
+    topic_aliases:
+      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      range: {type: VL53L4CD, source: range}

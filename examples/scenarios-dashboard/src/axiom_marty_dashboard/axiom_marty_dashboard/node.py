@@ -1,8 +1,10 @@
 """Optional observer: subscribes to ROS state and exposes read-only HTTP snapshots."""
 
 import json
+import os
 import time
 
+from axiom_driver.config import load_boards
 from axiom_interfaces.srv import GetConnectionState
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
@@ -30,10 +32,12 @@ class Dashboard(Node):
         super().__init__("dashboard", **kwargs)
         for key, value in dict(
             host="127.0.0.1",
-            port=8083,
+            port=int(os.environ.get("AXIOM_DASHBOARD_PORT", "8083")),
             workstation_reset_dir="",
         ).items():
             self.declare_parameter(key, value, ParameterDescriptor(read_only=True))
+        self.boards_file = os.environ.get("AXIOM_ROS_BOARDS_FILE", "")
+        self.configured_boards = load_boards(self.boards_file) if self.boards_file else None
         self.boards = {}
         self.marty_status, self.marty_seen = {}, None
         retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -48,7 +52,8 @@ class Dashboard(Node):
             self.get_parameter("port").value,
             reset=WorkstationReset(reset_dir) if reset_dir else None,
         )
-        self._add_board("/axiom")
+        for root in self.configured_boards or {"/axiom": {}}:
+            self._add_board(root)
         self.create_timer(0.5, self._check_connection)
         self.create_timer(1.0, self._graph)
         self.create_timer(0.25, self._publish)
@@ -217,7 +222,10 @@ class Dashboard(Node):
         guides = {}
         for root, board in visible.items():
             devices = board["devices"] if self._board_status(board)["connected"] else []
-            commands = recipes({"devices": devices, "graph": self.graph}, root)
+            commands = recipes(
+                {"devices": devices, "graph": self.graph}, root,
+                boards=self.configured_boards, boards_file=self.boards_file,
+            )
             guides[root] = dict(
                 commands=commands,
                 catalogue=catalogue(root),
