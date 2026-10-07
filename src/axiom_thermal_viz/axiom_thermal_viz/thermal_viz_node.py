@@ -12,7 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import ColorRGBA
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,7 @@ class ThermalGridVisualizer(Node):
         self.declare_parameter('use_dynamic_range', True)
         self.declare_parameter('frame_fallback', 'thermal_link')
         self.declare_parameter('interpolation_factor', 1)
+        self.declare_parameter('show_temperatures', True)
 
         input_topic = self.get_parameter('input_topic').value
         output_topic = self.get_parameter('output_topic').value
@@ -61,6 +62,10 @@ class ThermalGridVisualizer(Node):
         sub_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
 
         self._publisher = self.create_publisher(Marker, output_topic, pub_qos)
+        self._label_publisher = self.create_publisher(
+            MarkerArray, output_topic + '_labels', pub_qos
+        )
+        self._label_count = 0
         self._subscription = self.create_subscription(
             ThermalGrid,
             input_topic,
@@ -141,6 +146,44 @@ class ThermalGridVisualizer(Node):
         marker.lifetime.nanosec = 0
 
         self._publisher.publish(marker)
+        # Labels always describe measured pixels, including when the heatmap is interpolated.
+        self._publish_temperatures(
+            marker, list(msg.temperature_c)[:total],
+            int(msg.width), int(msg.height), base_cell_size, cell_height
+        )
+
+    def _publish_temperatures(
+        self, grid: Marker, temperatures: Sequence[float],
+        width: int, height: int, cell_size: float, cell_height: float
+    ) -> None:
+        labels = MarkerArray()
+        namespace = grid.ns + '_temperatures'
+        if self.get_parameter('show_temperatures').value:
+            for index, (point, temperature) in enumerate(
+                zip(self._grid_points(width, height, cell_size), temperatures)
+            ):
+                label = Marker()
+                label.header = grid.header
+                label.ns, label.id = namespace, index
+                label.type, label.action = Marker.TEXT_VIEW_FACING, Marker.ADD
+                # RViz centres text at its pose; these offsets keep it inside the top-right corner.
+                label.pose.position = Point(x=point.x + cell_size * 0.20,
+                                            y=point.y + cell_size * 0.34,
+                                            z=cell_height / 2 + cell_size * 0.01)
+                label.pose.orientation.w = 1.0
+                label.scale.z = cell_size * 0.16
+                label.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+                label.text = f'{temperature:.1f}°'
+                labels.markers.append(label)
+        count = len(labels.markers)
+        # Retire old IDs when the grid shrinks or labels are switched off.
+        for index in range(count, self._label_count):
+            label = Marker()
+            label.header = grid.header
+            label.ns, label.id, label.action = namespace, index, Marker.DELETE
+            labels.markers.append(label)
+        self._label_count = count
+        self._label_publisher.publish(labels)
 
     def _grid_points(self, width: int, height: int, cell_size: float) -> List[Point]:
         half_w = width / 2.0
@@ -274,7 +317,8 @@ def main(args: Optional[Sequence[str]] = None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 __all__ = ['ThermalGridVisualizer', 'main']

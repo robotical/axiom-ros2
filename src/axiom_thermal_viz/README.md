@@ -6,6 +6,7 @@
 
 - Subscribes to the `ThermalGrid` topic produced by `axiom_driver`.
 - Maps temperature ranges to a colour gradient and publishes a `CUBE_LIST` marker.
+- Publishes small temperature labels at the top-right of each measured pixel.
 - Configurable topic names, scaling, alpha and fixed temperature ranges.
 
 ## Usage
@@ -23,6 +24,9 @@
    ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p input_topic:=bus_1/device_169/thermal/grid
    ```
 4. In RViz, add a *Marker* display pointed at the `thermal_heatmap` topic. Adjust the marker size/colour as desired.
+5. Add a *MarkerArray* display for `thermal_heatmap_labels` to show pixel temperatures
+   to one decimal place. Values are in °C; labels refer to measured pixels even
+   when the heatmap is interpolated.
 
 ### Parameters
 
@@ -39,6 +43,7 @@
 | `max_temperature`    | `nan`                             | Fixed maximum (°C) for colour mapping. Ignored when `use_dynamic_range` is `true`. |
 | `use_dynamic_range`  | `true`                            | When `true`, derive colour scaling from each incoming frame. |
 | `frame_fallback`     | `thermal_link`                    | Frame used if the incoming message has an empty frame id. |
+| `show_temperatures`  | `true`                            | Publish per-pixel temperature labels on `<output_topic>_labels`. Setting it to `false` removes existing labels. |
 
 ## RViz Tips
 
