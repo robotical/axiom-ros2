@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<applications xmlns="http://openbox.org/3.4/rc">
+  <application class="rviz2">
+    <position force="yes"><x>642</x><y>0</y></position>
+    <size><width>956</width><height>614</height></size>
+  </application>
+  <application class="AxiomTerminal">
+    <position force="yes"><x>642</x><y>642</y></position>
+    <size><width>956</width><height>224</height></size>
+  </application>
+  <application class="AxiomDashboard">
+    <position force="yes"><x>0</x><y>0</y></position>
+    <size><width>638</width><height>866</height></size>
+  </application>
+</applications>

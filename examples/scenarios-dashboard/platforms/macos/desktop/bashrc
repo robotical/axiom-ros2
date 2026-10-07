@@ -1,0 +1,8 @@
+# Also source overlays when a terminal is reopened from the panel.
+source /opt/ros/jazzy/setup.bash
+source /ws/install/setup.bash
+export PS1='\[\e[38;5;109m\]ROS\[\e[0m\] \w $ '
+# Each learning session starts with an empty command history, without deleting files.
+export HISTFILE=/dev/null
+alias ll='ls -alF'
+printf 'ROS 2 workspace. Start nodes from the console.\nGuide: cat /demo/docs/learn-ros2.md\nFirst command: ros2 node list --no-daemon\n'

@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+testpaths = ["src/axiom_marty_demo/test", "src/axiom_marty_dashboard/test"]
+pythonpath = ["src/axiom_marty_demo", "src/axiom_marty_dashboard"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F"]

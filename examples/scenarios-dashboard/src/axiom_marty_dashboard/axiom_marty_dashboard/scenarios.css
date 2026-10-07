@@ -1,0 +1,45 @@
+.scenario-prerequisites{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:8px 12px 5px;font-size:11px}
+.scenario-prerequisite{border:1px solid var(--line);border-radius:3px;padding:3px 6px;color:var(--muted)}
+.scenario-mode{color:var(--accent);padding:3px 6px;background:#eaf2f0;border-radius:3px}
+.scenario-toolbar{display:flex;align-items:center;gap:6px;padding:5px 12px 8px;border-bottom:1px solid var(--line)}
+.scenario-toolbar button{font-size:11px;padding:4px 6px;background:transparent}
+button:disabled{cursor:default;opacity:.4}
+.scenario-position{font-size:11px;color:var(--muted);min-width:65px;text-align:center}
+.scenario-toolbar .scenario-expand{margin-left:auto;border-color:transparent;color:var(--accent)}
+.scenario-steps{padding:0 12px}
+.scenario-step{border-bottom:1px solid #edf0f0;border-left:2px solid transparent}
+.scenario-step:last-child{border-bottom:0}
+.scenario-step.active{border-left-color:var(--accent);background:#fafcfc}
+.scenario-step-head{display:flex;align-items:center;gap:6px;padding-right:8px;min-height:36px}
+.scenario-step-toggle{display:flex;align-items:center;gap:8px;min-width:0;flex:1;text-align:left;border:0;border-radius:0;padding:7px 8px;background:transparent;font-size:12px}
+.scenario-step-toggle:hover{background:#edf3f2}
+.scenario-number{flex-shrink:0;color:#869493;font:11px ui-monospace,monospace;min-width:16px;text-align:center}
+.active .scenario-number{color:var(--accent);font-weight:600}
+.scenario-step-name{flex:1;min-width:0;line-height:1.4}
+.active .scenario-step-name{font-weight:600}
+.scenario-terminal{padding:2px 4px;font:10px ui-monospace,monospace;background:#edf2f2;border-radius:3px;color:var(--muted);white-space:nowrap}
+.scenario-step-head .command-actions{gap:5px;margin-left:0}
+.scenario-step-head .command-actions button{font-size:11px;padding:3px 7px}
+.scenario-step-head .command-actions .command-info{width:21px;height:21px;padding:0}
+.scenario-step-body{padding:0 8px 10px 24px}
+.scenario-command pre{font-size:11px;padding:7px 9px;line-height:1.5;background:#eef3f3;max-height:240px;overflow:auto}
+.scenario-instruction{margin:0 0 8px;color:#253135;font-size:12px;line-height:1.5}
+.scenario-results{display:grid;grid-template-columns:58px minmax(0,1fr);gap:4px 8px;margin:9px 0 0;font-size:12px;line-height:1.45}
+.scenario-results dt,.scenario-results dd{margin:0}
+.scenario-results dt{color:var(--muted);font-size:11px}
+.scenario-observed{color:#805d32}
+.scenario-observed.observed{color:var(--accent)}
+.scenario-evidence{margin:3px 0 8px 66px;color:var(--muted);font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.scenario-evidence:empty{display:none}
+.scenario-relationship{margin-top:8px}
+.scenario-flow-caption{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}
+.scenario-flow{display:flex;align-items:center;gap:5px;font:10px/1.45 ui-monospace,monospace}
+.scenario-flow-item{display:flex;flex-direction:column;min-width:0;flex:1;padding:5px 6px;border:1px solid var(--line);border-radius:3px;overflow-wrap:anywhere;color:var(--muted);background:white}
+.scenario-flow-item small{font:9px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-transform:capitalize;color:var(--muted)}
+.scenario-flow-item.present{color:var(--accent);border-color:#a8ccc7;background:#edf6f3}
+.scenario-flow-arrow{color:#8ba29f;flex-shrink:0}
+.scenario-detail>summary{font-size:11px;padding:8px 12px;background:white;color:var(--muted)}
+.scenario-help{padding:0 12px 9px;color:var(--muted);font-size:12px;line-height:1.5}
+.scenario-help p{margin:5px 0}
+.scenario-shortcuts{font-size:11px;color:#435f5e}
+@media(max-width:420px){.scenario-toolbar{gap:3px}.scenario-toolbar button{padding:4px}.scenario-step-body{padding-left:8px}.scenario-position{min-width:52px}.scenario-prerequisites{padding-left:8px}.scenario-steps{padding:0 8px}.scenario-flow{font-size:9px}}

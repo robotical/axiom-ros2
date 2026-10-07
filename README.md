@@ -12,11 +12,29 @@ Requires ROS 2 Jazzy, `rosdep` and `colcon`. Run from the repository root:
 ```bash
 source /opt/ros/jazzy/setup.bash
 rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
+colcon build --base-paths src --symlink-install
 source install/setup.bash
 ```
 
 Source ROS and `install/setup.bash` in each ROS terminal.
+
+## Optional scenarios dashboard
+
+The console guide, ROS graph, scenarios and RViz examples are in
+[examples/scenarios-dashboard](examples/scenarios-dashboard/README.md).
+Build them alongside the driver from this repository:
+
+```bash
+rosdep install --from-paths src examples/scenarios-dashboard/src --ignore-src -r -y
+colcon build --base-paths src examples/scenarios-dashboard/src --symlink-install
+source install/setup.bash
+ros2 run axiom_marty_dashboard dashboard
+```
+
+Open http://127.0.0.1:8083. The dashboard observes ROS state and provides commands
+to run in the console. Drivers, acquisition and RViz work independently of it.
+`COLCON_IGNORE` excludes the example from default recursive builds; specifying
+its `src` directory includes it. Marty packages are needed only for Marty scenarios.
 
 ## Connect a board
 

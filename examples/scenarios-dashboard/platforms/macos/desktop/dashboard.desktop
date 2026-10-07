@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Sensor dashboard
+Exec=/demo/platforms/macos/desktop/app.sh dashboard
+Icon=web-browser
+Terminal=false

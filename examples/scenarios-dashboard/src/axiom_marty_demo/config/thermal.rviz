@@ -1,0 +1,53 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Marker
+      Name: Thermal camera · 15–40 °C
+      Enabled: true
+      Topic:
+        Value: /sensing/thermal_heatmap
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Queue Size: 10
+      Namespaces:
+        thermal_grid: true
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Pixel temperatures · °C
+      Enabled: true
+      Topic:
+        Value: /sensing/thermal_heatmap_labels
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Queue Size: 10
+      Namespaces:
+        thermal_grid_temperatures: true
+  Enabled: true
+  Global Options:
+    Background Color: 243; 245; 245
+    Fixed Frame: thermal_link
+    Frame Rate: 20
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Angle: 0
+      Scale: 2500
+      X: 0
+      Y: 0
+      Target Frame: <Fixed Frame>
+Window Geometry:
+  Width: 1000
+  Height: 720

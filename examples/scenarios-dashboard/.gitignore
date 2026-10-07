@@ -1,0 +1,10 @@
+.venv/
+.runtime/
+.validation/
+build/
+install/
+log/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/

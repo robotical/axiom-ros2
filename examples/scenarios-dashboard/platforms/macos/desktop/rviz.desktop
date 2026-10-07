@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=RViz
+Exec=/demo/platforms/macos/desktop/app.sh rviz
+Icon=applications-science
+Terminal=false

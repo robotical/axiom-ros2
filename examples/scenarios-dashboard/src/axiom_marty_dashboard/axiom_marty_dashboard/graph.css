@@ -1,0 +1,16 @@
+.graph-toolbar{display:flex;flex-wrap:wrap;gap:5px;padding:9px 12px;border-bottom:1px solid var(--line);align-items:center}
+.graph-toolbar input{min-width:120px;width:170px;flex:1}.graph-toolbar select{max-width:210px}
+.graph-toolbar input,.graph-toolbar select,.graph-inspector+select,select[aria-label^="Inspect"]{font:inherit;color:inherit;border:1px solid #cdd8d8;border-radius:4px;background:#fff;padding:5px 7px}
+.graph-counts{padding:7px 12px}.ros-graph-viewport{overflow:auto;max-height:480px;min-height:180px;background:#fafcfc;border-block:1px solid var(--line)}
+.ros-graph-viewport svg{display:block;margin:0 auto}.ros-vertex{cursor:pointer}.ros-vertex ellipse{fill:#eaf3f1;stroke:#61958e;stroke-width:1.5}.ros-vertex rect{fill:#f0f4f4;stroke:#a9bdbc;stroke-width:1.3}
+.ros-vertex.waiting rect{fill:#fff5e6;stroke:#b9915a;stroke-dasharray:4 3}.ros-vertex text{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#253b3a;pointer-events:none}
+.ros-vertex:focus{outline:none}.ros-vertex:focus ellipse,.ros-vertex:hover ellipse,.ros-vertex:focus rect,.ros-vertex:hover rect{stroke:#267975;stroke-width:2.5}
+.ros-edge{cursor:pointer}.ros-edge path{stroke:#588b87;stroke-width:1.6;fill:none}.ros-edge.waiting path{stroke:#b9915a;stroke-dasharray:4 3}.ros-edge rect{fill:#fafcfc}.ros-edge text{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#376e68}.ros-edge:hover path,.ros-edge:focus path{stroke-width:3}.ros-edge:focus{outline:none}
+select[aria-label^="Inspect"]{display:block;margin:10px 12px;max-width:calc(100% - 24px);width:calc(100% - 24px)}
+.graph-inspector{padding:0 12px 12px}.graph-inspector h3{font-size:12px;margin:14px 0 5px}.graph-inspector p{margin:7px 0;line-height:1.45}.graph-inspector td{padding:6px 0}.graph-inspector small{font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;display:block;margin-top:2px}
+.endpoint-info{font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);white-space:pre-line;overflow-wrap:anywhere;margin:3px 0}
+.graph-command{position:relative;margin:8px 0}.graph-command pre{padding-right:92px;min-height:38px}.graph-command .command-actions{position:absolute;right:5px;top:5px}.graph-command button{padding:3px 6px;font-size:11px}
+.graph-key{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted)}.graph-key span:before{content:"";display:inline-block;width:18px;height:10px;border:1px solid #61958e;background:#eaf3f1;margin-right:5px;vertical-align:middle;border-radius:50%}.graph-key .topic:before{border-radius:2px;background:#fff5e6;border:1px dashed #b9915a}
+.ros-vertex.selected ellipse,.ros-vertex.selected rect{stroke:#267975;stroke-width:2.5}.ros-edge.selected path{stroke-width:3}.ros-edge.selected rect{fill:#e0eeea}
+.interface-title{display:flex;align-items:flex-start;gap:8px}.interface-title .source{flex:1;min-width:0}.command-info{flex-shrink:0;width:22px;height:22px;padding:0;border-radius:50%;font:bold italic 13px Georgia,serif;color:var(--accent)}.interface-title .command-info{margin-left:auto}.interface-help-cell{width:34px;padding-left:0;text-align:right}
+.command-dialog-head h2{min-width:0;overflow-wrap:anywhere}.command-dialog-head button{flex-shrink:0}

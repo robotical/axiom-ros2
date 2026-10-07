@@ -1,0 +1,56 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 20
+      Color: 194; 204; 206
+      Alpha: 0.45
+      Line Style:
+        Value: Lines
+        Line Width: 0.003
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Live Axiom sensors
+      Enabled: true
+      Topic:
+        Value: /sensing/visualization/markers
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Queue Size: 10
+  Enabled: true
+  Global Options:
+    Background Color: 243; 245; 245
+    Fixed Frame: sensor_view
+    Frame Rate: 20
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 1.6
+      Focal Point:
+        X: 0.15
+        Y: 0.0
+        Z: 0.30
+      Pitch: 0.42
+      Yaw: 0.80
+      Target Frame: <Fixed Frame>
+Window Geometry:
+  Width: 1280
+  Height: 720
+  X: 0
+  Y: 0

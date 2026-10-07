@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Axiom · Linux desktop</title>
+  <style>
+    html, body, #screen { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f3f5f5; }
+    #status { position: absolute; inset: 0; display: grid; place-items: center;
+      font: 13px -apple-system, BlinkMacSystemFont, sans-serif; color: #69777c; }
+    #status:empty { display: none; }
+    #tools { position: fixed; right: 10px; top: 10px; display: flex; align-items: center; gap: 7px;
+      font: 12px -apple-system, BlinkMacSystemFont, sans-serif; }
+    #tools button, #clipboard-panel button { font: inherit; padding: 5px 9px; color: #253135;
+      background: #f7fafa; border: 1px solid #c9d5d6; border-radius: 4px; cursor: pointer; }
+    #tools button:disabled { opacity: .5; cursor: default; }
+    #caps { color: #89622d; background: #f6efdf; padding: 5px 7px; border-radius: 4px; }
+    #clipboard-panel { position: fixed; right: 10px; top: 47px; width: min(390px, calc(100vw - 20px));
+      padding: 12px; border: 1px solid #c9d5d6; border-radius: 5px; background: #fff;
+      box-shadow: 0 4px 18px #18232b24; color: #253135; font: 12px -apple-system, BlinkMacSystemFont, sans-serif; }
+    #clipboard-panel label { display: block; font-weight: 600; margin-bottom: 7px; }
+    #clipboard-text { width: 100%; height: 120px; padding: 8px; resize: vertical;
+      border: 1px solid #c9d5d6; border-radius: 3px; font: 12px/1.5 monospace; }
+    .clipboard-actions { display: flex; gap: 6px; margin-top: 7px; }
+    #clipboard-close { margin-left: auto; }
+    #clipboard-message { color: #69777c; margin: 9px 0 0; line-height: 1.45; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body><div id="screen"></div><div id="status">Connecting to Linux…</div>
+<div id="tools"><span id="caps" hidden>Caps Lock</span><button id="clipboard-toggle" disabled aria-expanded="false" aria-controls="clipboard-panel">Clipboard</button></div>
+<section id="clipboard-panel" hidden aria-label="Desktop clipboard">
+  <label for="clipboard-text">Clipboard</label><textarea id="clipboard-text" placeholder="Paste command text here"></textarea>
+  <div class="clipboard-actions"><button id="clipboard-paste">Paste to Linux</button><button id="clipboard-copy">Copy from Linux</button><button id="clipboard-close">Close</button></div>
+  <p id="clipboard-message" role="status"></p>
+</section>
+<script type="module">
+import RFB from './core/rfb.js';
+import {attachDesktopInput} from './clipboard.js?v=4';
+const screen = document.getElementById('screen'), status = document.getElementById('status');
+let client = null, detachInput = null;
+const $ = id => document.getElementById(id);
+const parentOrigin = document.referrer ? new URL(document.referrer).origin : location.origin;
+function report(state, message = '') {
+  status.textContent = message;
+  if (parent !== window) parent.postMessage({type: 'rviz', state, message}, parentOrigin);
+}
+function connect() {
+  report('connecting', 'Connecting to Linux…');
+  if (detachInput) detachInput();
+  client = new RFB(screen, `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/websockify`);
+  client.scaleViewport = true;
+  client.resizeSession = false;
+  detachInput = attachDesktopInput({client, screen, document, navigator,
+    toggle: $('clipboard-toggle'), panel: $('clipboard-panel'), area: $('clipboard-text'),
+    paste: $('clipboard-paste'), copy: $('clipboard-copy'), close: $('clipboard-close'),
+    message: $('clipboard-message'), caps: $('caps')});
+  client.addEventListener('connect', () => report('connected'));
+  client.addEventListener('disconnect', () => {
+    report('disconnected', 'Linux desktop disconnected. Reconnecting…');
+    setTimeout(connect, 1500);
+  });
+  client.addEventListener('securityfailure', () => report('disconnected', 'Desktop connection rejected'));
+}
+connect();
+</script></body>
+</html>
