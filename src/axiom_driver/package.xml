@@ -6,7 +6,6 @@
   <description>Axiom device bridge node</description>
   <maintainer email="nikos@robotical.io">Nikos</maintainer>
   <license>MIT</license>
-  <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>rcl_interfaces</exec_depend>
   <exec_depend>axiom_interfaces</exec_depend>

@@ -6,7 +6,6 @@
   <description>A visualization package for the Axiom thermal camera.</description>
   <maintainer email="nikos@robotical.io">Nikos Theodoropoulos</maintainer>
   <license>MIT</license>
-  <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>rviz2</exec_depend>
 

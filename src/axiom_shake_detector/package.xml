@@ -5,7 +5,6 @@
   <description>IMU shake detection and a browser movement lab</description>
   <maintainer email="info@robotical.io">Robotical</maintainer>
   <license>MIT</license>
-  <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>axiom_driver</exec_depend>
   <depend>axiom_interfaces</depend>
   <depend>rclpy</depend>
