@@ -33,7 +33,7 @@ graphs = {
   devices [label="/axiom/devices\n/axiom/device_metadata\nInventory + descriptors"];
   measures [label="/axiom/bus_BUS/device_ADDRESS/…\nsample • data • typed measurements"];
   diagnostics [label="/axiom/diagnostics\n/axiom/raw/devjson\n/axiom/serial_console"];
-  consumer [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="Your ROS nodes\nor ros2 topic echo"];
+  consumer [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ROS node\nor ros2 topic echo"];
   dashboard [shape=ellipse, style="filled,dashed", fillcolor="#e9f3f2", color="#3b7b75", label="/dashboard\nOptional scenarios guide"];
   board -> driver [label="USB serial or Wi-Fi WebSocket", dir=both];
   driver -> devices;
@@ -45,7 +45,7 @@ graphs = {
   {rank=same; consumer; dashboard;}
 ''',
 'ros2-services-graph': r'''
-  client [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="Your ROS node\nor ros2 service call"];
+  client [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ROS node\nor ros2 service call"];
   services [label="/axiom/connect • disconnect • get_connection_state\n/axiom/publish_data_subscription • set_sample_rate\n/axiom/ric_rest_url • ping\n/axiom/bus_BUS/device_ADDRESS/commands/COMMAND"];
   driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
   client -> services [dir=both, style=dashed, label="request / response"];

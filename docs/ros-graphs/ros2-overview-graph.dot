@@ -9,7 +9,7 @@ digraph ros {
   devices [label="/axiom/devices\n/axiom/device_metadata\nInventory + descriptors"];
   measures [label="/axiom/bus_BUS/device_ADDRESS/…\nsample • data • typed measurements"];
   diagnostics [label="/axiom/diagnostics\n/axiom/raw/devjson\n/axiom/serial_console"];
-  consumer [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="Your ROS nodes\nor ros2 topic echo"];
+  consumer [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ROS node\nor ros2 topic echo"];
   dashboard [shape=ellipse, style="filled,dashed", fillcolor="#e9f3f2", color="#3b7b75", label="/dashboard\nOptional scenarios guide"];
   board -> driver [label="USB serial or Wi-Fi WebSocket", dir=both];
   driver -> devices;
