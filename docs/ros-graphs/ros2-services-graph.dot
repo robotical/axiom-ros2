@@ -1,0 +1,13 @@
+digraph ros {
+
+  graph [bgcolor="white", rankdir=TB, pad="0.25", nodesep="0.35", ranksep="0.5", fontname="Helvetica", dpi=180];
+  node [fontname="Helvetica", fontsize=17, fontcolor="#203638", color="#81999d", penwidth=1.3, margin="0.16,0.12", shape=box, style=filled, fillcolor="white"];
+  edge [fontname="Helvetica", fontsize=13, color="#517979", fontcolor="#49676d", penwidth=1.4, arrowsize=0.75];
+
+  client [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="Your ROS node\nor ros2 service call"];
+  services [label="/axiom/connect • disconnect • get_connection_state\n/axiom/publish_data_subscription • set_sample_rate\n/axiom/ric_rest_url • ping\n/axiom/bus_BUS/device_ADDRESS/commands/COMMAND"];
+  driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
+  client -> services [dir=both, style=dashed, label="request / response"];
+  services -> driver [dir=both, style=dashed, label="service server"];
+
+}
