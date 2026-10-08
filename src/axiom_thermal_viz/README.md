@@ -8,25 +8,49 @@
 - Maps temperature ranges to a colour gradient and publishes a `CUBE_LIST` marker.
 - Publishes small temperature labels at the top-right of each measured pixel.
 - Configurable topic names, scaling, alpha and fixed temperature ranges.
+- Includes an RViz layout for the heatmap and pixel labels.
 
 ## Usage
 
-1. Build the workspace to generate the custom message types:
+The driver must be connected and acquiring thermal data. Run the build commands
+from the repository root. This package does not require the scenarios dashboard.
+
+1. Install dependencies and build the core packages:
    ```bash
-   colcon build --packages-select axiom_interfaces axiom_driver axiom_thermal_viz
+   source scripts/setup_env.sh
+   rosdep install --from-paths src --ignore-src -r -y
+   colcon build --base-paths src --symlink-install
+   source scripts/setup_env.sh
    ```
-2. Source your overlay:
+2. Find the topic ending in `/thermal/grid` using `ros2 topic list -t`, then
+   start the visualiser with that exact path. This address is an example:
    ```bash
-   . install/setup.bash
+   THERMAL_TOPIC=/axiom/bus_1/device_169/thermal/grid
+   ros2 run axiom_thermal_viz thermal_heatmap --ros-args \
+     -r __ns:=/sensing \
+     -p input_topic:="$THERMAL_TOPIC" \
+     -p output_topic:=thermal_heatmap \
+     -p use_dynamic_range:=false \
+     -p min_temperature:=15.0 \
+     -p max_temperature:=40.0
    ```
-3. Launch the visualiser (update the topic if required):
+3. In another terminal at the repository root, source the environment and set the
+   same camera topic. Read its frame ID and open the supplied RViz layout:
    ```bash
-   ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p input_topic:=bus_1/device_169/thermal/grid
+   source scripts/setup_env.sh
+   THERMAL_TOPIC=/axiom/bus_1/device_169/thermal/grid
+   THERMAL_FRAME="$(ros2 topic echo "$THERMAL_TOPIC" \
+     axiom_interfaces/msg/ThermalGrid --field header.frame_id \
+     --qos-reliability best_effort --once | sed -n '1p')"
+   ros2 run rviz2 rviz2 \
+     -d "$(ros2 pkg prefix --share axiom_thermal_viz)/config/thermal.rviz" \
+     -f "${THERMAL_FRAME:?No camera frame received}"
    ```
-4. In RViz, add a *Marker* display pointed at the `thermal_heatmap` topic. Adjust the marker size/colour as desired.
-5. Add a *MarkerArray* display for `thermal_heatmap_labels` to show pixel temperatures
-   to one decimal place. Values are in °C; labels refer to measured pixels even
-   when the heatmap is interpolated.
+
+The layout subscribes to `/sensing/thermal_heatmap` (*Marker*) and
+`/sensing/thermal_heatmap_labels` (*MarkerArray*). Temperatures are in °C; labels
+refer to measured pixels even when the heatmap is interpolated. You can also add
+these displays to an existing RViz session.
 
 ### Parameters
 

@@ -1,3 +1,4 @@
+# Thermal markers and labels published by axiom_thermal_viz in /sensing.
 Panels:
   - Class: rviz_common/Displays
     Name: Displays

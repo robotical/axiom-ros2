@@ -152,7 +152,7 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     add(
         "Visualize",
         "Thermal camera RViz",
-        'ros2 run rviz2 rviz2 -d "$(ros2 pkg prefix --share axiom_marty_demo)/config/thermal.rviz" '
+        'ros2 run rviz2 rviz2 -d "$(ros2 pkg prefix --share axiom_thermal_viz)/config/thermal.rviz" '
         '-f "${THERMAL_FRAME:?Run Read thermal frame in this terminal first}"',
         "Read thermal frame in this terminal first. Blue is cooler, red is warmer.",
     )
