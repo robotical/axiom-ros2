@@ -76,6 +76,25 @@ Sensors are discovered automatically; the YAML is not a required sensor list.
 Driver defaults are in [src/axiom_driver/config/axiom.yaml](src/axiom_driver/config/axiom.yaml).
 Values in `boards.yaml` override those defaults; explicit launch arguments override both.
 
+### Optional tmux consoles
+
+Keep the driver, service commands and viewers in one terminal window with four panes:
+
+```bash
+sudo apt install tmux
+bash scripts/ros_tmux.sh
+```
+
+Run this from the repository root after configuring `machine.env` and `boards.yaml`.
+Each pane loads the ROS installation and built workspace through `scripts/setup_env.sh`.
+The panes start empty; run the commands below manually. The helper works with the core
+packages alone, including when the dashboard example is not built.
+
+Press `Ctrl+b`, release both keys, then an arrow to switch panes. `Ctrl+b`, then `d`
+detaches while commands continue running. Run `bash scripts/ros_tmux.sh` again to reattach.
+`Ctrl+C` stops the foreground command in the selected pane. The helper and its
+`console.bashrc` and `tmux.conf` live together in `scripts/`.
+
 ## 3. Connect and read acceleration
 
 Run these commands from the repository root. In **Terminal 1**, prepare the

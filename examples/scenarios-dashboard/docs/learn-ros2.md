@@ -37,7 +37,7 @@ Transient Local lets inventory subscribers receive the retained inventory.
 The supplied workstation has four tmux panes. Press Ctrl+b, release it, then an
 arrow key to switch panes. Ctrl+C affects only the selected pane. Ctrl+b then d
 detaches; from the repository root, run
-`bash examples/scenarios-dashboard/scripts/ros_tmux.sh` again to reattach. Ctrl+Shift+V pastes in
+`bash scripts/ros_tmux.sh` again to reattach. Ctrl+Shift+V pastes in
 the Linux terminal. Shift+mouse selection bypasses tmux's mouse handling.
 
 Use **Start from scratch** to end the current workstation session. All drivers,

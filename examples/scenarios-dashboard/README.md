@@ -9,7 +9,7 @@ commands; the guide observes state and displays command examples.
 Stack: ROS 2 Jazzy on Ubuntu 24.04. Run these commands from the `axiom-ros2`
 repository root. The dashboard and RViz adapters are included in this clone.
 For machine paths and board connections, copy and edit the local configuration
-examples described in the [project README](../../README.md#machine-and-board-configuration).
+examples described in the [project README](../../README.md#2-configure-this-machine-and-axiom).
 
 ```bash
 source scripts/setup_env.sh
@@ -22,7 +22,7 @@ Optional tmux consoles:
 
 ```bash
 sudo apt install tmux
-bash examples/scenarios-dashboard/scripts/ros_tmux.sh
+bash scripts/ros_tmux.sh
 ```
 
 Guide, in a separate terminal:
@@ -173,7 +173,8 @@ physical boards. Keep the Wi-Fi board powered.
 
 ## tmux
 
-`examples/scenarios-dashboard/scripts/ros_tmux.sh` opens four consoles in a 2×2 layout.
+The shared `scripts/ros_tmux.sh` opens four consoles in a 2×2 layout. It also works with
+the core driver alone; see the [project README](../../README.md#optional-tmux-consoles).
 `Ctrl+b`, then an arrow selects a pane;
 `Ctrl+b`, then `d` detaches without stopping commands. Run the script again to
 reattach. `Ctrl+C` stops the foreground command in the active pane. Linux terminals

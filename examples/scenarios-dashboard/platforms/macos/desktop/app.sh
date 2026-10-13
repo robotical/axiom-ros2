@@ -18,7 +18,7 @@ case "${1:-}" in
     fi
     terminal_command=(bash --rcfile /demo/platforms/macos/desktop/bashrc -i)
     if [[ ${2:-} == tmux ]]; then
-      terminal_command=(bash /demo/scripts/ros_tmux.sh)
+      terminal_command=(bash /axiom/scripts/ros_tmux.sh)
       terminal_title='ROS consoles'
     fi
     exec xterm -class AxiomTerminal "${terminal_options[@]}" -title "$terminal_title" \

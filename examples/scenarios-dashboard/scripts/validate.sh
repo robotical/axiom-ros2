@@ -20,7 +20,7 @@ docker run --rm -e ROS_DOMAIN_ID=81 -e ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST -
     source /ws/install/setup.bash
     pytest -q -p no:cacheprovider /demo/src/axiom_marty_demo/test --junitxml=/results/pytest.xml
     ros2 launch axiom_marty_demo workstation.launch.py --show-args
-    bash /demo/scripts/ros_tmux.sh --prepare
+    bash /axiom/scripts/ros_tmux.sh --prepare
     test "$(tmux -L axiom-ros list-panes | wc -l)" -eq 4
     tmux -L axiom-ros kill-server
   ' 2>&1 | tee "$demo_root/.validation/ros.log"
