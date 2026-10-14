@@ -1,51 +1,59 @@
-to connect axiom to wifi RICREST to w/TP-Link_092B/11630470/Marty_598c8a
+# Axiom ROS 2 command reference
 
+For setup and configuration, use the [README](README.md) and
+[published user guides](https://userguides.robotical.io/axiom/ros2/start).
+Prepare each Bash terminal from the repository root with
+`source scripts/setup_env.sh`, or use the [tmux helper](docs/tmux.md).
+The examples use `/axiom`; substitute your configured namespace.
 
-to build everything:  colcon build --symlink-install
-or specific package:
-colcon build --symlink-install --packages-select <package_name>
+## Start and acquire
 
-to plot with plotjuggler:
-ros2 run plotjuggler plotjuggler
+Terminal 1:
 
-clean build:
-rm -rf build/ install/ log/
-
-Connect ws:
+```bash
 ros2 launch axiom_driver axiom_minimal_launch.py \
-  transport:=ws \
-  device_uri:=ws://192.168.1.3/devjson \
-  ws_path:=/ws ws_pcol:=RICSerial
+  namespace:=axiom boards_file:="$AXIOM_ROS_BOARDS_FILE"
+```
 
-Connect serial:
-ros2 launch axiom_driver axiom_minimal_launch.py \
-  transport:=serial \
-  serial.port:=/dev/tty.usbmodem2101 serial.baud:=921600 serial.timeout:=0.02
+Terminal 2:
 
+```bash
+ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
+ros2 service call /axiom/publish_data_subscription \
+  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
+ros2 node list --no-daemon
+ros2 topic list -t --no-daemon
+ros2 service list -t
+ros2 topic echo /axiom/devices --qos-durability transient_local --once
+```
 
-Send Rest commands:
-ros2 service call /ric_rest_url axiom_interfaces/srv/RicRestUrl \
-  "{url_path: 'v', timeout: 3.0, ws_pcol: ''}"
+Connect uses the USB or framed `/ws` endpoint in the board file. Check `success`
+in each response; delivery rate is separate from sensor sampling rate.
 
-to subscribe to published data:
-ros2 service call /publish_data_subscription axiom_interfaces/srv/PublishedDataSubscription \
-  "{'rate_hz': 10.0}"
+## Inspect and stop
 
+Replace the placeholder with the exact discovered topic:
 
-To see raw IMU data:
-<!-- no limit on the output -->
-ros2 topic echo /axiom/bus_1/device_76a/imu/data_raw --full-length
+```bash
+SENSOR_TOPIC='PASTE_DISCOVERED_SENSOR_TOPIC_HERE'
+ros2 topic echo "$SENSOR_TOPIC" --qos-reliability best_effort --once
+ros2 topic info "$SENSOR_TOPIC" --verbose
+```
 
+For firmware version over the active driver connection:
 
-create package with:
-go to the src in root and:
-ros2 pkg create --build-type ament_python <package_name> --dependencies rclpy
+```bash
+ros2 service call /axiom/ric_rest_url axiom_interfaces/srv/RicRestUrl \
+  '{url_path: "v", timeout: 3.0, ws_pcol: ""}'
+```
 
+Stop viewers/echoes, then stop acquisition and disconnect before stopping the driver:
 
-<!-- thermal cam viz -->
+```bash
+ros2 service call /axiom/publish_data_subscription \
+  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 0.0}'
+ros2 service call /axiom/disconnect axiom_interfaces/srv/Disconnect '{}'
+```
 
-in rviz under global options change map to axiom_link
-have the driver running and subscribe to published data
-run the axiom_thermal_viz node:
-ros2 run axiom_thermal_viz thermal_heatmap --ros-args -p interpolation_factor:=4 ( don't specify interpolation_factor if you want raw 8x8 grid)
-open up rviz2 and add a marker display and set the topic to /thermal_heatmap
+More workflows: [sensor services and multiple boards](docs/sensors-and-boards.md),
+[thermal RViz](docs/thermal-camera.md), and [Foxglove](examples/foxglove/README.md).

@@ -1,5 +1,11 @@
 # Firmware alignment validation
 
+This is dated development evidence, not a setup guide. Use the [README](../README.md)
+and [published user guides](https://userguides.robotical.io/axiom/ros2/start) for
+current installation and firmware selection. Historical firmware versions, test
+environments and sensor identities below describe those checks, not requirements
+for a user's host or boards. Results apply to their recorded source snapshots.
+
 ## Host grid images — 2026-10-14
 
 The host driver now adds `thermal/image` and `range/image` as standard
@@ -33,8 +39,8 @@ round-trip through the SDK without changes. Import instructions and colour-scale
 settings are in the [Foxglove guide](../examples/foxglove/README.md#thermal-camera-on-one-axiom).
 
 Physical VL53L5CX operation, mounting orientation and GUI rendering/import on
-the Pi remain unverified. This run validates ROS Jazzy; it does not constitute a
-fresh build on the Pi's ROS Kilted installation.
+other workstations were outside this automated run. The container result validates
+ROS Jazzy; it is not a build result for other distributions.
 
 Validated on 2026-09-29 against the source baseline in
 [firmware-alignment.md](firmware-alignment.md). The baseline does not identify a
@@ -67,7 +73,7 @@ PYTHONDONTWRITEBYTECODE=1 /tmp/axiom-client-tests/bin/python -m pytest -q -p no:
 
 ## Evidence and coverage
 
-Latest clean run: **2026-10-06**, using `./scripts/validate_ros.sh`.
+Earlier clean run: **2026-10-06**, using `./scripts/validate_ros.sh`.
 All seven packages built. Colcon reported **99 tests, zero errors, zero failures,
 four existing copyright-check skips** (95 passed). The driver contributed 59
 passing tests, including descriptor commands, aliases, hot-plug lifecycle and
@@ -86,8 +92,8 @@ This run used firmware peers and virtual serial ports; it did not access hardwar
 | QoS/configuration | Per-topic reliable publisher and local history depth; read-only startup parameters; installed launch with JSON overrides and clean SIGINT shutdown |
 | Tooling | Bringup exposes every driver option; timestamp-based plot history expiry/reset/capacity; package lint and XML checks |
 
-The clean build passed for all six packages. The final suite result is recorded in
-`firmware-alignment-plan.md`. Four pre-existing copyright-template tests remain
+The original alignment milestone built six packages; its result is recorded in
+`firmware-alignment-plan.md`. Later runs above include seven packages. Four pre-existing copyright-template tests remain
 skipped; no functional test is skipped in the ROS container. The ament flake8 runner
 emits Python warnings about forking from a multithreaded process; lint passes.
 
@@ -97,9 +103,9 @@ rendering was tested in Docker. A subsequent physical USB check is recorded belo
 
 ## Physical USB check — 2026-09-29
 
-The repository's `core.Session` and `core.Pipeline` connected on macOS through
-`/dev/cu.usbmodem2101`, at 115200 baud with serial mode `auto` (OverAscii-framed
-RICREST). The board identified itself as **Axiom018**, firmware **0.1.16-devlib**.
+The repository's `core.Session` and `core.Pipeline` connected to a test Axiom
+through its macOS USB serial device at 115200 baud, using serial mode `auto`
+(OverAscii-framed RICREST). That board reported firmware **0.1.16-devlib**.
 Its version response does not establish the exact flashed Raft module commits.
 
 Initial captures exposed two client defects, now covered by regression tests:
@@ -134,28 +140,28 @@ timestamps therefore need a distinct clock contract before precise timing claims
 
 This check exercised the real serial transport, RPC, discovery and decoding paths.
 It did **not** launch the ROS node or verify DDS topics from this physical board:
-native ROS is not installed on this Mac. No firmware was changed/flashed, sample
+native ROS was not installed on that host. No firmware was changed/flashed, sample
 rates configured, or actuator commands sent.
 
 ## Movement lab: full ROS and physical USB — 2026-09-29
 
 The later [shake detector project](shake-lab.md) extended the earlier USB check to
-the actual ROS node and DDS subscribers. ROS Jazzy runs in Docker on this Mac, with
+the actual ROS node and DDS subscribers. That check ran ROS Jazzy in Docker on macOS, with
 a loopback-only host USB/OverAscii-to-RICSerial relay. The ROS driver owns the
 subscription; the relay does not acquire or decode measurements independently.
 
 - All **seven packages built**. The aggregate colcon result was **91 tests, zero
   errors, zero failures, four existing copyright skips**. The new package contributed
   22 passing tests, including real DDS and HTTP integration plus lint.
-- The real Axiom018 streamed `sensor_msgs/Imu` through the driver into the shake
+- The physical test Axiom streamed `sensor_msgs/Imu` through the driver into the shake
   detector and browser dashboard. Before deliberate movement, over 5,000 readings
   arrived without a shake event.
-- The user physically shook the board. The detector emitted **event #1**, with
+- A physical shake was performed on the test board. The detector emitted **event #1**, with
   three pulses and motion magnitude **3.22 m/s²** at the triggering sample. This
   validates one real gesture, not general gesture-recognition accuracy.
 - A real-device resting recording retained **2,060 IMU messages**. Playing only its
   IMU topic into a fresh detector delivered all 2,060 messages and produced zero
-  shake events. The recording began after the user's gesture; it is not a recording
+  shake events. The recording began after that gesture; it is not a recording
   of that gesture.
 - After increasing the FIFO burst buffers, a further real-device recording retained
   **1,033 IMU messages and 1,033 derived motion messages** over 9.60 seconds. The

@@ -1,184 +1,154 @@
-# Scenarios dashboard
+# Optional Axiom scenarios dashboard
 
-Internal Robotical example for Axiom scenarios, RViz adapters and the browser
-guide. Marty scenarios use the same workspace. Driver control is through ROS
-commands; the guide observes state and displays command examples.
+The browser guide explains commands, interfaces and the live ROS graph. Run its
+commands in a console. The host driver, acquisition and visualisers work independently
+of the dashboard. Axiom-only scenarios do not require a Marty.
 
-## Native Linux
+Complete the [host-driver setup](../../README.md), including the local machine and
+board files. Examples use Ubuntu 24.04/Jazzy; use the installed distribution's setup
+file for another compatible installation. All consoles and the dashboard need the
+same ROS domain and middleware settings.
 
-Stack: ROS 2 Jazzy on Ubuntu 24.04. Run these commands from the `axiom-ros2`
-repository root. The dashboard and RViz adapters are included in this clone.
-For machine paths and board connections, copy and edit the local configuration
-examples described in the [project README](../../README.md#2-configure-this-machine-and-axiom).
+## Build and open on Linux
+
+If rebuilding while drivers/visualisers are active, stop their acquisition and
+processes first, then restart them after the build. From the repository root:
 
 ```bash
 source scripts/setup_env.sh
 rosdep install --from-paths src examples/scenarios-dashboard/src --ignore-src -r -y
 colcon build --base-paths src examples/scenarios-dashboard/src --symlink-install
 source scripts/setup_env.sh
+bash examples/scenarios-dashboard/scripts/dashboard.sh
 ```
 
-Optional tmux consoles:
+The example's `COLCON_IGNORE` excludes it from default recursive discovery;
+passing `examples/scenarios-dashboard/src` explicitly includes it. The optional
+packages are `axiom_marty_dashboard` and `axiom_marty_demo`. The wrapper stays in
+the foreground and starts the guide, with no drivers or acquisition.
+
+Open **http://127.0.0.1:8083** on the ROS host, or the port in `machine.env`.
+The server listens on loopback by default. For a viewer on another computer,
+run an SSH tunnel there, replacing its login and the ROS host address:
+
+```bash
+ssh -N -L 8083:127.0.0.1:8083 USER@ROS_HOST_IP
+```
+
+Keep it running and open the same localhost URL on the viewer computer. If the
+dashboard port differs, substitute that port in the tunnel and URL. Leave the
+dashboard process running in a separate terminal while using ROS commands.
+
+## Read the guide
+
+| Tab | Purpose |
+|---|---|
+| Available | Catalogue of interfaces and relationships the packages can expose |
+| Running graph | Discovered nodes/topics/services and publisher/subscriber edges |
+| Commands | Console recipes grouped by purpose |
+| Scenarios | Workflows from setup through cleanup; expand one step or all |
+
+The board selector scopes recipes to a configured namespace. Information buttons
+explain argument order, units, permitted values and interface fields. Discovery
+shows registered endpoints, not whether commands succeeded or valid messages
+arrived. Check service responses and sensor messages in the console. An echo can
+keep a topic name registered after its publisher disappears; inspect publisher count.
+
+Configured boards can appear before their drivers start. **Driver offline** means
+no driver was discovered for that namespace. **Connected** reflects the driver's
+reported connection state, not a separate cable or Wi-Fi test.
+
+## Use four tmux consoles
+
+From an outer terminal at the repository root:
 
 ```bash
 sudo apt install tmux
 bash scripts/ros_tmux.sh
 ```
 
-Guide, in a separate terminal:
+New panes preload the environment; reused panes after a rebuild need
+`source scripts/setup_env.sh`. Use Terminal 1 for the driver, Terminal 2 for
+services/checks, Terminal 3 for the dashboard or visualiser, and Terminal 4 for
+RViz or more checks. If the selected scenario needs both an adapter and RViz,
+keep the dashboard in an extra outer terminal.
+
+Ctrl+b then an arrow switches panes, z zooms, and d detaches. Rerun the helper
+to reattach. See [tmux controls](../../docs/tmux.md) for copying output and scrolling.
+The helper opens empty consoles; it starts no drivers.
+
+## Axiom workflows
+
+Use the configured USB port or framed `/ws` endpoint. Review copied commands for
+example addresses and identities before running them. The ordinary single-board
+recipes keep connection and acquisition manual:
+
+1. Launch the selected driver and leave it running.
+2. Call its connect service, then request acquisition.
+3. Inspect inventory, topics and messages.
+4. Run the optional adapter and viewer.
+5. Stop viewers, stop acquisition, disconnect, then stop the driver.
+
+The thermal scenario uses an AMG8833 8×8 camera. It selects a camera topic when
+exactly one publisher is discovered; otherwise choose its identity-based topic.
+Read the camera frame in the same terminal used for RViz. The camera's own frame
+and the supplied 15–40 °C heatmap need no dashboard at runtime.
+
+Walkthroughs: [sensor discovery/services and multiple boards](../../docs/sensors-and-boards.md),
+[thermal RViz](../../docs/thermal-camera.md), and
+[thermal Foxglove](../foxglove/README.md#thermal-camera-on-one-axiom).
+Firmware must recognise a supported profile; aliases are optional names rather
+than a list of installed sensors.
+
+## USB + Wi-Fi scenario
+
+This scenario generates a separate file with `axiom/front` and `axiom/rear`.
+It uses **automatic connection and acquisition**, unlike the manual walkthroughs.
+Stop any existing driver connected to either physical board first.
+
+Before copying the configuration recipe, set the actual endpoints in the **same
+terminal that will run that recipe**:
 
 ```bash
-bash examples/scenarios-dashboard/scripts/dashboard.sh
+export AXIOM_ROS_TRANSPORT=serial
+export AXIOM_ROS_SERIAL_PORT='/dev/serial/by-id/REPLACE_WITH_USB_AXIOM'
+export AXIOM_WIFI_IP='REPLACE_WITH_WIFI_AXIOM_IP'
 ```
 
-Guide: http://127.0.0.1:8083, or the port in `machine.env`. Scenarios, command notes, interface inventory and
-current DDS graph. Board selection scopes the commands; the running graph covers
-all discovered nodes. Device connection and acquisition are controlled by the drivers.
-The tmux consoles and guide wrapper load the same `machine.env`. Configured boards
-are shown before their drivers start; their single-board launch commands use the
-same `boards.yaml` as the console. Guide scenarios explicitly keep connection and
-acquisition manual. The separate USB + Wi-Fi scenario uses its own generated
-configuration with automatic connection and acquisition, as shown in its steps.
+The recipe writes `~/usb_wifi_axioms.yaml`; review it before running the scenario's
+multi-board launch. It does not reuse the two endpoints from your usual board file.
+Both entries opt into `auto_connect: true`, `autosub: true` and 20 Hz packet delivery,
+with `auto_reconnect: false`. The endpoints must belong to different physical Axioms.
 
-Scenarios show one expanded step, with Previous/Next navigation and an Expand all
-view. Each step pairs its expected result with read-only ROS evidence and a small
-relationship diagram. Discovery verifies endpoints, not message delivery or command
-execution; confirm those in the console. Command arguments remain under ⓘ, and
-setup, shortcuts, troubleshooting and cleanup remain available below the outline.
+After inspecting each IMU, the scenario frees Terminals 3 and 4 for the two-board
+adapter and RViz. USB and Wi-Fi acceleration arrows have separate labels. Display
+origins are a layout, not measured mounting transforms or pose estimates.
+The ordinary [multi-board guide](../../docs/sensors-and-boards.md#multiple-boards)
+uses manual per-board connect/acquisition calls instead.
 
-The **Axiom · thermal camera + RViz** scenario uses one Axiom and an AMG8833
-(8×8 pixels). It connects and starts acquisition through explicit console commands,
-then reads a `ThermalGrid`, starts `axiom_thermal_viz` and opens the supplied RViz
-heatmap. The guide fills in the topic when exactly one camera publisher is discovered;
-otherwise choose its identity-based topic from `ros2 topic list -t`. RViz uses the
-camera's own frame and a fixed 15–40 °C colour scale. It needs no dashboard at runtime.
+## Optional Marty scenarios
 
-## Plug, unplug and reconnect
-
-Terminal 1 (replace the USB path):
+These additionally require the `marty-ros2` repository and hardware. Place that
+checkout beside `axiom-ros2`, then build from the Axiom repository root:
 
 ```bash
-ros2 launch axiom_driver axiom_minimal_launch.py \
-  transport:=serial serial.port:=/dev/ttyACM0 \
-  params_file:="$(ros2 pkg prefix --share axiom_driver)/config/hotplug.yaml"
-```
-
-Terminal 2:
-
-```bash
-ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
-ros2 service call /axiom/publish_data_subscription axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
-ros2 topic list -t --no-daemon
-```
-
-Terminal 3:
-
-```bash
-ros2 topic echo /axiom/range sensor_msgs/msg/Range --field range --qos-reliability best_effort
-```
-
-Terminal 4:
-
-```bash
-ros2 topic echo /axiom/devices --qos-durability transient_local
-```
-
-With VL53L4CD attached, the device topic and optional `/axiom/range` alias appear.
-Unplug removes the publisher; echo waits. Reconnect resumes data without a driver
-restart or another acquisition request. Range is in metres; invalid measurements
-are NaN. A subscriber can keep a topic listed after its publisher disappears.
-Check publisher count with `ros2 topic info /axiom/range --verbose`.
-
-Firmware must support sensor detection and supply its descriptor. Standard
-descriptor profiles need no per-sensor ROS configuration. Unsupported custom
-binary formats or ROS message mappings require driver changes.
-
-## Aliases and descriptor services
-
-The driver's normal `axiom.yaml` has no aliases. `hotplug.yaml` adds optional
-aliases for LSM6DS and VL53L4CD while preserving identity-based topics. Rules map
-an alias to `type`, `source`, and optional string `bus`/`address` selectors. If
-multiple devices match, no alias is published until the selection is unambiguous.
-Aliases live beneath each board's namespace. Restart the driver to change its
-read-only configuration.
-
-Device descriptors create services under:
-
-```text
-/axiom/bus_BUS/device_ADDRESS/commands/COMMAND
-```
-
-Paths: `ros2 service list -t`. Argument ranges/maps: `/axiom/device_metadata` or
-the guide's information dialog. LSM6DS sample-rate example:
-
-```bash
-ros2 service call /axiom/bus_1/device_76a/commands/set_sample_rate axiom_interfaces/srv/DeviceCommand '{values: [52.0]}'
-ros2 service call /axiom/bus_1/device_76a/commands/set_sample_rate axiom_interfaces/srv/DeviceCommand '{values: [104.0]}'
-```
-
-Output-only modules also expose descriptor services. LED commands can include
-`brightness`, `pixels` and `off`. Numeric arguments follow descriptor order and units;
-`off` uses `{values: []}`. Out-of-range values are rejected before transmission.
-Success means firmware acknowledgment, not completion of physical movement.
-Commands requiring unsupported custom value formats are not advertised as
-callable services. Configuration/output requests use ROS services; Marty's
-longer motion operations retain their ROS action interface.
-
-## RViz and Marty
-
-Marty is optional. To use its scenarios, clone `marty-ros2` beside `axiom-ros2`
-and include its packages when building from the `axiom-ros2` root:
-
-```bash
+source scripts/setup_env.sh
 rosdep install --from-paths src examples/scenarios-dashboard/src ../marty-ros2/src --ignore-src -r -y
 colcon build --base-paths src examples/scenarios-dashboard/src ../marty-ros2/src --symlink-install
-source install/setup.bash
+source scripts/setup_env.sh
 ```
 
-The single-Axiom and Axiom/Marty scenarios use explicit connection and acquisition
-calls. RViz adapters subscribe to ROS measurements and publish markers. Display
-origins are a layout, not measured mounting transforms or pose estimates. The guide,
-adapters and RViz run independently.
+Use the actual Marty connection settings in its recipes. Longer Marty motion
+operations use its own action interfaces; Axiom descriptor commands use services.
 
-## Multiple Axioms
+## Finish
 
-Copy the example, then edit the endpoints and startup flags before launching:
+Stop viewers/echoes first. While each driver is running, call its stop-acquisition
+and disconnect services, then stop the drivers and dashboard with Ctrl+C.
+A **Start from scratch** control needs an optional workstation reset adapter;
+it is not part of the normal Linux setup. The
+[Mac adapter](platforms/macos/README.md) is a separate optional Docker/noVNC workflow.
 
-```bash
-cp "$(ros2 pkg prefix --share axiom_driver)/config/two_axioms.yaml" ./axioms.yaml
-```
-
-```bash
-ros2 launch axiom_driver multi_axiom.launch.py boards_file:="$PWD/axioms.yaml"
-```
-
-Each board has its own driver, connection, namespace, registry and frame prefix.
-Use stable `/dev/serial/by-id` paths where available. The launch file rejects
-reused namespaces, frame IDs and connections. Connect and enable acquisition on
-`/axiom/front` and `/axiom/rear` separately. Identical sensor addresses on different
-boards do not conflict.
-
-**Two Axioms · USB + Wi-Fi + RViz** writes
-`~/usb_wifi_axioms.yaml`: `/axiom/front` uses a Linux USB serial port, and
-`/axiom/rear` uses `ws://192.168.1.11/ws`. Run the configuration
-step first, then launch. Both drivers use `auto_connect: true`, `autosub: true`
-and a delivery rate of 20 Hz. Subscribe to each IMU in the console, stop those
-subscribers, then start the two-Axiom adapter and RViz in Terminals 3 and 4.
-RViz labels the teal USB and orange Wi-Fi acceleration arrows separately.
-Other scenarios retain their manual connection and acquisition steps.
-Set `AXIOM_ROS_SERIAL_PORT` before creating the file if the USB
-path differs from `/dev/ttyACM0`. Set `AXIOM_WIFI_IP` in that same terminal if the
-second board's IP changes. USB and Wi-Fi endpoints must refer to different
-physical boards. Keep the Wi-Fi board powered.
-
-## tmux
-
-The shared `scripts/ros_tmux.sh` opens four consoles in a 2×2 layout. It also works with
-the core driver alone; see the [project README](../../README.md#optional-tmux-consoles).
-`Ctrl+b`, then an arrow selects a pane;
-`Ctrl+b`, then `d` detaches without stopping commands. Run the script again to
-reattach. `Ctrl+C` stops the foreground command in the active pane. Linux terminals
-usually paste with `Ctrl+Shift+V`.
-
-Further tmux commands: [tmux guide](https://github.com/tmux/tmux/wiki/Getting-Started).
-Checks and hardware observations: [docs/validation.md](docs/validation.md).
+Published walkthrough: [Scenarios dashboard](https://userguides.robotical.io/axiom/ros2/dashboard).
+See [ROS concepts](docs/learn-ros2.md) and the dated
+[validation record](docs/validation.md) for technical background and evidence.

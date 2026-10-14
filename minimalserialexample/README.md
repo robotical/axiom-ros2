@@ -1,52 +1,20 @@
-# Minimal RIC Serial Subscriber
+# Legacy serial console prototype
 
-This script connects to the device over a serial/USB console port and subscribes to a publish topic (e.g. `devjson`). In binary mode (default) it properly encodes a RICREST subscription command using RICSerial + MiniHDLC + ProtocolOverAscii and decodes incoming publish frames continuously.
+For supported USB acquisition and ROS topics, follow the
+[current host-driver setup](../README.md) and
+[user guides](https://userguides.robotical.io/axiom/ros2/start).
 
-## Features
-- Binary subscription (default) with full frame decoding
-- Optional legacy ASCII mode (`--ascii`)
-- Automatic keep-alive / re-subscription (`--keepalive-secs`)
-- Adjustable publish rate and topic name
-- Debug flag for verbose frame diagnostics
+This directory contains an earlier console experiment, rather than the ROS driver.
+The existing `minimalserialconnection.py` opens the module-level `PORT` at `BAUD`,
+sends an ASCII JSON subscription using `NAME` and `RATE`, and prints decoded console
+lines from a background reader. Those constants would need to be adapted to the
+actual device for a console experiment.
 
-## Install
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+The script has no command-line port/rate options, Mini-HDLC or ProtocolOverAscii
+frame decoder, ROS topics, acknowledgement checks or automatic resubscription.
+The earlier descriptions of binary mode and related CLI flags did not describe
+this file. Use `axiom_driver` for the current framed firmware contract.
 
-## Run (Binary Mode)
-```bash
-python minimalserialconnection.py --port /dev/tty.usbmodemXXXX --name devjson --rate 2
-```
-
-## Run (ASCII Mode)
-```bash
-python minimalserialconnection.py --port /dev/tty.usbmodemXXXX --name devjson --rate 2 --ascii
-```
-
-## Useful Flags
-- `--port` Serial device path.
-- `--baud` Baud rate (ignored by USB Serial/JTAG firmware but required by host lib).
-- `--name` Topic / subscription name (e.g. `devjson`, `Status`).
-- `--rate` Publish rate Hz (0 disables).
-- `--ascii` Use simple ASCII request/line reader (no binary decoding).
-- `--keepalive-secs` Periodic re-send of subscription (0 disables).
-- `--debug` Verbose logging of frames and ASCII lines.
-
-## Troubleshooting
-| Symptom | Fix |
-|---------|-----|
-| No publishes printing | Ensure correct `--name` and `--rate > 0`; stay in binary mode. |
-| High-bit gibberish in ASCII mode | You're seeing binary frames; omit `--ascii`. |
-| Intermittent missing frames | Lower rate; check cable quality; leave debug on to inspect CRC acceptance. |
-| Immediate port open error | Check your device path and permissions (`ls /dev/tty.*`). |
-
-## Notes
-- Response frames (command acknowledgements) are printed with `[RESP]` prefix.
-- Publish frames (msgType=2 proto=0) print with `[PUB]` prefix and payload JSON.
-- The script keeps a rolling message counter (0-255) for commands.
-
-## License
-MIT (adjust as needed).
+Keep this prototype separate from an active driver, updater or other serial reader:
+one application should own an Axiom serial connection at a time. Its console output
+does not establish successful acquisition or correctly decoded sensor measurements.

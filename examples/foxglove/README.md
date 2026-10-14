@@ -1,215 +1,229 @@
 # Foxglove sensor dashboards
 
-Import [two-axiom-imu.json](two-axiom-imu.json) to view two Axioms without
-configuring individual series in the GUI. It works with either USB or Wi-Fi
-connections through the host ROS driver.
+Use the host ROS driver with either USB or Wi-Fi. Foxglove displays ROS topics
+through `foxglove_bridge`; it does not connect directly to Axiom or start firmware
+acquisition. Complete the [host setup](../../README.md) first, using host firmware
+and the setup-file path for your installed ROS distribution.
 
-The layout has four plots:
+Ready-made layouts:
 
-| Position | Board | Measurement |
-|---|---|---|
-| Top left | Axiom 1 | X/Y/Z acceleration, m/s² |
-| Bottom left | Axiom 1 | X/Y/Z angular velocity, rad/s |
-| Top right | Axiom 2 | X/Y/Z acceleration, m/s² |
-| Bottom right | Axiom 2 | X/Y/Z angular velocity, rad/s |
+| Layout | Display |
+|---|---|
+| [one-axiom-thermal.json](one-axiom-thermal.json) | One AMG8833 8×8 thermal Image panel |
+| [two-axiom-imu.json](two-axiom-imu.json) | Acceleration and angular velocity plots for two boards |
 
-All plots use a rolling 30-second window, automatic vertical scaling, and the
-same axis colours: X red, Y green, Z blue. They use Foxglove's log/receipt time;
-aligning their time axes does not synchronise the boards' hardware clocks.
+Both use example board namespaces. Match those namespaces/aliases in your board
+configuration, or select your actual topics in the imported panel settings.
 
-## Required topics
+## Install the bridge and connect a viewer
 
-The driver must already be connected and acquiring measurements on both boards:
-
-```text
-/axiom1/imu/data_raw   sensor_msgs/msg/Imu
-/axiom2/imu/data_raw   sensor_msgs/msg/Imu
-```
-
-Use `axiom1` and `axiom2` as the board keys in `config/boards.yaml`, with this
-alias in each board entry:
-
-```yaml
-    topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
-```
-
-An alias requires exactly one matching online sensor. If you have multiple IMUs
-on one board, select the intended sensor with the alias's `bus` and `address`
-preferences; see the [driver README](../../src/axiom_driver/README.md).
-For other namespaces or identity-based topics, replace the topic prefixes in
-the layout JSON before importing it. The layout itself does not configure
-connections or start acquisition.
-
-## Start the bridge
-
-Keep the driver running. In another terminal, from the repository root:
+In a prepared terminal at the repository root, install the bridge once for the
+loaded distribution:
 
 ```bash
 source scripts/setup_env.sh
 sudo apt install "ros-${ROS_DISTRO}-foxglove-bridge"
+```
+
+Installation uses the ROS package repositories configured for that distribution.
+See the [official ROS bridge guide](https://docs.foxglove.dev/docs/getting-started/frameworks/ros2)
+for package availability and source-build options. Start the bridge after the
+driver is running with the same ROS domain and middleware settings:
+
+```bash
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 
-In a pane opened by `scripts/ros_tmux.sh`, the environment is already loaded.
-Skip installation if the bridge is installed. The driver and bridge must use
-the same ROS domain and middleware settings. No additional build is needed for
-the JSON layout.
+Leave it running. Open [app.foxglove.dev](https://app.foxglove.dev) in Chrome or the
+[Foxglove desktop app](https://foxglove.dev/download) on a supported computer.
+Choose **Open connection** from the dashboard or top-left app menu, then
+**Foxglove WebSocket**:
 
-## Connect the viewer and import
+- Viewer on the bridge host: `ws://localhost:8765`.
+- Viewer on another computer: `ws://ROS_HOST_IP:8765`, replacing `ROS_HOST_IP`
+  with the bridge host's reachable address, not Axiom's Wi-Fi address.
 
-Use the Foxglove desktop app or open [app.foxglove.dev](https://app.foxglove.dev)
-in Chrome. Connect using **Foxglove WebSocket**:
+Select **Open** and check that the Axiom topics appear. `localhost` means the
+computer running the viewer. For a remote viewer, the bridge's TCP port 8765 must
+be reachable; browser/OS local-network permissions may also need to be allowed.
 
-- Viewer running on the Pi: `ws://localhost:8765`.
-- Viewer running on another computer: `ws://PI_IP:8765`, using the Pi's address.
-
-The browser viewer needs internet access to load and sign in; the direct sensor
-stream stays on the local machine or network. See Foxglove's
-[connection documentation](https://docs.foxglove.dev/docs/visualization/connecting/live)
-and [standalone offline licensing](https://docs.foxglove.dev/docs/standalone-license).
-
-With the viewer connected:
-
-1. Click the current layout name and dropdown arrow in the top toolbar, beside
-   the connection address. This opens the **Layouts** menu.
-2. Choose **Import from file...** and select
-   `examples/foxglove/two-axiom-imu.json` from your local checkout.
-3. Name the layout **Axiom: two IMUs** if prompted, and save it for reuse.
-
-If the checkout is on a different computer, copy the JSON to the Pi first:
-
-```bash
-# Run on the computer holding this repository, replacing USER and PI_IP.
-scp examples/foxglove/two-axiom-imu.json USER@PI_IP:~/two-axiom-imu.json
-```
-
-Then import `two-axiom-imu.json` from the Pi user's home directory instead.
-See Foxglove's [layout import/export documentation](https://docs.foxglove.dev/docs/visualization/layouts).
-
-### Update an imported layout
-
-Copy the updated JSON to the Pi again, then use **Layouts → Import from file...**
-and select that file. Open the newly imported layout and save it for reuse.
-Replacing the file on disk does not update an existing saved Foxglove layout.
-You can keep the previous layout while checking the updated one.
-
-The four panel headers should read **Axiom 1: Acceleration**,
-**Axiom 1: Gyroscope**, **Axiom 2: Acceleration**, and **Axiom 2: Gyroscope**.
-In this exported layout format, header titles are stored as `foxglovePanelTitle`
-in each panel's configuration.
-
-## Check the plots
-
-Leave both the driver and bridge running. At rest, acceleration includes gravity
-(approximately 9.8 m/s² in total), and angular velocity should be near zero.
-Tilting a board shifts the gravity components between acceleration axes;
-rotating it produces gyroscope changes. Each column should respond to its own
-board. These are raw sensor-axis measurements, not fused orientation or speed.
-
-If a plot is empty, check that its topic has a publisher:
-
-```bash
-ros2 topic info /axiom1/imu/data_raw
-ros2 topic info /axiom2/imu/data_raw
-```
-
-A missing alias can mean acquisition is stopped, the IMU is disconnected, or
-the alias matches more than one sensor. Compare with `ros2 topic list -t` and
-the board's `devices` inventory before changing the layout.
-
-Stop the bridge with `Ctrl+C` in its terminal when finished. This does not stop
-the driver or acquisition.
+You need account access to direct connections and layout import/editing. Foxglove
+currently specifies a developer seat for direct connections and editing layouts;
+see its [live connection](https://docs.foxglove.dev/docs/visualization/connecting/live)
+and [layout](https://docs.foxglove.dev/docs/visualization/layouts) documentation.
+The web viewer needs internet to load and sign in. The direct measurement stream
+travels between the local bridge and viewer. Desktop offline use depends on
+[standalone licensing](https://docs.foxglove.dev/docs/standalone-license).
+[RViz](../../docs/thermal-camera.md) provides a local thermal-display alternative.
 
 ## Thermal camera on one Axiom
 
-Import [one-axiom-thermal.json](one-axiom-thermal.json) for one Image panel showing
-an AMG8833 thermal camera on `/axiom1/thermal/image`. Its title is **Axiom 1:
-Thermal (°C)**. The panel uses the Turbo colour map with a fixed 15–40 °C scale;
-low values are blue and high values red. The image contains the sensor's native
-8×8 measurements. It preserves the firmware pixel order; use the panel's
-rotation/flip controls if your physical mounting requires it.
+The single-camera layout subscribes to `/axiom1/thermal/image`. Its Image panel
+is titled **Axiom 1: Thermal (°C)** and uses Turbo with a fixed **15–40 °C** scale.
+Values beyond the colour limits clip to the end colours; ROS measurements retain
+their original values. The native 8×8 grid is not an interpolated camera image.
 
-### Board configuration
+### Update and configure
 
-Add the following entry to the existing `topic_aliases` mapping for board
-`axiom1` in `config/boards.yaml`, preserving its connection settings and other
-aliases:
+For an existing clone already on `main` with no local source changes, stop
+acquisition, disconnect and stop affected ROS processes before updating. From the
+repository root:
+
+```bash
+git pull --ff-only origin main
+source scripts/setup_env.sh
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --base-paths src --symlink-install
+source scripts/setup_env.sh
+```
+
+For first setup, use the [README](../../README.md). A layout-only update needs a
+pull and reimport, without a rebuild. Changing driver code requires a rebuild
+and restart.
+
+In `config/boards.yaml`, use board key `axiom1` for this example. If renaming the
+earlier `axiom` key, stop its driver first, preserve the USB or Wi-Fi settings,
+and keep `auto_connect`, `auto_reconnect` and `autosub` false. Merge this alias
+into the board's existing `topic_aliases` mapping:
 
 ```yaml
     topic_aliases:
       thermal/image: {type: AMG8833, source: thermal/image}
 ```
 
-The alias requires exactly one matching online AMG8833. Add `bus` and `address`
-selectors if the match is ambiguous. The driver also preserves the camera's
-identity-based topic. If you use another board namespace, select its thermal
-image topic in the panel's settings after importing the layout.
+This is a fragment, not a replacement board file. It binds to exactly one online,
+resolved and fresh AMG8833; use inventory `bus` and `address` selectors if several
+cameras match. An alias names ROS output rather than installing a device profile.
+The identity-based topic remains available. For another namespace, substitute
+it throughout the commands and select its image topic in the panel.
 
-### Update and start on the Pi
+### Start the session
 
-Stop the running host driver before rebuilding, then run from the repository:
+The [tmux helper](../../docs/tmux.md) opens four empty panes with the environment
+preloaded. Use Terminal 1 for the driver, Terminal 2 for services/inspection,
+Terminal 3 for the bridge, and Terminal 4 for optional checks. In separate windows
+or reused panes after a rebuild, source `scripts/setup_env.sh` first.
 
-```bash
-cd ~/axiom-ros2
-git pull --ff-only origin main
-source scripts/setup_env.sh
-colcon build --base-paths src --symlink-install
-source scripts/setup_env.sh
-```
-
-The layout is JSON; rebuilding is only needed to pick up the host driver changes
-if you have not built them yet. Updating an already-built layout needs just the
-Git pull and import.
-
-Run the driver for the selected board in one terminal:
+Terminal 1:
 
 ```bash
-ros2 launch axiom_driver axiom_minimal_launch.py namespace:=axiom1 \
-  boards_file:="$HOME/axiom-ros2/config/boards.yaml"
+ros2 launch axiom_driver axiom_minimal_launch.py \
+  namespace:=axiom1 boards_file:="$AXIOM_ROS_BOARDS_FILE"
 ```
 
-In another terminal with the same environment loaded, connect and acquire:
+Terminal 2:
 
 ```bash
 ros2 service call /axiom1/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
 ros2 service call /axiom1/publish_data_subscription \
   axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
+ros2 topic list -t --no-daemon
 ros2 topic info /axiom1/thermal/image
+ros2 topic echo /axiom1/thermal/image --once --qos-reliability best_effort
 ```
 
-The services should return `success: true`; the topic should have type
-`sensor_msgs/msg/Image` and one publisher. The sensor must be attached and its
-firmware profile enabled. In another terminal, start the bridge:
+Expect both service replies to say `success: true`, and the topic to be
+`sensor_msgs/msg/Image` with one publisher. A frame has width/height 8, encoding
+`32FC1`, `is_bigendian: 0`, `step: 32`, and 256 bytes representing 64 little-endian
+float32 temperatures in °C. Its header has the sample timestamp and sensor frame.
+The `thermal/grid` topic remains available for RViz.
 
-```bash
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml
-```
+The camera must be connected with a supported firmware profile. The 20 Hz request
+controls delivery, not camera sampling. An echo or viewer alone does not enable
+acquisition.
+
+In Terminal 3, run the bridge command from the section above, then connect the viewer.
 
 ### Import and check
 
-Connect Foxglove to `ws://localhost:8765` on the Pi. Select **Layouts → Import
-from file...** and choose `examples/foxglove/one-axiom-thermal.json`. Save it as
-**Axiom: thermal camera**. Importing the new file replaces neither the contents
-nor the selected panel of an older saved layout; open the newly imported layout.
+1. Click the layout name/dropdown in the top toolbar to open **Layouts**.
+2. Choose **Import from file...** and select
+   `examples/foxglove/one-axiom-thermal.json` on the viewer computer.
+3. Open the newly imported layout and save it as **Axiom: thermal camera**.
 
-You should see one thermal panel. Move your hand in front of the camera and
-check that warmer pixels change colour. The topic, colour map and scale are
-already configured. See Foxglove's [Image panel documentation](https://docs.foxglove.dev/docs/visualization/panels/image)
-for display settings.
-
-To copy just the layout from another computer, run there:
+If the checkout is on another computer, download the
+[thermal JSON](https://raw.githubusercontent.com/robotical/axiom-ros2/main/examples/foxglove/one-axiom-thermal.json)
+to the viewer computer, or copy it there. For example, run from the checkout on
+the source computer, replacing the login/address of the viewer computer:
 
 ```bash
-scp examples/foxglove/one-axiom-thermal.json USER@PI_IP:~/one-axiom-thermal.json
+scp examples/foxglove/one-axiom-thermal.json USER@VIEWER_HOST:~/one-axiom-thermal.json
 ```
 
-Import the copied file from the Pi user's home directory.
+Import the copied file from the viewer computer's home directory. The supplied
+layout has one thermal panel. Move a hand in front of the camera to see warmer
+pixels change colour. Pixel order follows firmware; adjust the panel's rotation
+or flip controls for mounting. Enlarging the display adds no measured pixels.
+This 2D heatmap needs no TF tree or camera calibration. A spatial 3D projection
+requires a separate calibration and frame contract.
 
-### Validation limits
+Replacing a JSON file does not update a saved Foxglove layout. Import it again
+and open the new layout after a layout change.
 
-The single-panel JSON configuration is validated against the official Foxglove
-SDK. The host image output has automated tests using the released AMG8833
-metadata, synthetic thermal frames and real ROS image subscribers, including
-negative temperatures, units, timestamps and aliases. Physical mounting
-orientation and rendering/import in the Pi's Foxglove viewer remain unverified.
+### Troubleshoot and finish
+
+| Symptom | Check |
+|---|---|
+| No Axiom topics | Driver running, acquisition enabled, matching ROS domain/middleware |
+| Viewer cannot connect | Bridge running, correct host address/port, local-network permission and direct-connection entitlement |
+| No image publisher | Camera online in `/axiom1/devices`, correct alias/type/namespace |
+| Identity image exists, alias absent | Resolve an ambiguous match with bus/address, or select the identity topic |
+| Grid exists, image absent | Build/source/restart the current host driver; Image output needs known Celsius units |
+| One colour | Inspect temperatures and adjust **Value min** / **Value max** |
+| Extra panels | Open the newly imported `one-axiom-thermal.json` layout |
+
+Stop the bridge in Terminal 3. In Terminal 2:
+
+```bash
+ros2 service call /axiom1/publish_data_subscription \
+  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 0.0}'
+ros2 service call /axiom1/disconnect axiom_interfaces/srv/Disconnect '{}'
+```
+
+Then stop the driver. Published walkthrough:
+[Thermal camera in Foxglove](https://userguides.robotical.io/axiom/ros2/foxglove).
+See the [Image panel documentation](https://docs.foxglove.dev/docs/visualization/panels/image)
+for display controls.
+
+## Two-board IMU plots
+
+[two-axiom-imu.json](two-axiom-imu.json) plots X/Y/Z acceleration and angular
+velocity for `/axiom1/imu/data_raw` and `/axiom2/imu/data_raw`. Use board keys
+`axiom1` and `axiom2`, each with its actual endpoint and this alias fragment:
+
+```yaml
+    topic_aliases:
+      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+```
+
+Each alias needs exactly one matching online IMU; use bus/address selectors if
+needed. Follow the [multi-board workflow](../../docs/sensors-and-boards.md#multiple-boards)
+with those namespace names to launch, connect and request acquisition separately.
+Use a single Foxglove bridge for the ROS session.
+
+Import `examples/foxglove/two-axiom-imu.json` on the viewer computer using the
+same Layouts menu. For a remote checkout, download the
+[IMU JSON](https://raw.githubusercontent.com/robotical/axiom-ros2/main/examples/foxglove/two-axiom-imu.json)
+or copy that file to the viewer computer before import.
+
+| Position | Panel title | Units |
+|---|---|---|
+| Top left | Axiom 1: Acceleration | m/s² |
+| Bottom left | Axiom 1: Gyroscope | rad/s |
+| Top right | Axiom 2: Acceleration | m/s² |
+| Bottom right | Axiom 2: Gyroscope | rad/s |
+
+The plots have a rolling 30-second window, automatic vertical scaling, and X red,
+Y green, Z blue. They use log/receipt time; aligned axes do not synchronise hardware
+clocks. At rest, acceleration includes about 9.8 m/s² of gravity in total, and
+angular velocity should be near zero. Tilt/rotate each board to check its own column.
+These are raw sensor-axis values, not fused orientation or speed.
+
+For empty plots, check actual publisher counts, the inventory, acquisition and
+alias ambiguity. For different namespaces, select those topics in the panel
+settings. Stop the bridge, then stop acquisition and disconnect both drivers
+using their respective namespaces before stopping the multi-board launch.
+
+Layout configuration and automated image-output evidence are recorded in
+[validation.md](../../docs/validation.md). Those dated checks do not establish
+physical mounting orientation or rendering on every workstation.

@@ -1,6 +1,9 @@
 # axiom_thermal_viz
 
-`axiom_thermal_viz` turns thermal samples from the AMG8833 (or any other device publishing `axiom_interfaces/ThermalGrid`) into an RViz heatmap by emitting a `visualization_msgs/Marker` stream.
+`axiom_thermal_viz` turns Celsius samples in `axiom_interfaces/msg/ThermalGrid`
+into an RViz heatmap and pixel labels. For an AMG8833 camera, follow the complete
+[four-terminal walkthrough](../../docs/thermal-camera.md) or the
+[published RViz guide](https://userguides.robotical.io/axiom/ros2/thermal_camera).
 
 ## Features
 
@@ -12,8 +15,11 @@
 
 ## Usage
 
-The driver must be connected and acquiring thermal data. Run the build commands
-from the repository root. This package does not require the scenarios dashboard.
+Complete the [host-driver setup](../../README.md) first. The driver must be
+connected and acquiring thermal data. Run build commands from the repository root,
+stopping affected processes before rebuilding. Use a graphical desktop for RViz.
+The scenarios dashboard is optional; for a standard Image panel use the
+[Foxglove guide](../../examples/foxglove/README.md#thermal-camera-on-one-axiom).
 
 1. Install dependencies and build the core packages:
    ```bash
@@ -22,10 +28,12 @@ from the repository root. This package does not require the scenarios dashboard.
    colcon build --base-paths src --symlink-install
    source scripts/setup_env.sh
    ```
+   Restart the driver, connect and enable acquisition using the README before
+   continuing to topic inspection.
 2. Find the topic ending in `/thermal/grid` using `ros2 topic list -t`, then
-   start the visualiser with that exact path. This address is an example:
+   start the visualiser with that exact path, replacing the placeholder:
    ```bash
-   THERMAL_TOPIC=/axiom/bus_1/device_169/thermal/grid
+   THERMAL_TOPIC='PASTE_DISCOVERED_THERMAL_GRID_TOPIC_HERE'
    ros2 run axiom_thermal_viz thermal_heatmap --ros-args \
      -r __ns:=/sensing \
      -p input_topic:="$THERMAL_TOPIC" \
@@ -38,7 +46,7 @@ from the repository root. This package does not require the scenarios dashboard.
    same camera topic. Read its frame ID and open the supplied RViz layout:
    ```bash
    source scripts/setup_env.sh
-   THERMAL_TOPIC=/axiom/bus_1/device_169/thermal/grid
+   THERMAL_TOPIC='PASTE_DISCOVERED_THERMAL_GRID_TOPIC_HERE'
    THERMAL_FRAME="$(ros2 topic echo "$THERMAL_TOPIC" \
      axiom_interfaces/msg/ThermalGrid --field header.frame_id \
      --qos-reliability best_effort --once | sed -n '1p')"
@@ -49,14 +57,17 @@ from the repository root. This package does not require the scenarios dashboard.
 
 The layout subscribes to `/sensing/thermal_heatmap` (*Marker*) and
 `/sensing/thermal_heatmap_labels` (*MarkerArray*). Temperatures are in °C; labels
-refer to measured pixels even when the heatmap is interpolated. You can also add
-these displays to an existing RViz session.
+refer to measured pixels even when the heatmap is interpolated. Set the topic and
+read the frame in each terminal where they are used; shell variables are not shared
+between panes. Pixel order is preserved. Cell size is a display layout, rather than
+measured object size or position. Stop the adapter/RViz with Ctrl+C, then stop
+acquisition and disconnect through the driver before stopping it.
 
 ### Parameters
 
 | Parameter            | Default value                     | Description |
 |----------------------|-----------------------------------|-------------|
-| `input_topic`        | `bus_1/device_169/thermal/grid`        | Source topic with `ThermalGrid` messages. |
+| `input_topic` | `bus_1/device_169/thermal/grid` | Built-in relative example; override with the actual camera topic. |
 | `output_topic`       | `thermal_heatmap`                 | Marker topic published for RViz. |
 | `marker_namespace`   | `thermal_grid`                    | Namespace used for the marker message. |
 | `cell_size`          | `0.02`                            | Side length (metres) of each base grid cell. |
@@ -72,5 +83,5 @@ these displays to an existing RViz session.
 ## RViz Tips
 
 - The default cube size works well for the 8×8 AMG8833 sensor. Reduce `cell_size` for denser sensors.
-- Enable *Use Frame Lock* in RViz if you expect the frame to move with the robot.
+- To place the camera in a robot coordinate system, provide its actual mounting transform and select the appropriate Fixed Frame.
 - Combine the marker layer with a camera image or mesh for additional context.

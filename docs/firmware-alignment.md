@@ -1,5 +1,11 @@
 # Firmware contract and migration
 
+Technical source/fixture reference. For current host firmware selection and USB or
+Wi-Fi setup, follow the [README](../README.md) and
+[published user guides](https://userguides.robotical.io/axiom/ros2/start). The inspected
+revisions below identify the historical contract baseline, not firmware a user
+must install or proof of the exact firmware flashed on a board.
+
 ## Inspected baseline
 
 | Source | Revision |

@@ -1,7 +1,8 @@
 # axiom_interfaces
 
 ROS interfaces for the Axiom bridge. See the [driver contracts](../axiom_driver/README.md)
-for units, topics, timing and examples.
+for units, topics, timing and examples. Start with the
+[host-driver setup](../../README.md) for installation and manual acquisition.
 
 | Interface | Purpose |
 |---|---|
@@ -17,6 +18,11 @@ for units, topics, timing and examples.
 | `RicRestUrl` | URL, timeout and optional matching framing → firmware JSON |
 | `SetSampleRate` | Bus, hex address and supported sample rate → actual rate, poll interval and retained poll count |
 | `DeviceCommand` | Numeric values in live descriptor order/units → success, message and firmware response JSON; endpoint follows device lifetime |
+
+Standard IMU, scalar Range and thermal/multizone Image outputs use `sensor_msgs`;
+they do not need new custom message definitions. Image values are `32FC1`, in °C
+for thermal images or metres for supported multizone range images. See the
+[Foxglove walkthrough](../../examples/foxglove/README.md).
 
 Rebuild and source the workspace after interface changes. These interfaces expose
 sensor acquisition and configuration; they do not constitute ros2_control actuation.

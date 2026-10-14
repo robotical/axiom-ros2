@@ -1,5 +1,9 @@
 # Firmware alignment work
 
+Historical engineering milestone from September 2026. The source revisions and
+test results below describe that milestone; use the [README](../README.md) and
+[current driver reference](../src/axiom_driver/README.md) for user setup.
+
 Scope: align the ROS repository with current Axiom/Raft firmware and close the
 integration gaps identified on 2026-09-29. Firmware repositories remain read-only.
 

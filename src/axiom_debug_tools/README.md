@@ -1,41 +1,70 @@
 # axiom_debug_tools
 
-This package provides small debugging nodes that subscribe to topics published by the Axiom driver.
+Small ROS subscribers for inspecting host-driver measurements. Complete the
+[host setup](../../README.md), connect and start acquisition first. These tools
+subscribe to ROS topics; they do not open Axiom connections or enable firmware
+delivery. They are included in the core build.
 
-## Nodes
+## Pick actual topics
 
-### `axiom_topic_sniff`
-Generic topic sniffer.
-- **Parameters**:
-  - `topic` (string): topic to subscribe to
-  - `type` (string): message type (e.g., `sensor_msgs/msg/Imu`)
-- **Output**: Logs JSON-formatted messages and message rate.
+In a prepared terminal at the repository root:
 
-### `axiom_imu_monitor`
-IMU monitor and sanity checker.
-- **Parameters**:
-  - `topic` (string, default `bus_1/device_6a/imu/data_raw`)
-- **Subscribed topics**:
-  - `sensor_msgs/msg/Imu`
-- **Output**: Logs acceleration, gyro, estimated bias, frequency, warns if out of range.
+```bash
+source scripts/setup_env.sh
+ros2 topic list -t --no-daemon
+```
 
-### `axiom_range_monitor`
-Range monitor for VL53/VL6180.
-- **Parameters**:
-  - `topic` (string, default `bus_1/device_29/range`)
-- **Subscribed topics**:
-  - `sensor_msgs/msg/Range`
-- **Output**: Logs range in meters, frequency, flags out-of-range.
+Replace the placeholders below with full discovered topics. Set variables in
+each terminal that uses them. All monitors use best-effort QoS and the same ROS
+domain/middleware as the driver.
 
-### `axiom_env_monitor`
-Environment monitor for temperature and humidity.
-- **Parameters**:
-  - `temp_topic` (string, default `bus_1/device_38/temperature`)
-  - `hum_topic` (string, default `bus_1/device_38/humidity`)
-- **Subscribed topics**:
-  - `sensor_msgs/msg/Temperature`
-  - `sensor_msgs/msg/RelativeHumidity`
-- **Output**: Logs temperature (°C), humidity (%RH), frequency.
+| Executable | Parameters | Output |
+|---|---|---|
+| `axiom_topic_sniff` | Required `topic` and `type`; optional `depth` (10) | JSON message view and an approximate received rate |
+| `axiom_imu_monitor` | `topic`; built-in relative default `bus_1/device_6a/imu/data_raw` | Acceleration, gyro, running gyro average, approximate rate and simple sanity warnings |
+| `axiom_range_monitor` | `topic`; built-in relative default `bus_1/device_29/range` | Scalar range in metres, approximate rate and min/max checks |
+| `axiom_env_monitor` | `temp_topic` and `hum_topic`; relative defaults under `bus_1/device_38` | Temperature °C, humidity %RH and approximate rates |
 
-Run with `--ros-args -r __ns:=/axiom` to use the default bringup namespace.
-Monitor topics use BEST_EFFORT QoS. Use the device inventory for actual addresses.
+Built-in defaults are example identities, not automatic sensor discovery. Use
+explicit absolute topics for your board, or remap the node namespace only when
+the relative defaults match your actual sensors.
+
+## IMU and scalar range
+
+Run each monitor in its own terminal:
+
+```bash
+IMU_TOPIC='PASTE_DISCOVERED_IMU_TOPIC_HERE'
+ros2 run axiom_debug_tools axiom_imu_monitor --ros-args -p topic:="$IMU_TOPIC"
+```
+
+```bash
+RANGE_TOPIC='PASTE_DISCOVERED_SCALAR_RANGE_TOPIC_HERE'
+ros2 run axiom_debug_tools axiom_range_monitor --ros-args -p topic:="$RANGE_TOPIC"
+```
+
+The range monitor expects `sensor_msgs/msg/Range`, not a multizone Image.
+IMU acceleration includes gravity in m/s² and gyro values are rad/s. The running
+gyro average is a diagnostic, not a calibration or bias correction. The six-axis
+message has no fused orientation.
+
+## Environmental or generic messages
+
+```bash
+TEMP_TOPIC='PASTE_DISCOVERED_TEMPERATURE_TOPIC_HERE'
+HUM_TOPIC='PASTE_DISCOVERED_HUMIDITY_TOPIC_HERE'
+ros2 run axiom_debug_tools axiom_env_monitor --ros-args \
+  -p temp_topic:="$TEMP_TOPIC" -p hum_topic:="$HUM_TOPIC"
+```
+
+```bash
+SENSOR_TOPIC='PASTE_DISCOVERED_SENSOR_TOPIC_HERE'
+SENSOR_TYPE='PASTE_DISCOVERED_ROS_MESSAGE_TYPE_HERE'
+ros2 run axiom_debug_tools axiom_topic_sniff --ros-args \
+  -p topic:="$SENSOR_TOPIC" -p type:="$SENSOR_TYPE"
+```
+
+Use the type shown by `ros2 topic list -t`, such as `sensor_msgs/msg/Imu`.
+Per-message rates are receipt observations and can vary with batching and scheduling;
+use `ros2 topic hz` for a rolling received-rate check. Stop a monitor with Ctrl+C;
+acquisition continues until stopped through the driver.

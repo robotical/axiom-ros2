@@ -6,17 +6,23 @@ It runs locally, with either a real USB-connected Axiom or a labelled synthetic 
 
 ## Open the teaching platform
 
-On this Mac, from the repository root with Docker Desktop running:
+This optional teaching platform owns its ROS applications and, in live mode,
+automatically connects and requests acquisition. That differs from the manual
+host-driver walkthroughs in the [README](../README.md). Use host firmware and
+one acquisition owner per board; stop any other driver connected to that Axiom.
+
+On macOS, from the repository root with Docker Desktop running:
 
 ```bash
 ./scripts/shake_lab.sh setup  # first use only
 ./scripts/shake_lab.sh start # live Axiom; selects a single matching USB device
 ```
 
-Open **http://localhost:8080**. If needed, specify the USB port explicitly:
+Open **http://localhost:8080** on the host computer. For an explicit USB port,
+replace the placeholder below with the actual macOS serial device:
 
 ```bash
-./scripts/shake_lab.sh start /dev/cu.usbmodem2101
+./scripts/shake_lab.sh start /dev/cu.usbmodemREPLACE_WITH_AXIOM_DEVICE
 ```
 
 Without hardware:
@@ -91,11 +97,11 @@ experiment. The optional strict detector also counts from its own startup.
 
 | Topic | Type | Purpose |
 |---|---|---|
-| `/axiom/bus_1/device_76a/imu/data_raw` | `sensor_msgs/Imu` | Acceleration in m/s² and rotation in rad/s |
-| `/axiom/shake/events` | `axiom_interfaces/ShakeEvent` | Source timestamp, event number, triggering motion and pulse count |
-| `/axiom/shake/motion` | `std_msgs/Float64` | Motion magnitude after estimating slow gravity changes |
-| `/axiom/shake/count` | `std_msgs/UInt64` | Current detector event count |
-| `/axiom/face/state` | `std_msgs/String` containing JSON | Expression, reactions and last received event number |
+| Selected IMU topic | `sensor_msgs/msg/Imu` | Acceleration in m/s² and rotation in rad/s |
+| `/axiom/shake/events` | `axiom_interfaces/msg/ShakeEvent` | Source timestamp, event number, triggering motion and pulse count |
+| `/axiom/shake/motion` | `std_msgs/msg/Float64` | Motion magnitude after estimating slow gravity changes |
+| `/axiom/shake/count` | `std_msgs/msg/UInt64` | Current detector event count |
+| `/axiom/face/state` | `std_msgs/msg/String` containing JSON | Expression, reactions and last received event number |
 | `/axiom/strict/events`, `/axiom/strict/count` | Same event/count types | Independent high-threshold detector outputs |
 
 ## Recording and playback controls
@@ -144,16 +150,25 @@ Driver timestamps are estimates, and corrections can restart filter warmup.
 
 ## Run on native Linux ROS
 
-With ROS Jazzy installed:
+Follow the [host setup](../README.md) to build the core packages and identify
+the board's actual IMU topic. If using the manual driver to discover that topic,
+stop acquisition, disconnect and stop it before launching this managed teaching
+platform. From the repository root, substitute the actual USB port and IMU topic:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
-source install/setup.bash
+source scripts/setup_env.sh
+IMU_TOPIC='PASTE_DISCOVERED_IMU_TOPIC_HERE'
 ros2 launch axiom_shake_detector shake_lab.launch.py \
-  transport:=serial serial_port:=/dev/ttyACM0
+  transport:=serial serial_port:=/dev/serial/by-id/REPLACE_WITH_AXIOM_DEVICE \
+  imu_topic:="$IMU_TOPIC"
 ```
+
+The platform starts its own driver with automatic connection/acquisition. For a
+Wi-Fi board, use `transport:=ws` and `device_uri:=ws://AXIOM_IP/ws`, replacing
+`AXIOM_IP` with its actual address. Its direct managed driver uses these launch
+arguments rather than reading the manual driver's board entry. All ROS applications
+must use matching domain/middleware settings. Open the browser on the host, or
+use an SSH tunnel if viewing its default loopback server from another computer.
 
 Launch parameters include `imu_topic`, `dashboard_host`, `dashboard_port`,
 `recordings_dir`, `with_driver`, `transport`, `device_uri` and `serial_port`.
@@ -161,8 +176,11 @@ The standalone `shake_detector` executable remains available for direct ROS use
 and supports the original threshold/filter parameters and simple diagnostic page.
 The teaching platform uses its fixed standard and strict configurations.
 
-For a different attached IMU, set `AXIOM_IMU_TOPIC` before starting the Mac lab.
-On native Linux, pass the corresponding `imu_topic` launch argument.
+Select the IMU topic discovered from your board rather than assuming the
+platform's built-in example identity. On macOS, set `AXIOM_IMU_TOPIC` before
+starting the lab; on native Linux use the `imu_topic` launch argument. The optional
+`with_driver:=false` mode starts without a managed live source for replay; stop
+external live publishers before replaying on that same topic.
 
 The Mac uses a loopback USB-to-WebSocket relay because the Linux container cannot
 open the Mac serial path directly. Only the driver owns firmware acquisition.

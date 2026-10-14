@@ -10,6 +10,19 @@ leave room for disconnect/state callbacks while firmware requests wait.
 
 ## Configuration
 
+For host firmware selection, ROS installation and the shared local files, start
+with the [repository README](../../README.md). These contracts describe the host
+driver; native ROS/Zenoh firmware is a separate workflow. The examples use
+user-chosen namespaces and illustrative sensor identities. Inspect the actual
+inventory before selecting a topic, frame, device address or command.
+
+`scripts/setup_env.sh` loads `config/machine.env` and the built workspace.
+`config/boards.yaml` supplies one endpoint per namespace to both driver launches.
+The single-board launch reads its parameter file, then board settings, then
+explicit launch overrides. The multi-board launch merges driver defaults with
+each board entry. See [sensor/board configuration](../../docs/sensors-and-boards.md).
+
+
 Copy [config/axiom.yaml](config/axiom.yaml) and pass `params_file:=/absolute/path.yaml`.
 Explicit launch arguments override the file. Connection, reconnection and acquisition
 are manual by default for both launches and direct nodes. Startup parameters are
@@ -18,7 +31,7 @@ read-only. Use services for runtime connection, subscription and sample-rate cha
 | Parameter | Default | Meaning |
 |---|---|---|
 | `transport` | `ws` | `ws` or `serial` |
-| `device_uri` | `ws://192.168.1.7/ws` | Framed firmware endpoint |
+| `device_uri` | `ws://192.168.1.7/ws` | Built-in example default; configure the actual board's framed `/ws` endpoint |
 | `ws_pcol` | `RICSerial` | HDLC-framed RIC; `RICFrame` requires matching firmware endpoint |
 | `serial.port`, `serial.baud` | `/dev/ttyUSB0`, `115200` | USB serial connection |
 | `serial.mode` | `auto` | `auto`/`overascii` send OverAscii; `ascii` uses console REST |
@@ -169,11 +182,17 @@ Spaces and special characters in names are escaped. `_conf.rate` becomes
 `set_sample_rate` and uses the firmware configuration API to keep sampling and
 polling settings consistent.
 
+Copy each exact service path from discovery into these placeholders. The values
+below are examples; use only values and commands advertised by the device's live
+descriptor (52 Hz is an illustrative LSM6DS rate):
+
 ```bash
-ros2 service call /axiom/bus_1/device_76a/commands/set_sample_rate axiom_interfaces/srv/DeviceCommand '{values: [52.0]}'
-# For a connected LED module, use its discovered bus/address:
-ros2 service call /axiom/bus_1/device_23/commands/pixels axiom_interfaces/srv/DeviceCommand '{values: [0.0, 0.0, 16.0, 16.0]}'
-ros2 service call /axiom/bus_1/device_23/commands/off axiom_interfaces/srv/DeviceCommand '{values: []}'
+RATE_SERVICE='PASTE_DISCOVERED_SAMPLE_RATE_SERVICE_HERE'
+ros2 service call "$RATE_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: [52.0]}'
+LED_PIXELS_SERVICE='PASTE_DISCOVERED_LED_PIXELS_SERVICE_HERE'
+LED_OFF_SERVICE='PASTE_DISCOVERED_LED_OFF_SERVICE_HERE'
+ros2 service call "$LED_PIXELS_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: [0.0, 0.0, 16.0, 16.0]}'
+ros2 service call "$LED_OFF_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: []}'
 ```
 
 The encoder supports numeric struct formats, descriptor scaling, pixel indices,
@@ -184,13 +203,17 @@ Success means firmware acknowledgment, not physical completion; these quick
 configuration/output operations use services rather than ROS actions.
 
 ```bash
-ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: "ws://192.168.1.7/ws"}'
+ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
 ros2 service call /axiom/get_connection_state axiom_interfaces/srv/GetConnectionState '{}'
 ros2 service call /axiom/publish_data_subscription axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
-ros2 service call /axiom/set_sample_rate axiom_interfaces/srv/SetSampleRate '{bus: "1", address: "21", sample_rate_hz: 100.0}'
 ros2 service call /axiom/ric_rest_url axiom_interfaces/srv/RicRestUrl '{url_path: "v", timeout: 3.0, ws_pcol: ""}'
 ros2 service call /axiom/disconnect axiom_interfaces/srv/Disconnect '{}'
 ```
+
+The empty connect URI uses the configured connection. Replace `/axiom` with
+your board namespace. For `SetSampleRate`, supply the actual inventory `bus`,
+hexadecimal `address` and a rate listed in that device's configuration map; see
+the [interface definition](../axiom_interfaces/srv/SetSampleRate.srv).
 
 Subscription rate zero unsubscribes. `set_sample_rate` only accepts rates advertised
 by that device's `_conf.rate` map; firmware configures polling/storage atomically
@@ -203,7 +226,8 @@ it cannot change framing mid-connection.
 
 Connecting only opens the transport and reads the firmware version. With `autosub=false`,
 measurements are forwarded only after a successful `publish_data_subscription` call;
-unsolicited packets are ignored. An explicit reconnect needs another acquisition call.
+unsolicited packets are ignored. An explicit board reconnect needs another acquisition call. Sensor hot swapping
+while its board stays connected does not need that call.
 Stopping acquisition leaves the connection open and stops measurement forwarding.
 The node still publishes its connection diagnostics and retained inventory; inventory
 ages normally while measurements are stopped. Starting `ros2 topic echo` creates a DDS

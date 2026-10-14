@@ -1,5 +1,10 @@
 # Sensor demo validation
 
+This is a historical validation record, not user setup instructions. The
+[dashboard guide](../README.md) and [published user guide](https://userguides.robotical.io/axiom/ros2/dashboard)
+describe current setup with user-selected paths and board endpoints. Dates,
+firmware versions and discovered identities below identify the test conditions.
+
 ## Thermal camera scenario — 7 October 2026
 
 - Added the manual one-Axiom AMG8833 walkthrough: connect, request acquisition,
@@ -14,9 +19,9 @@
   and subscribed to `/sensing/thermal_heatmap`.
 - Browser checks covered selection, terminal assignments, Copy confirmation,
   frame-command ⓘ details and navigation to the RViz step. The Linux guide is
-  open on the scenario's first step with the four existing consoles preserved.
+  checked on the scenario's first step with four idle consoles.
 - Physical thermal camera validation remains pending. No device connection or
-  firmware acquisition was started in the user's ROS domain.
+  firmware acquisition was started in the active hardware ROS domain.
 
 Report: `../.validation/thermal-scenario-ros.log`.
 
@@ -69,9 +74,9 @@ visualization packages also use normal ROS interfaces on native Linux.
 
 ## Physical USB Axiom
 
-Board: Axiom018, firmware 0.1.16-devlib, USB `/dev/cu.usbmodem2101`.
+Test board: one Axiom running firmware 0.1.16-devlib over a macOS USB serial connection.
 Discovered LSM6DS (`bus_1/device_76a`) and VL53L4CD (`bus_1/device_129`).
-The board remained powered during the user's distance-sensor unplug/reconnect.
+The test board remained powered during the physical distance-sensor unplug/reconnect.
 
 - Connection and acquisition were started explicitly through ROS services.
 - The existing `/axiom/range` subscriber stayed running throughout the swap.
