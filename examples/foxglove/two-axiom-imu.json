@@ -1,0 +1,203 @@
+{
+  "configById": {
+    "Plot!axiom1accel": {
+      "foxglovePanelTitle": "Axiom 1: Acceleration",
+      "paths": [
+        {
+          "value": "/axiom1/imu/data_raw.linear_acceleration.x",
+          "label": "X",
+          "color": "#e45756",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/imu/data_raw.linear_acceleration.y",
+          "label": "Y",
+          "color": "#54a24b",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/imu/data_raw.linear_acceleration.z",
+          "label": "Z",
+          "color": "#4c78a8",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Acceleration (m/s²)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "floatingLegendPosition": "top-left",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom1gyro": {
+      "foxglovePanelTitle": "Axiom 1: Gyroscope",
+      "paths": [
+        {
+          "value": "/axiom1/imu/data_raw.angular_velocity.x",
+          "label": "X",
+          "color": "#e45756",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/imu/data_raw.angular_velocity.y",
+          "label": "Y",
+          "color": "#54a24b",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/imu/data_raw.angular_velocity.z",
+          "label": "Z",
+          "color": "#4c78a8",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Angular velocity (rad/s)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "floatingLegendPosition": "top-left",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom2accel": {
+      "foxglovePanelTitle": "Axiom 2: Acceleration",
+      "paths": [
+        {
+          "value": "/axiom2/imu/data_raw.linear_acceleration.x",
+          "label": "X",
+          "color": "#e45756",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom2/imu/data_raw.linear_acceleration.y",
+          "label": "Y",
+          "color": "#54a24b",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom2/imu/data_raw.linear_acceleration.z",
+          "label": "Z",
+          "color": "#4c78a8",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Acceleration (m/s²)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "floatingLegendPosition": "top-left",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom2gyro": {
+      "foxglovePanelTitle": "Axiom 2: Gyroscope",
+      "paths": [
+        {
+          "value": "/axiom2/imu/data_raw.angular_velocity.x",
+          "label": "X",
+          "color": "#e45756",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom2/imu/data_raw.angular_velocity.y",
+          "label": "Y",
+          "color": "#54a24b",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom2/imu/data_raw.angular_velocity.z",
+          "label": "Z",
+          "color": "#4c78a8",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Angular velocity (rad/s)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "floatingLegendPosition": "top-left",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "linkedGlobalVariables": [],
+  "playbackConfig": {
+    "speed": 1,
+    "messageOrder": "receiveTime"
+  },
+  "layout": {
+    "direction": "row",
+    "splitPercentage": 50,
+    "first": {
+      "direction": "column",
+      "splitPercentage": 50,
+      "first": "Plot!axiom1accel",
+      "second": "Plot!axiom1gyro"
+    },
+    "second": {
+      "direction": "column",
+      "splitPercentage": 50,
+      "first": "Plot!axiom2accel",
+      "second": "Plot!axiom2gyro"
+    }
+  }
+}

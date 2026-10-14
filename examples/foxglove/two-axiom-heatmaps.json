@@ -1,0 +1,91 @@
+{
+  "configById": {
+    "Image!axiom1thermal": {
+      "synchronize": false,
+      "imageMode": {
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "imageTopic": "/axiom1/thermal/image",
+        "imageSchemaName": "sensor_msgs/msg/Image",
+        "rotation": 0,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "rectifyImage": false,
+        "minValue": 15,
+        "maxValue": 40
+      },
+      "foxglovePanelTitle": "Axiom 1: Thermal (°C)"
+    },
+    "Image!axiom1range": {
+      "synchronize": false,
+      "imageMode": {
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "imageTopic": "/axiom1/range/image",
+        "imageSchemaName": "sensor_msgs/msg/Image",
+        "rotation": 0,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "rectifyImage": false,
+        "minValue": 0,
+        "maxValue": 4
+      },
+      "foxglovePanelTitle": "Axiom 1: VL53L5CX distance (m)"
+    },
+    "Image!axiom2thermal": {
+      "synchronize": false,
+      "imageMode": {
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "imageTopic": "/axiom2/thermal/image",
+        "imageSchemaName": "sensor_msgs/msg/Image",
+        "rotation": 0,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "rectifyImage": false,
+        "minValue": 15,
+        "maxValue": 40
+      },
+      "foxglovePanelTitle": "Axiom 2: Thermal (°C)"
+    },
+    "Image!axiom2range": {
+      "synchronize": false,
+      "imageMode": {
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "imageTopic": "/axiom2/range/image",
+        "imageSchemaName": "sensor_msgs/msg/Image",
+        "rotation": 0,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "rectifyImage": false,
+        "minValue": 0,
+        "maxValue": 4
+      },
+      "foxglovePanelTitle": "Axiom 2: VL53L5CX distance (m)"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "linkedGlobalVariables": [],
+  "playbackConfig": {
+    "speed": 1,
+    "messageOrder": "receiveTime"
+  },
+  "layout": {
+    "direction": "row",
+    "splitPercentage": 50,
+    "first": {
+      "direction": "column",
+      "splitPercentage": 50,
+      "first": "Image!axiom1thermal",
+      "second": "Image!axiom1range"
+    },
+    "second": {
+      "direction": "column",
+      "splitPercentage": 50,
+      "first": "Image!axiom2thermal",
+      "second": "Image!axiom2range"
+    }
+  }
+}

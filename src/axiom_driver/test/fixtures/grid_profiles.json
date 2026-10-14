@@ -1,0 +1,132 @@
+{
+  "source": "RoboticalAxiom1 feature/device-library f48a3e25d3d249d325c855e15d4b79c3e4377b02 (v0.1.19-devlib-host)",
+  "records": {
+    "VL53L5CX": {
+      "name": "Multizone Distance Sensor",
+      "desc": "4x4/8x8 ToF",
+      "manu": "ST",
+      "type": "VL53L5CX",
+      "clas": [
+        "DIST"
+      ],
+      "resp": {
+        "b": 196,
+        "a": [
+          {
+            "n": "grid",
+            "at": 0,
+            "t": "B",
+            "r": [
+              4,
+              8
+            ],
+            "f": "d",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "seq",
+            "at": 1,
+            "t": "B",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "o": "uint8",
+            "vs": false
+          },
+          {
+            "n": "tempC",
+            "at": 2,
+            "t": "b",
+            "u": "&deg;C",
+            "r": [
+              -40,
+              125
+            ],
+            "f": "d",
+            "o": "int8"
+          },
+          {
+            "n": "nValid",
+            "at": 3,
+            "t": "B",
+            "r": [
+              0,
+              64
+            ],
+            "f": "d",
+            "o": "uint8"
+          },
+          {
+            "n": "dist",
+            "at": 4,
+            "t": "<h[64]",
+            "u": "mm",
+            "r": [
+              0,
+              4000
+            ],
+            "f": "d",
+            "o": "int16",
+            "vs": false,
+            "vt": "zonegrid",
+            "vo": {
+              "gridAttr": "grid",
+              "statusAttr": "status",
+              "validStatus": [
+                5,
+                6,
+                9
+              ],
+              "invert": true
+            }
+          },
+          {
+            "n": "status",
+            "at": 132,
+            "t": "B[64]",
+            "r": [
+              0,
+              255
+            ],
+            "f": "d",
+            "o": "uint8",
+            "vs": false
+          }
+        ]
+      },
+      "actions": []
+    },
+    "AMG8833": {
+      "name": "Thermal Camera",
+      "desc": "",
+      "manu": "Panasonic",
+      "type": "AMG8833",
+      "clas": [
+        "TCAM"
+      ],
+      "resp": {
+        "b": 128,
+        "a": [
+          {
+            "n": "temperature",
+            "t": "<h[64]",
+            "resolution": "8x8",
+            "u": "&deg;C",
+            "r": [
+              -55,
+              125
+            ],
+            "s": -4,
+            "d": 64,
+            "f": ".2f",
+            "o": "float"
+          }
+        ]
+      },
+      "actions": []
+    }
+  }
+}

@@ -107,9 +107,11 @@ are escaped injectively. Group `x` uses the base path; other groups add `group_<
 | `bus_<bus>/device_<addr>/sample` | DeviceSample for every decoded row, including raw/engineering/SI values and validity |
 | `…/data` | String JSON convenience view |
 | `…/imu/data_raw` | sensor_msgs/Imu when all six axes have known SI units |
-| `…/range` | sensor_msgs/Range in metres; invalid range is NaN |
+| `…/range` | sensor_msgs/Range for scalar distances in metres; invalid range is NaN |
+| `…/range/image` | sensor_msgs/Image, `32FC1`, multizone distances in metres; invalid zones are NaN |
 | `…/temperature`, `…/humidity` | Temperature (°C), RelativeHumidity (0..1) |
 | `…/thermal/grid` | ThermalGrid preserving the metadata pixel array |
+| `…/thermal/image` | sensor_msgs/Image, `32FC1`, temperatures in °C, when units are known |
 | `…/joint_states` | Observed servo angle in radians; no invented velocity/effort |
 | `…/battery` | BatteryState with unavailable quantities NaN |
 | `…/imu/axiom`, `…/range/raw`, `…/power/raw` | Optional compatibility messages |
@@ -117,6 +119,36 @@ are escaped injectively. Group `x` uses the base path; other groups add `group_<
 Invalid values are NaN in numeric messages and `null` in JSON; raw values and
 validity remain available. Unknown physical units remain engineering values in
 DeviceSample, with SI fields unset. Grams of mass are not acceleration.
+
+### Grid images and Foxglove
+
+Thermal grids with a `widthxheight` resolution and known Celsius units also emit
+`thermal/image`. This is additive: the existing `ThermalGrid` and marker visualizer
+remain available. Range arrays advertised as `vt: "zonegrid"` emit `range/image`
+instead of a scalar `Range`. Other distance arrays remain available in `sample`
+and `data` without being collapsed into one distance.
+
+Both images contain row-major, little-endian float32 values, with `step = width * 4`.
+They retain the sample's timestamp, frame ID and original zone order, with no
+rotation, interpolation or automatic mirroring. The frame remains the configured
+sensor frame; no camera calibration or optical-frame transform is fabricated.
+Use these as 2D measurement heatmaps. An accurate 3D projection needs a separate
+calibration and coordinate-frame contract.
+
+For the VL53L5CX, the descriptor's `gridAttr`, `statusAttr` and `validStatus` select
+the dimensions and usable zones (currently statuses 5, 6 and 9). A 4×4 image uses
+the first 16 entries of the firmware's fixed 64-entry arrays; an 8×8 image uses all
+64. Invalid statuses, invalid decoded values and nonpositive/nonfinite distances
+become NaN. Missing or inconsistent dimensions/status arrays are reported through
+the existing decode-error diagnostics. Generic messages keep the original
+distances and status codes. Display preferences in `vo` do not change the
+image's pixel order.
+
+Add `thermal/image` and `range/image` alias sources in each board's configuration
+to use the [ready-made Foxglove heatmap layout](../../examples/foxglove/README.md#thermal-and-distance-heatmaps).
+Image topics use the usual sensor QoS, per-topic overrides and publisher lifecycle.
+They are also published when `publish_custom_messages` is false. No additional
+Python imaging dependency or visualization node is needed for the Image panels.
 
 Offline, removed, stale and replaced devices retire their publishers and descriptor
 services. Reconnecting a supported sensor recreates them without restarting the

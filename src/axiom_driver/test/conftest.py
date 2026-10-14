@@ -13,3 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def catalogue():
     fixture = Path(__file__).parent / 'fixtures' / 'firmware_catalogue.json'
     return json.loads(fixture.read_text())['records']
+
+
+@pytest.fixture
+def grid_profiles():
+    fixture = Path(__file__).parent / 'fixtures' / 'grid_profiles.json'
+    return json.loads(fixture.read_text())['records']

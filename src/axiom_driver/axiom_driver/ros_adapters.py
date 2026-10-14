@@ -6,10 +6,13 @@ import math
 from axiom_interfaces.msg import AxiomPowerState, DeviceSample, Imu6, ThermalGrid, VL53L4CDReading
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
-from sensor_msgs.msg import BatteryState, Imu, JointState, Range, RelativeHumidity, Temperature
+from sensor_msgs.msg import (
+    BatteryState, Image, Imu, JointState, Range, RelativeHumidity, Temperature,
+)
 from std_msgs.msg import String
 
 from .core.aliases import bindings
+from .core.grids import float32_image_data, zone_grid
 from .core.registry import topic_token
 from .publisher_cache import PublisherCache
 
@@ -140,6 +143,15 @@ class RosAdapters:
             entry = values[name]
             return float(entry['si_value'] if entry['si_value'] is not None else entry['value'])
 
+        def emit_image(suffix, width, height, pixels):
+            msg = Image()
+            msg.width, msg.height = width, height
+            msg.encoding = '32FC1'
+            msg.is_bigendian = 0
+            msg.step = width * 4
+            msg.data = float32_image_data(width, height, pixels)
+            emit(suffix, msg)
+
         if (
             all(n in values for n in ('gx', 'gy', 'gz', 'ax', 'ay', 'az'))
             and all(values[n]['si_unit'] == 'rad/s' for n in ('gx', 'gy', 'gz'))
@@ -163,7 +175,12 @@ class RosAdapters:
                 emit('imu/axiom', custom)
 
         distance = values.get('dist') or values.get('distance')
-        if distance and distance.get('si_unit') == 'm':
+        if (distance and distance.get('si_unit') == 'm'
+                and isinstance(distance['si_value'], list)):
+            if distance['meta'].get('vt') == 'zonegrid':
+                side, pixels = zone_grid(values, distance)
+                emit_image('range/image', side, side, pixels)
+        elif distance and distance.get('si_unit') == 'm':
             valid = bool(distance['valid'])
             msg = Range()
             msg.radiation_type = Range.INFRARED
@@ -194,6 +211,8 @@ class RosAdapters:
                     msg.width, msg.height = width, height
                     msg.temperature_c = [float(v) for v in readings]
                     emit('thermal/grid', msg)
+                    if temperature.get('si_unit') == 'degC':
+                        emit_image('thermal/image', width, height, temperature['si_value'])
             elif temperature.get('si_unit') == 'degC':
                 msg = Temperature()
                 msg.temperature = float(temperature['si_value'])

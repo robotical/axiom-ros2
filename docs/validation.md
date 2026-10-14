@@ -1,5 +1,40 @@
 # Firmware alignment validation
 
+## Host grid images — 2026-10-14
+
+The host driver now adds `thermal/image` and `range/image` as standard
+`sensor_msgs/msg/Image` messages with `32FC1` encoding. Thermal data retains
+Celsius units and the existing `ThermalGrid` output. Descriptor-defined multizone
+distance arrays use metres, valid status codes and the active 4×4/8×8 dimensions;
+unused padding and invalid zones do not become false distance measurements.
+Existing scalar range, IMU and generic sample behavior is retained.
+
+Validation completed on macOS with Python 3.13 and a disposable Linux ROS Jazzy
+container using the locally built `axiom-shake-lab:jazzy` image. Source was mounted
+read-only; all seven packages were built into an empty container workspace.
+The complete colcon suite reported **119 tests, zero errors, zero failures and
+four existing copyright-check skips** (115 passed). A separate pure-client run
+passed **65 tests**. Firmware and Raft repository HEADs, diffs and working-tree
+states were compared before and after this task and remained unchanged.
+
+New regressions cover released AMG8833/VL53L5CX descriptors, signed thermal
+pixels, float32 byte order and row stride, distance conversion, accepted/rejected
+zone statuses, nonfinite values, 4×4 padding and malformed dimensions. Two
+independent WebSocket firmware peers and real ROS subscribers verify all four
+image aliases, board/frame isolation, preserved generic and thermal messages,
+per-topic QoS, removal/reappearance and recovery to an 8×8 image after a rejected
+frame. These tests use synthetic sensor payloads rather than physical sensors.
+
+The [heatmap layout](../examples/foxglove/two-axiom-heatmaps.json) has four Image
+panels, validated against the official Foxglove SDK 0.29.2 configuration model.
+Its panel identifiers and aliases were also checked. The saved image settings
+round-trip through the SDK without changes. Import instructions and fixed colour
+scales are in the [Foxglove guide](../examples/foxglove/README.md#thermal-and-distance-heatmaps).
+
+Physical VL53L5CX operation, mounting orientation and GUI rendering/import on
+the Pi remain unverified. This run validates ROS Jazzy; it does not constitute a
+fresh build on the Pi's ROS Kilted installation.
+
 Validated on 2026-09-29 against the source baseline in
 [firmware-alignment.md](firmware-alignment.md). The baseline does not identify a
 physical board's flashed firmware.

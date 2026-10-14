@@ -17,7 +17,8 @@ def validate_aliases(rules):
         if not isinstance(rule.get('type'), str) or not rule['type']:
             raise ValueError('Each alias needs an advertised sensor type')
         if rule.get('source') not in (
-            'imu/data_raw', 'range', 'thermal/grid', 'temperature', 'humidity',
+            'imu/data_raw', 'range', 'range/image', 'thermal/grid', 'thermal/image',
+            'temperature', 'humidity',
             'battery', 'joint_states', 'sample', 'data',
         ):
             raise ValueError('Alias source must be a supported sensor topic suffix')
