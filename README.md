@@ -155,7 +155,7 @@ The teal arrow shows acceleration, including gravity. Move Axiom to see it chang
 The configuration sets the fixed frame to `sensor_view` and subscribes to
 `/sensing/visualization/markers`.
 
-### Optional Foxglove dashboard for two Axioms
+### Optional Foxglove dashboards
 
 The [ready-made Foxglove layout](examples/foxglove/two-axiom-imu.json) has
 acceleration and gyroscope plots for `/axiom1/imu/data_raw` and
@@ -163,11 +163,10 @@ acceleration and gyroscope plots for `/axiom1/imu/data_raw` and
 [Foxglove setup and import guide](examples/foxglove/README.md) to connect the
 viewer and load the layout.
 
-For AMG8833 thermal cameras and VL53L5CX multizone distance sensors, the
-[heatmap layout](examples/foxglove/two-axiom-heatmaps.json) provides four Image
-panels with temperature and distance colour scales. The host driver publishes
-standard float Image messages; see the [heatmap setup guide](examples/foxglove/README.md#thermal-and-distance-heatmaps)
-for board aliases, rebuilding and import instructions.
+For an AMG8833 thermal camera on one Axiom, the
+[thermal layout](examples/foxglove/one-axiom-thermal.json) provides one Image panel
+with a fixed temperature colour scale. See the [thermal setup guide](examples/foxglove/README.md#thermal-camera-on-one-axiom)
+for the board alias, driver startup and import instructions.
 
 ## 5. Stop
 

@@ -121,88 +121,95 @@ the board's `devices` inventory before changing the layout.
 Stop the bridge with `Ctrl+C` in its terminal when finished. This does not stop
 the driver or acquisition.
 
-## Thermal and distance heatmaps
+## Thermal camera on one Axiom
 
-Import [two-axiom-heatmaps.json](two-axiom-heatmaps.json) for four Image panels:
-
-| Position | Board | Measurement | Colour scale |
-|---|---|---|---|
-| Top left | Axiom 1 | AMG8833 thermal grid | 15–40 °C |
-| Bottom left | Axiom 1 | VL53L5CX distance grid | 0–4 m |
-| Top right | Axiom 2 | AMG8833 thermal grid | 15–40 °C |
-| Bottom right | Axiom 2 | VL53L5CX distance grid | 0–4 m |
-
-The layout uses the Image panel's Turbo colour map with fixed limits, so colour
-has the same meaning on both boards and does not change when the scene changes.
-Low values are blue and high values red; invalid distance zones appear black.
-These are native 4×4/8×8 measurements, with no additional image interpolation.
-The depth scale is measured range from each sensor zone, not calibrated optical
-Z-depth or a 3D point cloud. The image data remains in the firmware's zone order;
-use the panel's rotation/flip controls if the physical mounting requires it.
-Foxglove's [Image panel documentation](https://docs.foxglove.dev/docs/visualization/panels/image)
-describes float images, colour maps and NaN display.
+Import [one-axiom-thermal.json](one-axiom-thermal.json) for one Image panel showing
+an AMG8833 thermal camera on `/axiom1/thermal/image`. Its title is **Axiom 1:
+Thermal (°C)**. The panel uses the Turbo colour map with a fixed 15–40 °C scale;
+low values are blue and high values red. The image contains the sensor's native
+8×8 measurements. It preserves the firmware pixel order; use the panel's
+rotation/flip controls if your physical mounting requires it.
 
 ### Board configuration
 
-Add the following entries to the existing `topic_aliases` mapping for each board
-in `config/boards.yaml`, preserving its connection settings and existing aliases:
+Add the following entry to the existing `topic_aliases` mapping for board
+`axiom1` in `config/boards.yaml`, preserving its connection settings and other
+aliases:
 
 ```yaml
     topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
       thermal/image: {type: AMG8833, source: thermal/image}
-      range/image: {type: VL53L5CX, source: range/image}
 ```
 
-Use board keys `axiom1` and `axiom2`. Each alias requires one matching online
-sensor on that board; add `bus` and `address` selectors if the match is ambiguous.
-Both sensors do not need to be attached to both boards: an unattached sensor's
-panel will have no data. Each connected sensor retains its identity-based topic
-alongside the alias. Verify the aliases after restarting the driver and starting
-acquisition:
+The alias requires exactly one matching online AMG8833. Add `bus` and `address`
+selectors if the match is ambiguous. The driver also preserves the camera's
+identity-based topic. If you use another board namespace, select its thermal
+image topic in the panel's settings after importing the layout.
 
-```bash
-ros2 topic list -t | grep -E '/axiom[12]/(thermal|range)/image'
-```
+### Update and start on the Pi
 
-All four available topics should have type `sensor_msgs/msg/Image`. A thermal
-image contains temperatures in °C; a range image contains distances in metres.
-The VL53L5CX requires firmware advertising its multizone profile, such as
-`v0.1.19-devlib-host`. Installing the layout alone does not add firmware support.
-
-### Build and import on the Pi
-
-Once the updated repository files are on the Pi, stop the running host driver,
-then rebuild from the repository root:
+Stop the running host driver before rebuilding, then run from the repository:
 
 ```bash
 cd ~/axiom-ros2
+git pull --ff-only origin main
 source scripts/setup_env.sh
 colcon build --base-paths src --symlink-install
 source scripts/setup_env.sh
 ```
 
-Restart the driver with your board configuration and resume acquisition. Keep
-the Foxglove bridge running as described above, then select **Layouts → Import
-from file...** and choose `examples/foxglove/two-axiom-heatmaps.json`. Save it as
-**Axiom: thermal and distance heatmaps**. The temperature panels should show
-8×8 pixels; distance panels should show the configured 4×4 or 8×8 grid.
-Colour settings and topic selections are already included in the file.
+The layout is JSON; rebuilding is only needed to pick up the host driver changes
+if you have not built them yet. Updating an already-built layout needs just the
+Git pull and import.
+
+Run the driver for the selected board in one terminal:
+
+```bash
+ros2 launch axiom_driver axiom_minimal_launch.py namespace:=axiom1 \
+  boards_file:="$HOME/axiom-ros2/config/boards.yaml"
+```
+
+In another terminal with the same environment loaded, connect and acquire:
+
+```bash
+ros2 service call /axiom1/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
+ros2 service call /axiom1/publish_data_subscription \
+  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
+ros2 topic info /axiom1/thermal/image
+```
+
+The services should return `success: true`; the topic should have type
+`sensor_msgs/msg/Image` and one publisher. The sensor must be attached and its
+firmware profile enabled. In another terminal, start the bridge:
+
+```bash
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+```
+
+### Import and check
+
+Connect Foxglove to `ws://localhost:8765` on the Pi. Select **Layouts → Import
+from file...** and choose `examples/foxglove/one-axiom-thermal.json`. Save it as
+**Axiom: thermal camera**. Importing the new file replaces neither the contents
+nor the selected panel of an older saved layout; open the newly imported layout.
+
+You should see one thermal panel. Move your hand in front of the camera and
+check that warmer pixels change colour. The topic, colour map and scale are
+already configured. See Foxglove's [Image panel documentation](https://docs.foxglove.dev/docs/visualization/panels/image)
+for display settings.
 
 To copy just the layout from another computer, run there:
 
 ```bash
-scp examples/foxglove/two-axiom-heatmaps.json USER@PI_IP:~/two-axiom-heatmaps.json
+scp examples/foxglove/one-axiom-thermal.json USER@PI_IP:~/one-axiom-thermal.json
 ```
 
-Import the copied file from the Pi user's home directory. The layout also needs
-the updated host driver for the new Image topics. Reimporting the JSON creates a
-new layout; replacing a file on disk does not refresh a saved layout.
+Import the copied file from the Pi user's home directory.
 
 ### Validation limits
 
-Automated tests use the released firmware descriptors and synthetic sensor
-frames through two independent firmware peers and real ROS image subscribers.
-They check byte layout, units, negative temperatures, status masking, 4×4 padding,
-board isolation, aliases and publisher removal. They do not establish physical
-VL53L5CX operation, mounting orientation or rendering in the Pi's Foxglove viewer.
+The single-panel JSON configuration is validated against the official Foxglove
+SDK. The host image output has automated tests using the released AMG8833
+metadata, synthetic thermal frames and real ROS image subscribers, including
+negative temperatures, units, timestamps and aliases. Physical mounting
+orientation and rendering/import in the Pi's Foxglove viewer remain unverified.

@@ -144,8 +144,9 @@ the existing decode-error diagnostics. Generic messages keep the original
 distances and status codes. Display preferences in `vo` do not change the
 image's pixel order.
 
-Add `thermal/image` and `range/image` alias sources in each board's configuration
-to use the [ready-made Foxglove heatmap layout](../../examples/foxglove/README.md#thermal-and-distance-heatmaps).
+Add a `thermal/image` alias source for the selected board to use the
+[single-camera Foxglove thermal layout](../../examples/foxglove/README.md#thermal-camera-on-one-axiom).
+The `range/image` alias source is available for a separate multizone display.
 Image topics use the usual sensor QoS, per-topic overrides and publisher lifecycle.
 They are also published when `publish_custom_messages` is false. No additional
 Python imaging dependency or visualization node is needed for the Image panels.

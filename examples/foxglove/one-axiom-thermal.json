@@ -1,0 +1,28 @@
+{
+  "configById": {
+    "Image!axiom1thermal": {
+      "synchronize": false,
+      "imageMode": {
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "imageTopic": "/axiom1/thermal/image",
+        "imageSchemaName": "sensor_msgs/msg/Image",
+        "rotation": 0,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "rectifyImage": false,
+        "minValue": 15,
+        "maxValue": 40
+      },
+      "foxglovePanelTitle": "Axiom 1: Thermal (°C)"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "linkedGlobalVariables": [],
+  "playbackConfig": {
+    "speed": 1,
+    "messageOrder": "receiveTime"
+  },
+  "layout": "Image!axiom1thermal"
+}

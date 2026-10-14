@@ -25,11 +25,12 @@ image aliases, board/frame isolation, preserved generic and thermal messages,
 per-topic QoS, removal/reappearance and recovery to an 8×8 image after a rejected
 frame. These tests use synthetic sensor payloads rather than physical sensors.
 
-The [heatmap layout](../examples/foxglove/two-axiom-heatmaps.json) has four Image
-panels, validated against the official Foxglove SDK 0.29.2 configuration model.
+The [thermal layout](../examples/foxglove/one-axiom-thermal.json) has one Image
+panel for `/axiom1/thermal/image`, validated against the official Foxglove SDK
+0.29.2 configuration model. It replaces the initial four-panel heatmap layout.
 Its panel identifiers and aliases were also checked. The saved image settings
-round-trip through the SDK without changes. Import instructions and fixed colour
-scales are in the [Foxglove guide](../examples/foxglove/README.md#thermal-and-distance-heatmaps).
+round-trip through the SDK without changes. Import instructions and colour-scale
+settings are in the [Foxglove guide](../examples/foxglove/README.md#thermal-camera-on-one-axiom).
 
 Physical VL53L5CX operation, mounting orientation and GUI rendering/import on
 the Pi remain unverified. This run validates ROS Jazzy; it does not constitute a
