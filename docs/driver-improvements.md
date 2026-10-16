@@ -1,19 +1,20 @@
 # Host driver development plan
 
-Status: baseline prepared; feature implementation has not started.
+Status: USB waiting increment implemented; Pi/Kilted validation pending.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
 This is a working development record for improving startup, discovery, topic
 naming and measurement messages. The [README](../README.md) and
 [driver reference](../src/axiom_driver/README.md) describe current behaviour.
-Proposals below are not implemented features or installation instructions.
+Sections marked as proposals are not implemented features or installation
+instructions. Completed increments and their validation are recorded below.
 
 ## How we will work
 
 - Nikos writes the implementation. The assistant helps explain the code, define
-  each increment, review diffs and interpret test results. The assistant changes
-  implementation only when explicitly asked.
+  each increment, review diffs, and write and run tests. Implementation changes
+  by the assistant are discussed first.
 - Work on one small increment at a time on `main`. No firmware or Raft library
   changes are included in this plan.
 - Before coding, agree on observable behaviour, compatibility and acceptance
@@ -114,8 +115,9 @@ per physical Axiom. Additional visualisers consume ROS topics.
 
 ## Milestones
 
-The order and behaviour below are proposed. Each milestone needs a brief contract
-review before its implementation begins.
+Each milestone needs a brief contract review before its implementation begins.
+The user selected startup and USB discovery as the first priority. The milestone
+numbers below are reference labels, not implementation order.
 
 | Milestone | Intended result | Completion evidence |
 |---|---|---|
@@ -127,7 +129,26 @@ review before its implementation begins.
 | M5: descriptor mappings | A versioned optional metadata block selects supported message types and fields; descriptors without it still work. | Validation, precedence, unsupported mappings, missing fields, malformed metadata and fallback checks. Verify metadata survives the library upload/readback path before publishing profiles. |
 | M6: Wi-Fi discovery | Discovery finds verified boards and honours robot membership; a board visible over USB and Wi-Fi gets one owner. | Discovery timeout/reappearance, unrelated devices, selection rules, stable namespaces and cross-transport deduplication. Physical network acceptance separately. |
 
-## First increment: define and test measurement output
+## First increment: USB startup with no boards
+
+The standalone `axiom_usb_discovery` executable starts
+[UsbDiscoveryNode](../src/axiom_driver/axiom_driver/usb_discovery_node.py).
+It enumerates serial ports immediately and every two seconds, filtering USB
+candidates by Espressif VID/PID `303a:1001`. These are candidates, not verified
+Axioms. It does not open ports, connect boards or publish sensor data, and existing
+driver launches and defaults are unchanged.
+
+With no candidates, it logs `Waiting for an Axiom...` once and stays alive.
+It logs again only when the candidate set or enumeration error changes. Candidate
+ordering alone does not trigger another message. Enumeration errors are reported
+without stopping the node, and Ctrl+C releases the node and ROS context.
+
+[Discovery tests](../src/axiom_driver/test/test_usb_discovery.py) cover the real
+timer, candidate filtering and transitions, enumeration recovery, shutdown and
+the installed console entry point without opening physical ports. Pi/Kilted
+acceptance is pending; see the development log for completed validation.
+
+## Later proposal: define and test measurement output
 
 ### Current path to understand
 
@@ -242,6 +263,7 @@ real Axiom; do not compete with a running driver or browser acquisition session.
 | 2026-10-16 | Work on `main`; preparation changes documentation only. | Explicit user instruction. |
 | 2026-10-16 | Preserve all existing local edits. | Their disposition has not been authorised; keep them separate from new feature work. |
 | 2026-10-16 | Initial changes stay in the host repository. | Startup, topic presentation and host message adaptation do not require Raft library changes. |
+| 2026-10-16 | Start with startup and USB discovery; user implements, assistant writes and runs tests. | Follow the feedback order and keep implementation hands-on. |
 
 ## Development log
 
@@ -300,8 +322,25 @@ real Axiom; do not compete with a running driver or browser acquisition session.
 - After the user reviewed the changes and authorised publishing them, committed
   the existing demo work and formatting separately, followed by this plan. This
   establishes the baseline on `main`; no new feature code was written.
-- Next: Nikos writes the LTR-390 decoder regression, the assistant reviews it,
-  then both agree on the numeric publication contract before changing adapters.
+- The original LTR-390-first proposal was superseded by the user's decision to
+  start with startup and USB discovery.
+
+### 2026-10-16: USB waiting increment
+
+- Nikos implemented the discovery node and its `setup.py` console entry, then
+  corrected the functional issues identified in review. The assistant added the
+  tests and cleaned up formatting after announcing those changes.
+- Clean ROS Jazzy container validation: **all seven packages built; 130 tests,
+  zero errors, zero failures, four existing skips**. All 11 discovery test cases
+  passed. The image and isolation settings match the baseline recorded above;
+  no physical devices were passed through.
+- An installed `ros2 run axiom_driver axiom_usb_discovery` smoke check logged the
+  waiting message once, stayed alive across repeated scans and exited with code
+  zero on SIGINT without a traceback.
+- No Pi/Kilted or physical USB acceptance has been performed. Next: the user
+  pulls and builds on the Pi, runs the discovery tests and checks quiet waiting
+  and Ctrl+C with no USB Axioms connected. Board verification and connection are
+  later increments.
 
 For later entries, record: objective, behaviour/decision, changed files, tests and
 environment, hardware evidence (if any), commit and remaining issues. Add entries

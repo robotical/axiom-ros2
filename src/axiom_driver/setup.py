@@ -31,6 +31,7 @@ setup(
     entry_points={
         'console_scripts': [
             'axiom_bridge_node = axiom_driver.axiom_bridge_node:main',
+            'axiom_usb_discovery = axiom_driver.usb_discovery_node:main'
         ],
     },
 )
