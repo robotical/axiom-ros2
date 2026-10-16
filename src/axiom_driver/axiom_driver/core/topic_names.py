@@ -3,6 +3,17 @@
 from .registry import topic_token
 
 
+def attribute_topic(name):
+    """Keep attribute case while escaping names and reserving adapter outputs."""
+    token = topic_token(name)
+    if not token[0].isalpha() or token in {
+        'sample', 'data', 'data_raw', 'range', 'image', 'grid', 'battery',
+        'joint_states', 'imu', 'power', 'thermal',
+    }:
+        token = 'attribute_' + token
+    return token
+
+
 def sensor_topic(device_type, key):
     """Keep model and firmware location stable regardless of discovery order."""
     model = topic_token(device_type.lower())

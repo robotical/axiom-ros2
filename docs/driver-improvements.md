@@ -1,8 +1,9 @@
 # Host driver development plan
 
 Status: automatic USB/Wi-Fi startup implemented and validated; breaking readable
-topic migration implemented and validated in the uncommitted working tree;
-measurement output and descriptor-mapping work remain.
+topic migration committed and published as `7e5bec9`; Illuminance and scalar
+fallbacks implemented and validated. Optional descriptor ROS
+mapping metadata remains a later increment.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -176,7 +177,12 @@ its active probe before the node is destroyed. Tests use controlled probes and
 virtual serial peers rather than physical hardware. The user completed Pi/Kilted
 acceptance for the worker; acceptance of the subsequent retry change is pending.
 
-## Later proposal: define and test measurement output
+## Measurement output: original proposal
+
+The investigation and proposal below predate implementation. The first
+measurement increment is now implemented using existing descriptors; see the
+2026-10-16 Illuminance/scalar validation entry below and the current
+[output contracts](../src/axiom_driver/README.md#descriptor-driven-light-and-scalar-outputs).
 
 ### Current path to understand
 
@@ -615,3 +621,37 @@ when a meaningful increment finishes or a decision changes.
   Firmware/Raft, the physical Pi and published userguides remain untouched.
   Ignored local board configurations require alias-source migration before
   using this version. Physical Axiom/Pi validation remains pending.
+
+### 2026-10-16: Illuminance and scalar fallbacks
+
+- The user authorised implementing this increment in the host driver, with
+  independent review and tests, without committing or pushing. Existing
+  descriptors and their engineering/SI values drive the outputs; no new ROS
+  mapping metadata or firmware/Raft changes are included.
+- LTR-390 now exposes `ambient` as Illuminance in lux and `UVI` as Float64 in
+  index units. The same light-name/lux rules apply to other compatible
+  descriptors. Other numeric, boolean and text scalars use Float64, Bool and
+  String. Generic timestamped `sample` and JSON `data` outputs are retained.
+- Existing semantic adapters consume their represented attributes; arrays are
+  not flattened. Invalid numbers publish NaN, invalid bool/text readings are
+  omitted, attribute case is retained, unsafe/colliding names are escaped, and
+  scalar suffixes can be selected by aliases. Inventory retains `public_topics`
+  and adds `output_info` with each emitted canonical message type and unit.
+- An independent reviewer found no actionable bugs or regressions and verified
+  the final corrections for multiple distance/battery attributes, bracket text
+  formats and output units. Their focused final validation passed 32 tests.
+- Added **39 tests** covering existing descriptor scaling, SI/unknown-unit
+  fallback, another compatible light sensor, invalid first readings, booleans,
+  text, arrays, naming, aliases/QoS, revision/removal cleanup and real DDS
+  Illuminance/UVI delivery with late-joining retained inventory.
+- Final Linux/Jazzy build: all seven core packages built; **312 tests total,
+  308 passed, four existing copyright skips, zero errors/failures**. Optional
+  demo tests: **12 passed**. Dashboard tests run directly with pytest:
+  **30 passed, two existing optional Marty-interface skips**. Its colcon/setuptools
+  runner reported no tests, so direct pytest was used to execute the actual suite;
+  no dashboard files were changed. Package lint and `git diff --check` passed.
+- Evidence is retained under `/tmp/axiom-scalar-evidence` on the Mac. Validation
+  used synthetic firmware peers and real ROS Jazzy messages/DDS, without physical
+  Axiom or Pi/Kilted testing. Changes remain uncommitted and unpushed.
+- The user subsequently authorised committing and pushing this increment to
+  `main`. Physical Pi/Kilted acceptance remains pending.

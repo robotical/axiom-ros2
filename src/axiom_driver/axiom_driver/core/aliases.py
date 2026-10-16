@@ -16,10 +16,12 @@ def validate_aliases(rules):
             raise ValueError('Alias rules support type, source, bus and address')
         if not isinstance(rule.get('type'), str) or not rule['type']:
             raise ValueError('Each alias needs an advertised sensor type')
-        if rule.get('source') not in (
-            'data_raw', 'range', 'image', 'grid', 'range/image', 'thermal/image',
-            'temperature', 'humidity',
-            'battery', 'joint_states', 'sample', 'data',
+        source = rule.get('source')
+        # Scalar attributes add descriptor-defined single-token suffixes. Nested
+        # outputs still use the existing explicit contracts; old paths stay invalid.
+        if not isinstance(source, str) or not (
+            re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_]*', source)
+            or source in ('range/image', 'thermal/image')
         ):
             raise ValueError('Alias source must be a supported sensor topic suffix')
         for field in ('bus', 'address'):

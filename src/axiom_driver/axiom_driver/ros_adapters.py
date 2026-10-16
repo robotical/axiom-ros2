@@ -7,13 +7,14 @@ from axiom_interfaces.msg import AxiomPowerState, DeviceSample, Imu6, ThermalGri
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from sensor_msgs.msg import (
-    BatteryState, Image, Imu, JointState, Range, RelativeHumidity, Temperature,
+    BatteryState, Illuminance, Image, Imu, JointState, Range, RelativeHumidity, Temperature,
 )
-from std_msgs.msg import String
+from std_msgs.msg import Bool, Float64, String
 
 from .core.aliases import bindings
 from .core.grids import float32_image_data, zone_grid
-from .core.topic_names import image_suffix, measurement_topic, sensor_topic
+from .core.scalars import scalar_output
+from .core.topic_names import attribute_topic, image_suffix, measurement_topic, sensor_topic
 from .publisher_cache import PublisherCache
 
 
@@ -65,12 +66,14 @@ class RosAdapters:
         self.aliases = {}
         self.devices = {}
         self.public_topics = {}
+        self.output_info = {}
 
     def sync(self, devices):
         active = {row['topic']: row['revision'] for row in devices
                   if row['topic'] and row['online'] and not row['stale'] and row['metadata_ready']}
         for topic in self.devices.keys() | self.public_topics.keys():
             if topic not in active or active[topic] != self.devices.get(topic):
+                self.output_info.pop(topic, None)
                 for group in self.public_topics.pop(topic, {}).values():
                     for public_topic in group.values():
                         self.cache.remove_topic(public_topic)
@@ -87,6 +90,10 @@ class RosAdapters:
                 group: dict(topics)
                 for group, topics in self.public_topics.get(row['topic'], {}).items()
             }
+            row['output_info'] = {
+                group: {suffix: dict(info) for suffix, info in outputs.items()}
+                for group, outputs in self.output_info.get(row['topic'], {}).items()
+            }
 
     def frame(self, device):
         identity = f'{device.key.bus}:{device.key.address}'
@@ -99,8 +106,9 @@ class RosAdapters:
         frame = self.frame(device)
         stamp = Time(nanoseconds=sample['stamp_ns']).to_msg()
         values = sample['values']
+        consumed = set()
 
-        def emit(suffix, msg):
+        def emit(suffix, msg, unit=None):
             if hasattr(msg, 'header'):
                 msg.header.frame_id, msg.header.stamp = frame, stamp
             public_topic = measurement_topic(device, group, suffix)
@@ -112,6 +120,11 @@ class RosAdapters:
                 self.public_topics.setdefault(base, {}).setdefault(group, {})[
                     suffix
                 ] = public_topic
+                self.output_info.setdefault(base, {}).setdefault(group, {})[suffix] = {
+                    'message_type': (
+                        type(msg).__module__.split('.')[0] + '/msg/' + type(msg).__name__),
+                    'unit': unit,
+                }
             if group == 'x':
                 for alias, identity in self.aliases.items():
                     if identity == (base, device.revision, suffix):
@@ -155,14 +168,14 @@ class RosAdapters:
             entry = values[name]
             return float(entry['si_value'] if entry['si_value'] is not None else entry['value'])
 
-        def emit_image(suffix, width, height, pixels):
+        def emit_image(suffix, width, height, pixels, unit):
             msg = Image()
             msg.width, msg.height = width, height
             msg.encoding = '32FC1'
             msg.is_bigendian = 0
             msg.step = width * 4
             msg.data = float32_image_data(width, height, pixels)
-            emit(suffix, msg)
+            emit(suffix, msg, unit)
 
         if (
             all(n in values for n in ('gx', 'gy', 'gz', 'ax', 'ay', 'az'))
@@ -180,18 +193,22 @@ class RosAdapters:
                 value(n) for n in ('ax', 'ay', 'az')
             ]
             emit('data_raw', msg)
+            consumed.update(('gx', 'gy', 'gz', 'ax', 'ay', 'az'))
             if self.custom_messages:
                 custom = Imu6()
                 for name in ('gx', 'gy', 'gz', 'ax', 'ay', 'az'):
                     setattr(custom, name, value(name))
                 emit('imu/axiom', custom)
 
-        distance = values.get('dist') or values.get('distance')
+        distance_name = next((n for n in ('dist', 'distance') if n in values), None)
+        distance = values.get(distance_name)
         if (distance and distance.get('si_unit') == 'm'
                 and isinstance(distance['si_value'], list)):
             if distance['meta'].get('vt') == 'zonegrid':
                 side, pixels = zone_grid(values, distance)
-                emit_image(image_suffix(device, 'range'), side, side, pixels)
+                emit_image(image_suffix(device, 'range'), side, side, pixels, 'm')
+                consumed.update((distance_name, distance['meta']['vo']['gridAttr'],
+                                 distance['meta']['vo']['statusAttr']))
         elif distance and distance.get('si_unit') == 'm':
             valid = bool(distance['valid'])
             msg = Range()
@@ -201,7 +218,10 @@ class RosAdapters:
             scale = 0.001 if distance['unit'] == 'mm' else 1.0
             msg.min_range, msg.max_range = float(limits[0]) * scale, float(limits[1]) * scale
             msg.range = float(distance['si_value']) if valid else math.nan
-            emit('range', msg)
+            emit('range', msg, 'm')
+            consumed.add(distance_name)
+            if distance['meta'].get('vft'):
+                consumed.add(distance['meta']['vft'])
             if self.custom_messages and device.device_type.upper() == 'VL53L4CD':
                 custom = VL53L4CDReading()
                 custom.valid = valid
@@ -222,19 +242,22 @@ class RosAdapters:
                     msg = ThermalGrid()
                     msg.width, msg.height = width, height
                     msg.temperature_c = [float(v) for v in readings]
-                    emit('grid', msg)
+                    emit('grid', msg, temperature['si_unit'] or temperature['unit'])
+                    consumed.add('temperature')
                     if temperature.get('si_unit') == 'degC':
                         emit_image(image_suffix(device, 'thermal'), width, height,
-                                   temperature['si_value'])
+                                   temperature['si_value'], 'degC')
             elif temperature.get('si_unit') == 'degC':
                 msg = Temperature()
                 msg.temperature = float(temperature['si_value'])
-                emit('temperature', msg)
+                emit('temperature', msg, 'degC')
+                consumed.add('temperature')
         humidity = values.get('humidity')
         if humidity and humidity.get('si_unit') == 'fraction':
             msg = RelativeHumidity()
             msg.relative_humidity = float(humidity['si_value'])
-            emit('humidity', msg)
+            emit('humidity', msg, 'fraction')
+            consumed.add('humidity')
 
         if device.device_type in ('RoboticalServo', 'RoboticalSoloServo') and 'angle' in values:
             msg = JointState()
@@ -242,11 +265,12 @@ class RosAdapters:
             msg.position = [value('angle')]
             # Firmware current/velocity fields have no unit contract here; do not
             # publish them as effort or radians/sec by guessing their meaning.
-            emit('joint_states', msg)
+            emit('joint_states', msg, 'rad')
+            consumed.add('angle')
 
-        battery = next(
-            (values[n] for n in ('battV', 'batt_v', 'batteryVoltage') if n in values), None
-        )
+        battery_name = next(
+            (n for n in ('battV', 'batt_v', 'batteryVoltage') if n in values), None)
+        battery = values.get(battery_name)
         if battery:
             voltage = float(battery['value'])
             msg = BatteryState()
@@ -261,6 +285,20 @@ class RosAdapters:
                 'percentage',
             ):
                 setattr(msg, field, math.nan)
-            emit('battery', msg)
+            emit('battery', msg, 'V')
+            consumed.add(battery_name)
             if self.custom_messages:
-                emit('power/raw', AxiomPowerState(batt_v=voltage))
+                emit('power/raw', AxiomPowerState(batt_v=voltage), 'V')
+
+        for name, entry in values.items():
+            if name in consumed:
+                continue
+            output = scalar_output(name, entry)
+            if output is None:
+                continue
+            kind, reading, unit = output
+            if kind == 'illuminance':
+                msg = Illuminance(illuminance=reading, variance=0.0)
+            else:
+                msg = {'float': Float64, 'bool': Bool, 'string': String}[kind](data=reading)
+            emit(attribute_topic(name), msg, unit)

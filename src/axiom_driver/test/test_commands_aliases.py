@@ -74,8 +74,14 @@ def test_removed_alias_source_spellings_are_rejected(source):
 
 
 def test_aliases_use_current_suffixes_and_only_real_board_roots_are_reserved():
-    for source in ('data_raw', 'grid', 'image', 'range/image', 'thermal/image'):
+    for source in ('data_raw', 'grid', 'image', 'range/image', 'thermal/image', 'ambient', 'UVI'):
         assert validate_aliases({'bus_view': {'type': 'CombinedSensor', 'source': source}})
+
+
+@pytest.mark.parametrize('source', ['', None, 1, '/ambient', '_hidden', 'a/b', 'a-b'])
+def test_scalar_alias_sources_must_be_visible_single_tokens(source):
+    with pytest.raises(ValueError, match='supported sensor topic suffix'):
+        validate_aliases({'light': {'type': 'LTR-390', 'source': source}})
 
 
 def test_unchanged_profile_refresh_does_not_rotate_revision(catalogue):

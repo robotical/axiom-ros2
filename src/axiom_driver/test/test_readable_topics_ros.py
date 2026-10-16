@@ -159,7 +159,8 @@ def test_inventory_does_not_advertise_unsupported_sensor_mappings():
     adapter.publish(device, 'x', generic)
     rows = inventory(device)
     adapter.sync(rows)
-    assert set(rows[0]['public_topics']['x']) == {'sample', 'data'}
+    assert set(rows[0]['public_topics']['x']) == {'sample', 'data', 'unknown'}
+    assert node.active('lsm6ds_b1_29/unknown')[0].messages[-1].data == .25
     assert not node.active('lsm6ds_b1_29/data_raw')
     assert not node.active('lsm6ds_b1_29/range')
 

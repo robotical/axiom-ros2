@@ -29,6 +29,9 @@ Inventory `topic` is the relative sensor root; unresolved metadata rows have
 published IMU topic. Other payload groups have separate `group_<id>` paths.
 The map gains outputs after their first sample and becomes empty when publishers
 retire. Output-only devices can expose commands without measurement topics.
+The matching `output_info[group][suffix]` map lists each canonical output's
+`message_type` and `unit`; a `null` unit means unspecified/unitless or no single
+unit for the message.
 
 | Output suffix | Type and units |
 |---|---|
@@ -37,6 +40,8 @@ retire. Output-only devices can expose commands without measurement topics.
 | `image` | `sensor_msgs/msg/Image`; thermal °C or supported multizone distances in metres, `32FC1`; invalid pixels are NaN |
 | `temperature` | `sensor_msgs/msg/Temperature`; °C |
 | `humidity` | `sensor_msgs/msg/RelativeHumidity`; fraction from 0 to 1 |
+| Light attribute, e.g. `ambient` | `sensor_msgs/msg/Illuminance`; recognised light quantities in lux |
+| Other scalar attribute, e.g. `UVI` | `std_msgs/msg/Float64`, `Bool` or `String`; unit recorded in `output_info` |
 | `grid` | `axiom_interfaces/msg/ThermalGrid`; dimensions and pixel temperatures |
 | `sample` | `axiom_interfaces/msg/DeviceSample`; decoded values, validity and timing |
 | `data` | `std_msgs/msg/String`; JSON decoded measurement view |
@@ -45,6 +50,22 @@ A descriptor with both thermal and distance grids uses `thermal/image` and
 `range/image` to distinguish them. Supported profiles supply generic `sample` and
 `data`; standard typed outputs additionally need a supported mapping and known
 units. A Device Library profile does not automatically add a custom binary decoder.
+
+LTR-390, for example, publishes `ambient` in lux as Illuminance and `UVI` in the
+descriptor's `index` unit as Float64. These outputs use the existing descriptor;
+no firmware update or sensor-specific ROS configuration is required. Numeric
+fallbacks use decoded SI values when known, otherwise decoded engineering values.
+An unknown unit is not guessed. Existing semantic adapters consume their fields
+so IMU axes, range values and grid pixels are not duplicated as scalar topics.
+Arrays remain in the generic outputs unless a dedicated adapter handles them.
+
+Invalid numeric readings publish NaN; invalid bool/text readings are omitted.
+Scalar messages contain only `data`, without timestamps or units: read inventory
+for units or `sample` for timing and validity. Attribute names retain their case;
+unsafe names are escaped and collisions such as a numeric `data` attribute use
+`attribute_data`. Copy actual paths from inventory. See the
+[scalar contracts](../src/axiom_driver/README.md#descriptor-driven-light-and-scalar-outputs)
+for the light mapping rules and fallback limits.
 
 Old bus/device topic and command paths are removed. Update topic selections,
 recording lists, exact QoS override keys and alias `source` selectors when pulling
@@ -89,10 +110,13 @@ Merge aliases into an existing board entry, keeping its connection settings:
       imu/data_raw: {type: LSM6DS, source: data_raw}
       range: {type: VL53L4CD, source: range}
       thermal/image: {type: AMG8833, source: image}
+      light: {type: LTR-390, source: ambient}
+      uv: {type: LTR-390, source: UVI}
 ```
 
 This is a fragment, not a replacement board file. Under board `axiom`, the matching
-aliases become `/axiom/imu/data_raw`, `/axiom/range` and `/axiom/thermal/image`.
+aliases include `/axiom/imu/data_raw`, `/axiom/range`, `/axiom/thermal/image`,
+`/axiom/light` and `/axiom/uv`.
 They add convenience paths to the sensor topics and share source timestamps and frame IDs.
 Alias `source` values use the canonical output suffixes in the table above.
 If an alias uses a generated readable path, the alias takes precedence: the

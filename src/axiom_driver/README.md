@@ -157,6 +157,11 @@ suffix, to an actually published relative topic:
 
 Consumers should skip unresolved rows and refresh their subscriptions when
 `public_topics` changes: metadata may resolve before the first measurement.
+The parallel `output_info[group][suffix]` map describes each published canonical
+output with `message_type` (for example `sensor_msgs/msg/Illuminance`) and `unit`.
+The unit is `null` for unitless/unspecified values and messages without a single
+measurement unit, such as IMU, generic JSON, booleans and text. Both maps become
+empty when the device's publishers retire.
 Output-only devices have a readable root and descriptor-command services, with
 an empty output map. A configured alias reserves its exact path even while
 unbound. The canonical output at that path is suppressed and omitted from
@@ -180,6 +185,8 @@ All `…` paths below are beneath the discovered sensor root (and optional group
 | `…/range` | sensor_msgs/Range for scalar distances in metres; invalid range is NaN |
 | `…/image` | sensor_msgs/Image, `32FC1`; temperatures in °C or multizone distances in metres; invalid zones are NaN |
 | `…/temperature`, `…/humidity` | Temperature (°C), RelativeHumidity (0..1) |
+| `…/<light-attribute>` | sensor_msgs/Illuminance for recognised light quantities in lux; variance 0 means unknown |
+| `…/<attribute>` | std_msgs/Float64, Bool or String for remaining supported scalar attributes |
 | `…/grid` | ThermalGrid preserving the metadata pixel array |
 | `…/joint_states` | Observed servo angle in radians; no invented velocity/effort |
 | `…/battery` | BatteryState with unavailable quantities NaN |
@@ -189,6 +196,53 @@ A descriptor declaring both thermal and distance grids uses `thermal/image` and
 `range/image` instead of `image` to keep meanings separate. The decision follows
 descriptor capabilities independently of sample arrival order; only those dual
 profiles use these two output suffixes.
+
+### Descriptor-driven light and scalar outputs
+
+Existing descriptors supply these outputs without ROS-specific metadata or a
+firmware update. For example, an LTR-390 publishes `ambient` as
+`sensor_msgs/msg/Illuminance` in lux and `UVI` as `std_msgs/msg/Float64` in the
+descriptor's `index` unit. Attribute case is preserved. Recognised light names
+are `ambient`, `als`, `white`, `visible`, `illuminance` and `light` (case
+insensitive), with a known lux conversion. Ambiguous channels such as `ir` use
+the numeric fallback even if their descriptor labels them lux.
+
+Remaining numeric scalars publish their decoded SI value when available,
+otherwise the decoded engineering value and original unit. Divisors, offsets
+and other descriptor transforms are applied once by the decoder. Unknown units
+remain unknown; raw counters are never substituted for missing readings.
+Numeric values use Float64, including fractional engineering values from integer
+wire fields. Integer values above 2^53 may lose precision; the generic `sample`
+retains raw values. Descriptor booleans use Bool and decoded text uses String.
+Invalid/nonfinite numeric readings publish NaN; invalid boolean/text readings
+are omitted. Negative illuminance also publishes NaN.
+
+Existing semantic adapters take priority: IMU axes, range values and their
+validity flag, temperature/humidity, servo position, battery voltage and image
+pixels/dimensions are not duplicated as scalar outputs. Other attributes such
+as sensor status or auxiliary readings can still publish scalars. Arrays and
+structured values have no generic scalar output; use a supported image adapter
+or the unchanged `sample`/`data` JSON outputs.
+
+Float64, Bool and String carry only `data`, without a header or unit field. Use
+`output_info` for units and `sample` for timestamps, validity and complete data.
+These are practical fallbacks; an appropriate semantic sensor message takes
+precedence when a supported mapping is available.
+
+Unsafe attribute characters are escaped using the same byte encoding as sensor
+names. Names that would be hidden, start with a digit or collide with reserved
+adapter outputs gain an `attribute_` prefix (for example a numeric attribute
+named `data` uses `attribute_data`). Copy the actual suffix from `public_topics`
+for alias `source` and QoS settings. Scalar alias sources are single suffix
+tokens, for example:
+
+```yaml
+topic_aliases:
+  light: {type: LTR-390, source: ambient}
+  uv: {type: LTR-390, source: UVI}
+```
+
+No descriptor-defined message-selection schema is implemented in this increment.
 
 ### Migrating topic configuration
 
