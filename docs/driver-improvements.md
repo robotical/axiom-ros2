@@ -1,6 +1,6 @@
 # Host driver development plan
 
-Status: USB waiting increment implemented; Pi/Kilted validation pending.
+Status: background USB verification implemented; Pi/Kilted worker validation pending.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -131,12 +131,12 @@ numbers below are reference labels, not implementation order.
 
 ## First increment: USB startup with no boards
 
-The standalone `axiom_usb_discovery` executable starts
+The first increment added the standalone `axiom_usb_discovery` executable, which starts
 [UsbDiscoveryNode](../src/axiom_driver/axiom_driver/usb_discovery_node.py).
-It enumerates serial ports immediately and every two seconds, filtering USB
+It enumerated serial ports immediately and every two seconds, filtering USB
 candidates by Espressif VID/PID `303a:1001`. These are candidates, not verified
-Axioms. It does not open ports, connect boards or publish sensor data, and existing
-driver launches and defaults are unchanged.
+Axioms. At that stage it did not open ports, connect boards or publish sensor
+data. Background verification was added in the next increment below.
 
 With no candidates, it logs `Waiting for an Axiom...` once and stays alive.
 It logs again only when the candidate set or enumeration error changes. Candidate
@@ -145,8 +145,28 @@ without stopping the node, and Ctrl+C releases the node and ROS context.
 
 [Discovery tests](../src/axiom_driver/test/test_usb_discovery.py) cover the real
 timer, candidate filtering and transitions, enumeration recovery, shutdown and
-the installed console entry point without opening physical ports. Pi/Kilted
-acceptance is pending; see the development log for completed validation.
+the installed console entry point without opening physical ports. The user later
+confirmed waiting, shutdown and candidate plug/unplug behaviour on Pi/Kilted.
+
+## Next increment: background firmware verification
+
+The node now submits newly seen candidates to one background worker. The
+[probe helper](../src/axiom_driver/axiom_driver/core/discovery.py) opens a serial
+session, obtains the existing `v` response and closes the session in `finally`.
+Recognition checks only a successful `rslt` and a string `SystemName` beginning
+with `Axiom`. This prefix is a firmware naming convention, not an immutable
+hardware property. Version and MAC fields do not gate recognition.
+
+The ROS timer collects completed results and logs each outcome once. Removed
+ports lose their previous check; queued probes are cancelled and late results
+from removed attempts are discarded. Each port is checked once per observed
+appearance, including failed attempts. Timed retries and starting sensor drivers
+are later increments. Existing launches and defaults remain unchanged.
+
+On shutdown, the timer stops, queued work is cancelled and the worker finishes
+its active probe before the node is destroyed. Tests use controlled probes and
+virtual serial peers rather than physical hardware. Pi/Kilted acceptance for
+this worker increment is pending.
 
 ## Later proposal: define and test measurement output
 
@@ -341,6 +361,29 @@ real Axiom; do not compete with a running driver or browser acquisition session.
   pulls and builds on the Pi, runs the discovery tests and checks quiet waiting
   and Ctrl+C with no USB Axioms connected. Board verification and connection are
   later increments.
+
+### 2026-10-16: background USB verification
+
+- The user verified the initial waiting increment on Pi/Kilted: all 11 tests
+  passed, waiting was quiet, Ctrl+C was clean, and USB plug/unplug transitions
+  were reported correctly. A manual `v` handshake also succeeded once the host
+  driver holding the serial port was stopped.
+- Nikos implemented `is_axiom_firmware`, `probe_axiom_firmware` and the background
+  worker. The assistant reviewed them, added tests, corrected the misspelled
+  set operation and missing attribute underscore, fixed submission indentation,
+  and cleaned up formatting. No architecture changes were required.
+- Fresh ROS Jazzy container validation against `a1aa6cb` plus this increment:
+  **all seven packages built; 177 tests, zero errors, zero failures, four existing
+  skips**. ROS lint passed. Source was mounted read-only, domain 86 used Fast DDS
+  with localhost discovery, and no physical devices were passed through.
+- All 21 discovery-node cases passed, including real ROS callback responsiveness,
+  single-worker shutdown, duplicate prevention, multiple candidates, replug,
+  stale-result rejection and enumeration recovery. Helper and virtual serial
+  tests cover recognition, timeout/error propagation and session cleanup.
+- Next: the user pulls, builds and runs the worker tests on Pi/Kilted, then
+  checks background verification and unplug/replug using an otherwise unused
+  Axiom serial port. This increment verifies candidates without starting sensor
+  acquisition.
 
 For later entries, record: objective, behaviour/decision, changed files, tests and
 environment, hardware evidence (if any), commit and remaining issues. Add entries
