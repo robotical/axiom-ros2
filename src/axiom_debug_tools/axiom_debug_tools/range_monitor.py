@@ -7,6 +7,7 @@ from sensor_msgs.msg import Range
 
 
 class RangeMonitor(Node):
+
     def __init__(self):
         super().__init__('axiom_range_monitor')
         self.declare_parameter('topic', 'bus_1/device_29/range')

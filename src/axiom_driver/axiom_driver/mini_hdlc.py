@@ -19,6 +19,7 @@ def crc16_ccitt(data: bytes, init: int = 0xFFFF) -> int:
 
 
 class MiniHDLC:
+
     def __init__(self, flag: int = FLAG_DEFAULT, esc: int = ESC_DEFAULT, xo: int = XOR_DEFAULT):
         """
         Minimal HDLC-like framing used by firmware.

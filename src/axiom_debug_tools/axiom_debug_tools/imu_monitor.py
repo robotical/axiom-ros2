@@ -8,6 +8,7 @@ from sensor_msgs.msg import Imu
 
 
 class ImuMonitor(Node):
+
     def __init__(self):
         super().__init__('axiom_imu_monitor')
         self.declare_parameter('topic', 'bus_1/device_6a/imu/data_raw')

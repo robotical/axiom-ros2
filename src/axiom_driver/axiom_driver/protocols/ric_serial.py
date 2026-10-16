@@ -4,6 +4,7 @@ import threading
 
 
 class RICSerial:
+
     def __init__(self, hdlc, max_frame_bytes=262144):
         self._hdlc = hdlc
         self._buf = bytearray()

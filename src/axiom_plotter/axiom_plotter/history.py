@@ -4,6 +4,7 @@ from collections import deque
 
 
 class TimeWindow:
+
     def __init__(self, seconds, max_points=100000):
         if seconds <= 0 or max_points < 1:
             raise ValueError('History duration and capacity must be positive')

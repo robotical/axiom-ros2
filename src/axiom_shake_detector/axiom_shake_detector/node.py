@@ -144,6 +144,7 @@ class ShakeNode(Node):
         page = Path(__file__).with_name('dashboard.html').read_bytes()
 
         class Handler(BaseHTTPRequestHandler):
+
             def do_GET(self):
                 if self.path == '/':
                     body, mime = page, 'text/html; charset=utf-8'

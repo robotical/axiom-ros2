@@ -37,6 +37,7 @@ from .ros_adapters import json_text, RosAdapters
 
 
 class AxiomBridgeNode(Node):
+
     def __init__(self, **kwargs):
         super().__init__('axiom_bridge_node', **kwargs)
         defaults = DEFAULT_PARAMETERS

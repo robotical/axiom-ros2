@@ -48,6 +48,7 @@ def extract_path(message, path):
 
 
 class DynamicGrapher(Node):
+
     def __init__(self, args):
         super().__init__('dynamic_grapher')
         self.args = args

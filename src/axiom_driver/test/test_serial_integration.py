@@ -17,6 +17,7 @@ from axiom_driver.protocols.ric_serial import RICSerial  # noqa: E402
 
 
 class SerialFirmware:
+
     def __init__(self, ascii_mode=False):
         self.master, self.slave = os.openpty()
         self.path = os.ttyname(self.slave)

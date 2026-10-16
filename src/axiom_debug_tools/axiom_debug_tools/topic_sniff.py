@@ -9,6 +9,7 @@ from rosidl_runtime_py.utilities import get_message
 
 
 class TopicSniff(Node):
+
     def __init__(self):
         super().__init__('axiom_topic_sniff')
         self.declare_parameter('topic', '')

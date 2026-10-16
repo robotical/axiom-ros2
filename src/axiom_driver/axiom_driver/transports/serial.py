@@ -4,6 +4,7 @@ import threading
 
 
 class SerialTransport:
+
     def __init__(self, port, baud=115200, timeout=0.02):
         self.port, self.baud, self.timeout = port, baud, timeout
         self.on_status = None

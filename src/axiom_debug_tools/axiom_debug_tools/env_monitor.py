@@ -7,6 +7,7 @@ from sensor_msgs.msg import RelativeHumidity, Temperature
 
 
 class EnvMonitor(Node):
+
     def __init__(self):
         super().__init__('axiom_env_monitor')
         self.declare_parameter('temp_topic', 'bus_1/device_38/temperature')

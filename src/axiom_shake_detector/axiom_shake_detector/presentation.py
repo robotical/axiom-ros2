@@ -176,6 +176,7 @@ class TeachingNode(Node):
         page = Path(__file__).with_name('teaching.html').read_bytes()
 
         class Handler(BaseHTTPRequestHandler):
+
             def respond(self, status, value):
                 data = (
                     value

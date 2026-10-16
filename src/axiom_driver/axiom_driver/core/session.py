@@ -33,6 +33,7 @@ def _is_device_publication(data):
 
 
 class Session:
+
     def __init__(self, on_publish=None, on_state=None, on_error=None, on_console=None):
         self.on_publish = on_publish or (lambda data: None)
         self.on_state = on_state or (lambda ready, reason: None)

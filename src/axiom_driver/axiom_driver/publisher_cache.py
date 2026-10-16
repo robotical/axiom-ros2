@@ -4,6 +4,7 @@ import threading
 
 
 class PublisherCache:
+
     def __init__(self, node, default_qos=10):
         self._node = node
         self._qos = default_qos
