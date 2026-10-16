@@ -15,8 +15,8 @@ from axiom_marty_dashboard.commands import recipes
     [
         {},
         {
-            "devices": [{"topic": "bus_3/device_29", "capabilities": ["range"]}],
-            "selected": {"range": "bus_3/device_29", "thermal": "bus_2/device_69"},
+            "devices": [{"topic": "vl53l4cd_b3_29", "capabilities": ["range"]}],
+            "selected": {"range": "vl53l4cd_b3_29", "thermal": "amg8833_b2_69"},
         },
     ],
 )

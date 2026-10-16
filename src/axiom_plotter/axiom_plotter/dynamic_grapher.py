@@ -186,7 +186,7 @@ def main():
     parser.add_argument(
         '--topic-regex',
         default='',
-        help="Regular expression to filter topics (e.g. '/imu/data_raw$')",
+        help="Regular expression to filter topics (e.g. '/data_raw$')",
     )
     parser.add_argument(
         '--field',

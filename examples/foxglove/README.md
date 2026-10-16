@@ -90,13 +90,13 @@ into the board's existing `topic_aliases` mapping:
 
 ```yaml
     topic_aliases:
-      thermal/image: {type: AMG8833, source: thermal/image}
+      thermal/image: {type: AMG8833, source: image}
 ```
 
 This is a fragment, not a replacement board file. It binds to exactly one online,
 resolved and fresh AMG8833; use inventory `bus` and `address` selectors if several
 cameras match. An alias names ROS output rather than installing a device profile.
-The identity-based topic remains available. For another namespace, substitute
+The canonical sensor topic remains available. For another namespace, substitute
 it throughout the commands and select its image topic in the panel.
 
 ### Start the session
@@ -124,7 +124,7 @@ Discovery connects and acquires automatically. Expect the topic to be
 `sensor_msgs/msg/Image` with one publisher. A frame has width/height 8, encoding
 `32FC1`, `is_bigendian: 0`, `step: 32`, and 256 bytes representing 64 little-endian
 float32 temperatures in °C. Its header has the sample timestamp and sensor frame.
-The `thermal/grid` topic remains available for RViz.
+The camera's `grid` topic remains available for RViz.
 
 The camera must be connected with a supported firmware profile. The publication rate
 controls delivery, not camera sampling. An echo or viewer alone does not enable
@@ -191,7 +191,7 @@ velocity for `/axiom1/imu/data_raw` and `/axiom2/imu/data_raw`. Use board keys
 
 ```yaml
     topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      imu/data_raw: {type: LSM6DS, source: data_raw}
 ```
 
 Each alias needs exactly one matching online IMU; use bus/address selectors if

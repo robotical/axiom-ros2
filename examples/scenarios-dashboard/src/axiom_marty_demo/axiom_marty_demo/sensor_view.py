@@ -56,9 +56,10 @@ class SensorView(Node):
             rows = json.loads(msg.data)
             if not isinstance(rows, list) or len(rows) > 128:
                 raise ValueError("Invalid inventory")
+            rows = [row for row in rows if row.get("metadata_ready") and row.get("topic")]
             for row in rows:
                 topic = row["topic"]
-                if not isinstance(topic, str) or not topic.startswith("bus_"):
+                if not isinstance(topic, str):
                     raise ValueError("Invalid sensor topic")
                 validate_full_topic_name(self.root + "/" + topic)
             topics = {
@@ -73,26 +74,29 @@ class SensorView(Node):
                         self.imu_source = ""
                     if self.range_source == topic:
                         self.range_source = ""
-                    for sub in self.devices.pop(topic)["subscriptions"]:
+                    for sub in self.devices.pop(topic)["subscriptions"].values():
                         self.destroy_subscription(sub)
             for row in rows:
                 topic = row["topic"]
                 if topic not in self.devices:
-                    device = {"row": row, "imu": Reading(), "range": Reading(), "subscriptions": []}
+                    device = {"row": row, "imu": Reading(), "range": Reading(), "subscriptions": {}}
                     self.devices[topic] = device
-                    for suffix, kind, callback in (
-                        ("imu/data_raw", Imu, self._imu),
-                        ("range", Range, self._range),
-                    ):
-                        device["subscriptions"].append(
-                            self.create_subscription(
-                                kind,
-                                self.root + "/" + topic + "/" + suffix,
-                                lambda m, d=device, cb=callback: cb(d, m),
-                                qos_profile_sensor_data,
-                            )
-                        )
                 device = self.devices[topic]
+                outputs = row.get("public_topics", {}).get("x", {})
+                for suffix, kind, callback, reading in (
+                    ("data_raw", Imu, self._imu, "imu"),
+                    ("range", Range, self._range, "range"),
+                ):
+                    target = self.root + "/" + outputs[suffix] if suffix in outputs else ""
+                    subscription = device["subscriptions"].get(suffix)
+                    if subscription and subscription.topic_name != target:
+                        self.destroy_subscription(device["subscriptions"].pop(suffix))
+                        device[reading].reset()
+                    if target and suffix not in device["subscriptions"]:
+                        device["subscriptions"][suffix] = self.create_subscription(
+                            kind, target, lambda m, d=device, cb=callback: cb(d, m),
+                            qos_profile_sensor_data,
+                        )
                 changed_type = row.get("type") != device["row"].get("type")
                 if changed_type and self.imu_source == topic:
                     self.imu_source = ""

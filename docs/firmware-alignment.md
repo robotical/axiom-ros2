@@ -75,7 +75,8 @@ AMG8833 negative 12-bit temperature values also retain their sign after shifting
 ## Migrating existing clients
 
 - Replace type/address-derived names (for example `LSM6DS_76a/...`) with inventory
-  `topic` prefixes such as `bus_1/device_76a/...`. Addresses remain hexadecimal.
+  `topic` roots such as `lsm6ds_b1_76a` and published output paths such as
+  `lsm6ds_b1_76a/data_raw`. Addresses remain hexadecimal.
 - Replace separate WS data/control sockets with the single framed `/ws` session.
 - Replace `serial.autosub` / `serial.devjson_rate_hz` with `autosub` /
   `publish_rate_hz`. `ricrest_proto` and configurable HDLC delimiters were removed;

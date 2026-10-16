@@ -15,6 +15,7 @@ from rclpy.executors import MultiThreadedExecutor  # noqa: E402
 from rclpy.node import Node  # noqa: E402
 from rclpy.parameter import Parameter  # noqa: E402
 from rclpy.qos import qos_profile_sensor_data  # noqa: E402
+from rclpy.serialization import serialize_message  # noqa: E402
 from sensor_msgs.msg import Range  # noqa: E402
 from test_ros_integration import wait_until  # noqa: E402
 from test_session import FirmwareServer  # noqa: E402
@@ -50,9 +51,13 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
     spinning = threading.Thread(target=executor.spin, daemon=True)
     spinning.start()
     samples = [[], []]
+    readable = [[], []]
     for name, messages in zip(('front', 'rear'), samples):
         probe.create_subscription(Range, '/axiom/' + name + '/range', messages.append,
                                   qos_profile_sensor_data)
+    for name, public in zip(('front', 'rear'), readable):
+        probe.create_subscription(Range, '/axiom/' + name + '/vl53l4cd_b1_29/range',
+                                  public.append, qos_profile_sensor_data)
 
     def call(kind, path, expect=True, **fields):
         client = probe.create_client(kind, path)
@@ -87,21 +92,31 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
         assert samples[0][-1].range == pytest.approx(.1)
         assert samples[1][-1].range == pytest.approx(.3)
         assert samples[0][-1].header.frame_id != samples[1][-1].header.frame_id
+        wait_until(lambda: all(readable))
+        for aliases, public in zip(samples, readable):
+            wait_until(lambda: any(serialize_message(a) == serialize_message(p)
+                                   for a in aliases for p in public))
+        assert not any('/bus_' in path and probe.count_publishers(path)
+                       for path, _ in probe.get_topic_names_and_types())
 
         # Offline, rather than deleted, must retire the publisher even though the
         # probe's subscriber keeps the topic name registered in DDS.
         publish(0, online=0, data='')
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 0)
-        assert probe.count_publishers('/axiom/front/bus_1/device_29/range') == 0
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 0)
         assert probe.count_publishers('/axiom/rear/range') == 1
 
         # Replace it at the same bus/address with a device that has no resp schema.
         indices[0] = 2
         publish(0, data='')
-        brightness = '/axiom/front/bus_1/device_29/commands/brightness'
+        brightness = '/axiom/front/qwiicledstick_b1_29/commands/brightness'
         wait_until(lambda: any(name == brightness for name, _ in
                                probe.get_service_names_and_types()))
-        assert not probe.count_publishers('/axiom/front/bus_1/device_29/sample')
+        assert not probe.count_publishers('/axiom/front/vl53l4cd_b1_29/sample')
+        assert not probe.count_publishers('/axiom/front/qwiicledstick_b1_29/sample')
+        output = next(row for row in bridges[0]._inventory if row['address'] == '29')
+        assert output['topic'] == 'qwiicledstick_b1_29' and output['public_topics'] == {}
+        assert not any('/bus_' in path for path, _ in probe.get_service_names_and_types())
         call(DeviceCommand, brightness, values=[50.0])
         assert 'hexWr=7632' in peers[0].paths[-1]
         call(DeviceCommand, brightness.replace('brightness', 'pixels'),
@@ -119,22 +134,30 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
         indices[0] = 1
         publish(0)
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 1)
-        # Two matching devices must remove the alias, while preserving both raw topics.
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 1)
+        first_publisher = bridges[0].adapters.cache.get('vl53l4cd_b1_29/range', Range)
+        # Two matching devices must remove the alias, while preserving both canonical topics.
         publish(0, address='129')
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 0)
-        assert probe.count_publishers('/axiom/front/bus_1/device_129/range') == 1
-        assert probe.count_publishers('/axiom/front/bus_1/device_29/range') == 1
+        assert probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 1
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_129/range') == 1)
+        assert bridges[0].adapters.cache.get('vl53l4cd_b1_29/range', Range) is first_publisher
         publish(0, online=2, address='129', data='')
         publish(0)
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 1)
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_129/range') == 0)
+        assert probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 1
+        assert bridges[0].adapters.cache.get('vl53l4cd_b1_29/range', Range) is first_publisher
         # Silence expires interfaces; recovery from fresh packets recreates them.
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 0, timeout=3)
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 0)
         publish(0)
         publish(1)
         wait_until(lambda: all(probe.count_publishers('/axiom/' + n + '/range') == 1
                                for n in ('front', 'rear')))
         call(Disconnect, '/axiom/front/disconnect')
         wait_until(lambda: probe.count_publishers('/axiom/front/range') == 0)
+        wait_until(lambda: probe.count_publishers('/axiom/front/vl53l4cd_b1_29/range') == 0)
         assert bridges[1].session.connected and len(peers[1].connections) == 1
     finally:
         executor.shutdown(timeout_sec=3)

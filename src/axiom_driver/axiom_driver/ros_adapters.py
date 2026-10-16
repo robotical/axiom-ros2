@@ -13,7 +13,7 @@ from std_msgs.msg import String
 
 from .core.aliases import bindings
 from .core.grids import float32_image_data, zone_grid
-from .core.registry import topic_token
+from .core.topic_names import image_suffix, measurement_topic, sensor_topic
 from .publisher_cache import PublisherCache
 
 
@@ -64,33 +64,38 @@ class RosAdapters:
         self.alias_rules = topic_aliases or {}
         self.aliases = {}
         self.devices = {}
+        self.public_topics = {}
 
     def sync(self, devices):
         active = {row['topic']: row['revision'] for row in devices
-                  if row['online'] and not row['stale'] and row['metadata_ready']}
-        for topic, revision in self.devices.items():
-            if active.get(topic) != revision:
-                self.cache.remove(topic)
+                  if row['topic'] and row['online'] and not row['stale'] and row['metadata_ready']}
+        for topic in self.devices.keys() | self.public_topics.keys():
+            if topic not in active or active[topic] != self.devices.get(topic):
+                for group in self.public_topics.pop(topic, {}).values():
+                    for public_topic in group.values():
+                        self.cache.remove_topic(public_topic)
         self.devices = active
         selected = bindings(self.alias_rules, devices)
         for alias, identity in self.aliases.items():
             if selected.get(alias) != identity:
-                self.cache.remove(alias)
+                self.cache.remove_topic(alias)
         self.aliases = selected
         for row in devices:
             row['aliases'] = [alias for alias, (topic, _, _) in selected.items()
                               if topic == row['topic']]
+            row['public_topics'] = {
+                group: dict(topics)
+                for group, topics in self.public_topics.get(row['topic'], {}).items()
+            }
 
     def frame(self, device):
         identity = f'{device.key.bus}:{device.key.address}'
         return self.frames.get(
-            identity, self.frame_prefix + '_' + device.key.topic.replace('/', '_')
+            identity, self.frame_prefix + '_' + device.key.frame_suffix
         )
 
     def publish(self, device, group, sample):
-        base = device.key.topic
-        if group != 'x':
-            base += '/group_' + topic_token(group)
+        base = sensor_topic(device.device_type, device.key)
         frame = self.frame(device)
         stamp = Time(nanoseconds=sample['stamp_ns']).to_msg()
         values = sample['values']
@@ -98,11 +103,18 @@ class RosAdapters:
         def emit(suffix, msg):
             if hasattr(msg, 'header'):
                 msg.header.frame_id, msg.header.stamp = frame, stamp
-            topic = base + '/' + suffix
-            self.cache.get(topic, type(msg), self.qos_overrides.get(topic)).publish(msg)
+            public_topic = measurement_topic(device, group, suffix)
+            # User aliases reserve their exact paths even while unbound. An
+            # automatically generated output must never take over that name.
+            if public_topic not in self.alias_rules:
+                qos = self.qos_overrides.get(public_topic)
+                self.cache.get(public_topic, type(msg), qos).publish(msg)
+                self.public_topics.setdefault(base, {}).setdefault(group, {})[
+                    suffix
+                ] = public_topic
             if group == 'x':
                 for alias, identity in self.aliases.items():
-                    if identity == (device.key.topic, device.revision, suffix):
+                    if identity == (base, device.revision, suffix):
                         publisher = self.cache.get(alias, type(msg), self.qos_overrides.get(alias))
                         publisher.publish(msg)
 
@@ -167,7 +179,7 @@ class RosAdapters:
             msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z = [
                 value(n) for n in ('ax', 'ay', 'az')
             ]
-            emit('imu/data_raw', msg)
+            emit('data_raw', msg)
             if self.custom_messages:
                 custom = Imu6()
                 for name in ('gx', 'gy', 'gz', 'ax', 'ay', 'az'):
@@ -179,7 +191,7 @@ class RosAdapters:
                 and isinstance(distance['si_value'], list)):
             if distance['meta'].get('vt') == 'zonegrid':
                 side, pixels = zone_grid(values, distance)
-                emit_image('range/image', side, side, pixels)
+                emit_image(image_suffix(device, 'range'), side, side, pixels)
         elif distance and distance.get('si_unit') == 'm':
             valid = bool(distance['valid'])
             msg = Range()
@@ -210,9 +222,10 @@ class RosAdapters:
                     msg = ThermalGrid()
                     msg.width, msg.height = width, height
                     msg.temperature_c = [float(v) for v in readings]
-                    emit('thermal/grid', msg)
+                    emit('grid', msg)
                     if temperature.get('si_unit') == 'degC':
-                        emit_image('thermal/image', width, height, temperature['si_value'])
+                        emit_image(image_suffix(device, 'thermal'), width, height,
+                                   temperature['si_value'])
             elif temperature.get('si_unit') == 'degC':
                 msg = Temperature()
                 msg.temperature = float(temperature['si_value'])

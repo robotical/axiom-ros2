@@ -57,8 +57,8 @@
     if (row.name.endsWith('/diagnostics')) return 'Driver health and diagnostic details for troubleshooting connection, acquisition and decoding.';
     if (row.name.endsWith('/visualization/accelerometers')) return 'Two labelled acceleration arrows derived from the selected Axiom and Marty IMU topics. The origins are display offsets, not measured mounting transforms.';
     if (row.name.endsWith('/visualization/markers')) return 'RViz display markers derived from sensor measurements by the marker adapter.';
-    if (row.name.startsWith('/axiom/bus_')) {
-      if (row.name.endsWith('/imu/data_raw')) return 'Decoded Axiom IMU acceleration and angular velocity in SI units. Acceleration includes gravity; this adapter does not estimate orientation.';
+    if ((row.types || []).some(type => type.startsWith('sensor_msgs/') || type.startsWith('axiom_interfaces/'))) {
+      if (row.name.endsWith('/data_raw')) return 'Decoded Axiom IMU acceleration and angular velocity in SI units. Acceleration includes gravity; this adapter does not estimate orientation.';
       if (row.name.endsWith('/range')) return 'Axiom distance measurement in metres. A topic can be discovered before it has a valid reading; NaN means an invalid distance.';
       if (row.name.endsWith('/sample')) return 'Decoded Axiom sensor values with their units, validity, identity and acquisition/receipt timing.';
       if (row.name.endsWith('/data')) return 'Decoded Axiom sensor values as JSON, for profiles that do not need a standard ROS message adapter.';
@@ -87,7 +87,7 @@
       if (endpoints.length) detail('QoS meaning', 'RELIABLE retries delivery; BEST_EFFORT permits drops. A reliable subscriber cannot match a best-effort publisher. TRANSIENT_LOCAL retains messages for compatible late subscribers; VOLATILE requests live messages.');
       else if (row.retained) detail('Durability', 'The project reference expects a retained message for compatible transient-local subscribers. Inspect the running endpoints for their actual QoS.');
       detail(reference ? 'Availability' : 'Discovery', reference ? 'This is a possible project interface. Its publisher must be started; sensor-specific topics also require a matching profile and explicit acquisition.' : 'Registered endpoints do not prove messages are arriving or measurements are valid. Use topic echo or topic hz from the console to check delivery.');
-      if (row.name.includes('bus_BUS') || row.name.includes('device_ADDRESS')) detail('Sensor identity', 'Replace BUS and ADDRESS with the actual bus/address from /axiom/devices and the discovered topic list.');
+      if (row.name.includes('_bBUS_ADDRESS')) detail('Sensor identity', 'Copy the model and location instance from /axiom/devices and the discovered topic list.');
     } else if (kind === 'service') {
       let notes = types.map(type => serviceNotes[type]).find(Boolean);
       if (!notes && types.includes('std_srvs/srv/Trigger')) notes = [triggerNotes[row.name] || 'A request/response operation offered by a ROS node. The operation depends on this service’s server.', 'Empty request.', 'success and message: server-reported outcome.'];

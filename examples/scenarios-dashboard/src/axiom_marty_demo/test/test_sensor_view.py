@@ -34,10 +34,10 @@ def view_stack():
     retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     inventory = source.create_publisher(String, "/axiom/devices", retained)
     range_pub = source.create_publisher(
-        Range, "/axiom/bus_1/device_129/range", qos_profile_sensor_data
+        Range, "/axiom/vl53l4cd_b1_129/range", qos_profile_sensor_data
     )
     imu_pub = source.create_publisher(
-        Imu, "/axiom/bus_1/device_76a/imu/data_raw", qos_profile_sensor_data
+        Imu, "/axiom/lsm6ds_b1_76a/data_raw", qos_profile_sensor_data
     )
     frames = deque(maxlen=5)
     source.create_subscription(
@@ -51,23 +51,29 @@ def view_stack():
         "range": 0.4,
         "fov": 0.3,
         "streaming": True,
-        "selected": "bus_1/device_129",
-        "imu_topic": "bus_1/device_76a",
+        "selected": "vl53l4cd_b1_129",
+        "imu_topic": "lsm6ds_b1_76a",
     }
 
     def publish():
         rows = [
             {
-                "topic": "bus_1/device_129",
+                "topic": "vl53l4cd_b1_129",
                 "type": "VL53L4CD",
                 "online": settings["connected"],
                 "metadata_ready": True,
+                "public_topics": {
+                    "x": {"range": "vl53l4cd_b1_129/range"}
+                },
             },
             {
                 "topic": settings["imu_topic"],
                 "type": "LSM6DS",
                 "online": settings["connected"],
                 "metadata_ready": True,
+                "public_topics": {
+                    "x": {"data_raw": settings["imu_topic"] + "/data_raw"}
+                },
             },
         ]
         inventory.publish(String(data=json.dumps(rows)))
@@ -138,7 +144,7 @@ def test_changing_selected_sensor_never_displays_previous_source(view_stack):
     view, settings, marker = view_stack
     from rclpy.parameter import Parameter
 
-    view.set_parameters([Parameter("range_sensor", value="bus_2/device_129")])
+    view.set_parameters([Parameter("range_sensor", value="vl53l4cd_b2_129")])
     wait(lambda: marker(20).action == Marker.DELETE)
     assert "unavailable" in marker(21).text
 
@@ -155,15 +161,15 @@ def test_driver_default_unspecified_fov_keeps_valid_distance(view_stack):
 def test_replacing_imu_clears_old_source_and_rejects_queued_frames(view_stack):
     view, settings, marker = view_stack
     wait(lambda: marker(10).action == Marker.ADD)
-    old_device = view.devices["bus_1/device_76a"]
-    settings["imu_topic"] = "bus_2/device_76a"
-    wait(lambda: "bus_1/device_76a" not in view.devices)
+    old_device = view.devices["lsm6ds_b1_76a"]
+    settings["imu_topic"] = "lsm6ds_b2_76a"
+    wait(lambda: "lsm6ds_b1_76a" not in view.devices)
     stale = Imu()
     stale.header.stamp = view.get_clock().now().to_msg()
     stale.linear_acceleration.z = 3.0
     view._imu(old_device, stale)
-    assert view.imu_source != "bus_1/device_76a"
-    new = view.devices["bus_2/device_76a"]
+    assert view.imu_source != "lsm6ds_b1_76a"
+    new = view.devices["lsm6ds_b2_76a"]
     view._imu(new, stale)
     wait(
         lambda: (
@@ -171,4 +177,41 @@ def test_replacing_imu_clears_old_source_and_rejects_queued_frames(view_stack):
             and math.isclose(marker(10).points[-1].z, 3.0 * 0.025, abs_tol=1e-6)
         )
     )
-    assert view.imu_source == "bus_2/device_76a"
+    assert view.imu_source == "lsm6ds_b2_76a"
+
+
+def test_unresolved_rows_and_late_output_inventory_do_not_hide_ready_sensors():
+    rclpy.init()
+    view = SensorView(namespace="inventory_test")
+    imu = dict(topic="lsm6ds_b1_76a", type="LSM6DS", online=True,
+               metadata_ready=True, public_topics={})
+    unresolved = dict(topic=None, type="3", online=True, metadata_ready=False)
+    ranging = dict(topic="vl53l4cd_b2_29", type="VL53L4CD", online=True,
+                   metadata_ready=True, aliases=["front/range"], public_topics={
+                       "x": {"range": "vl53l4cd_b2_29/range"}})
+
+    def inventory():
+        view._inventory(String(data=json.dumps([unresolved, imu, ranging])))
+
+    try:
+        inventory()
+        assert view.connected and set(view.devices) == {imu["topic"], ranging["topic"]}
+        assert not view.devices[imu["topic"]]["subscriptions"]
+        range_subscription = view.devices[ranging["topic"]]["subscriptions"]["range"]
+        assert range_subscription.topic_name == "/axiom/vl53l4cd_b2_29/range"
+        assert not any(sub.topic_name == "/axiom/front/range" for sub in view.subscriptions)
+        # Metadata can be ready before the first sample creates a canonical output.
+        imu["public_topics"] = {"x": {"data_raw": "lsm6ds_b1_76a/data_raw"}}
+        inventory()
+        assert view.devices[imu["topic"]]["subscriptions"]["data_raw"].topic_name == (
+            "/axiom/lsm6ds_b1_76a/data_raw")
+        imu["public_topics"] = {}
+        inventory()
+        assert not view.devices[imu["topic"]]["subscriptions"]
+        imu["online"] = False
+        inventory()
+        assert set(view.devices) == {ranging["topic"]}
+        assert view.devices[ranging["topic"]]["subscriptions"]["range"] is range_subscription
+    finally:
+        view.destroy_node()
+        rclpy.shutdown()

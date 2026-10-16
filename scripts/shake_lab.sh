@@ -5,7 +5,7 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 state="$repo_root/.shake-lab"
 container=axiom-shake-lab
 image=axiom-shake-lab:jazzy
-imu_topic=${AXIOM_IMU_TOPIC:-/axiom/bus_1/device_76a/imu/data_raw}
+imu_topic=${AXIOM_IMU_TOPIC:-/axiom/lsm6ds_b1_76a/data_raw}
 mkdir -p "$state/recordings"
 
 owned_container() {

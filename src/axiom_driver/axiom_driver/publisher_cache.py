@@ -20,10 +20,11 @@ class PublisherCache:
                 )
             return self._cache[key]
 
-    def remove(self, prefix):
+    def remove_topic(self, topic):
+        """Retire one exact path without removing independently owned children."""
         with self._lock:
             for key in list(self._cache):
-                if key[0] == prefix or key[0].startswith(prefix + '/'):
+                if key[0] == topic:
                     self._node.destroy_publisher(self._cache.pop(key))
 
     def clear(self):

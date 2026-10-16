@@ -171,8 +171,8 @@
       const value = row?.command || 'ros2 node info ' + shellQuote(selected.name);
       w.inspector.append(command(value, row?.command ? row :
         root.CommandInfo.inspection('node', selected.name, value)));
-      if (reference && row.command.includes('bus_BUS')) w.inspector.append(el('p', 'muted',
-        'Replace BUS and ADDRESS using /axiom/devices.'));
+      if (reference && row.command.includes('_bBUS_ADDRESS')) w.inspector.append(el('p', 'muted',
+        'Replace the sensor instance using /axiom/devices and its discovered topic paths.'));
     } else {
       const names = selected.topics || [selected.name];
       const rows = graph.topics.filter(t => names.includes(t.name));

@@ -78,32 +78,34 @@ def catalogue(axiom_namespace="/axiom"):
         retained=True,
         diagram=False,
     )
-    for name, kind in (("imu/data_raw", "Imu"), ("range", "Range")):
+    for name, kind, alias in (("data_raw", "Imu", "imu/data_raw"), ("range", "Range", "range")):
+        sensor = "lsm6ds" if name == "data_raw" else "vl53l4cd"
         topic(
-            root + "/bus_BUS/device_ADDRESS/" + name,
+            root + "/" + sensor + "_bBUS_ADDRESS/" + name,
             "sensor_msgs/msg/" + kind,
             axiom,
-            [view],
+            [view, dual] if name == "data_raw" else [view],
             "Identity-based topic; appears for a supported, online sensor.",
         )
         topic(
-            root + "/" + name,
+            root + "/" + alias,
             "sensor_msgs/msg/" + kind,
             axiom,
-            [dual] if name.startswith("imu") else [],
+            [],
             "Optional alias; published only when one configured sensor matches.",
             diagram=False,
         )
     for suffix, kind in (
         ("sample", "axiom_interfaces/msg/DeviceSample"),
         ("data", "std_msgs/msg/String"),
-        ("thermal/grid", "axiom_interfaces/msg/ThermalGrid"),
+        ("grid", "axiom_interfaces/msg/ThermalGrid"),
+        ("image", "sensor_msgs/msg/Image"),
         ("temperature", "sensor_msgs/msg/Temperature"),
         ("humidity", "sensor_msgs/msg/RelativeHumidity"),
         ("joint_states", "sensor_msgs/msg/JointState"),
         ("battery", "sensor_msgs/msg/BatteryState"),
     ):
-        topic(root + "/bus_BUS/device_ADDRESS/" + suffix, kind, axiom, diagram=False)
+        topic(root + "/MODEL_bBUS_ADDRESS/" + suffix, kind, axiom, diagram=False)
     topic(root + "/diagnostics", "diagnostic_msgs/msg/DiagnosticArray", axiom, diagram=False)
     topic(root + "/raw/devjson", "std_msgs/msg/String", axiom, diagram=False)
     topic(root + "/serial_console", "std_msgs/msg/String", axiom, diagram=False)
@@ -138,7 +140,7 @@ def catalogue(axiom_namespace="/axiom"):
     ]
     axiom["services"].append(
         dict(
-            name=root + "/bus_BUS/device_ADDRESS/commands/COMMAND",
+            name=root + "/MODEL_bBUS_ADDRESS/commands/COMMAND",
             type="axiom_interfaces/srv/DeviceCommand",
             role="server",
             note="Created from the live descriptor; removed when the device goes offline.",

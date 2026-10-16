@@ -10,7 +10,7 @@ class RangeMonitor(Node):
 
     def __init__(self):
         super().__init__('axiom_range_monitor')
-        self.declare_parameter('topic', 'bus_1/device_29/range')
+        self.declare_parameter('topic', 'vl53l4cd_b1_29/range')
         topic = self.get_parameter('topic').get_parameter_value().string_value
         qos = QoSProfile(depth=20, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self._last = None

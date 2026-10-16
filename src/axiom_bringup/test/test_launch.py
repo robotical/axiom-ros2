@@ -34,7 +34,7 @@ def test_installed_driver_launch_accepts_json_and_exits_cleanly(tmp_path):
         'auto_connect:=false',
         'namespace:=alignment_launch',
         'sensor_frames:={"1:6a":"imu_link"}',
-        'sensor_qos.overrides:={"bus_1/device_29/range":{"depth":3}}',
+        'sensor_qos.overrides:={"vl53l4cd_b1_29/range":{"depth":3}}',
     ]
     with log_path.open('w') as log:
         process = subprocess.Popen(command, stdout=log, stderr=log, start_new_session=True)

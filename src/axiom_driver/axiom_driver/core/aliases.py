@@ -10,14 +10,14 @@ def validate_aliases(rules):
     for alias, rule in rules.items():
         if (not isinstance(alias, str)
                 or not re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_]*(/[a-zA-Z][a-zA-Z0-9_]*)*', alias)
-                or alias.split('/')[0] in reserved or alias.startswith('bus_')):
+                or alias.split('/')[0] in reserved):
             raise ValueError('Aliases must be relative ROS names outside driver/device topics')
         if not isinstance(rule, dict) or set(rule) - {'type', 'source', 'bus', 'address'}:
             raise ValueError('Alias rules support type, source, bus and address')
         if not isinstance(rule.get('type'), str) or not rule['type']:
             raise ValueError('Each alias needs an advertised sensor type')
         if rule.get('source') not in (
-            'imu/data_raw', 'range', 'range/image', 'thermal/grid', 'thermal/image',
+            'data_raw', 'range', 'image', 'grid', 'range/image', 'thermal/image',
             'temperature', 'humidity',
             'battery', 'joint_states', 'sample', 'data',
         ):

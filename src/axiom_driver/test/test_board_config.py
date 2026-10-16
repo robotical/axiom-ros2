@@ -11,7 +11,7 @@ def test_board_file_normalizes_names_frames_and_mapping_parameters(tmp_path):
     path.write_text(json.dumps({'axioms': {
         'axiom/usb': {'transport': 'serial', 'serial.port': '/dev/serial/by-id/axiom',
                       'topic_aliases': {
-                          'imu/data_raw': {'type': 'LSM6DS', 'source': 'imu/data_raw'}}},
+                          'imu/data_raw': {'type': 'LSM6DS', 'source': 'data_raw'}}},
         '/axiom/wifi': {'transport': 'ws', 'device_uri': 'ws://192.168.1.3/ws',
                         'publish_rate_hz': 20},
     }}))

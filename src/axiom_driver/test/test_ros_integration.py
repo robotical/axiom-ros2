@@ -162,7 +162,7 @@ def test_manual_connection_acquisition_stop_and_reconnect(catalogue):
     subscriptions = [
         probe.create_subscription(String, '/raw/devjson', raw.append, 10),
         probe.create_subscription(
-            Range, '/bus_1/device_29/range', ranges.append, qos_profile_sensor_data
+            Range, '/vl53l4cd_b1_29/range', ranges.append, qos_profile_sensor_data
         ),
     ]
 
@@ -191,7 +191,7 @@ def test_manual_connection_acquisition_stop_and_reconnect(catalogue):
         assert not raw and not ranges and not bridge.pipeline.registry.devices
         call(PublishedDataSubscription, '/publish_data_subscription', rate_hz=20.0)
         peer.publish(packet)
-        wait_until(lambda: probe.count_publishers('/bus_1/device_29/range') == 1)
+        wait_until(lambda: probe.count_publishers('/vl53l4cd_b1_29/range') == 1)
         time.sleep(0.2)
         peer.publish(packet)
         wait_until(lambda: raw and ranges)
@@ -255,7 +255,7 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
             '-p',
             'reconnect_interval:=0.1',
             '-p',
-            'sensor_qos.overrides:=\'{"bus_1/device_29/range":'
+            'sensor_qos.overrides:=\'{"vl53l4cd_b1_29/range":'
             '{"reliability":"reliable","depth":3}}\'',
         ]
     )
@@ -269,19 +269,19 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
     samples_a, samples_b, ranges, invalids, imus, inventories = [], [], [], [], [], []
     _subscriptions = [
         probe.create_subscription(
-            DeviceSample, '/bus_1/device_29/sample', samples_a.append, qos_profile_sensor_data
+            DeviceSample, '/vl53l4cd_b1_29/sample', samples_a.append, qos_profile_sensor_data
         ),
         probe.create_subscription(
-            DeviceSample, '/bus_1/device_29/sample', samples_b.append, qos_profile_sensor_data
+            DeviceSample, '/vl53l4cd_b1_29/sample', samples_b.append, qos_profile_sensor_data
         ),
         probe.create_subscription(
-            Range, '/bus_1/device_29/range', ranges.append, qos_profile_sensor_data
+            Range, '/vl53l4cd_b1_29/range', ranges.append, qos_profile_sensor_data
         ),
         probe.create_subscription(
-            VL53L4CDReading, '/bus_1/device_29/range/raw', invalids.append, qos_profile_sensor_data
+            VL53L4CDReading, '/vl53l4cd_b1_29/range/raw', invalids.append, qos_profile_sensor_data
         ),
         probe.create_subscription(
-            Imu, '/bus_1/device_6a/imu/data_raw', imus.append, qos_profile_sensor_data
+            Imu, '/lsm6ds_b1_6a/data_raw', imus.append, qos_profile_sensor_data
         ),
         probe.create_subscription(
             String,
@@ -296,7 +296,7 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
         assert bridge.describe_parameter('sensor_qos.depth').read_only
         # Prime publisher discovery before asserting DDS sample delivery.
         peer.publish({'_v': 1, '_t': 0, '1': {'29': {'_i': 1, '_o': 1, 'x': '0064000064'}}})
-        wait_until(lambda: probe.count_publishers('/bus_1/device_29/sample') == 1)
+        wait_until(lambda: probe.count_publishers('/vl53l4cd_b1_29/sample') == 1)
         time.sleep(0.2)
         peer.publish({'_v': 1, '_t': 0, '1': {'29': {'_i': 1, '_o': 1, 'x': '0065040064'}}})
         wait_until(lambda: any(not msg.valid for msg in invalids))
@@ -313,7 +313,7 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
         )
         payload = (b'\0\x64' + imu.ljust(244, b'\0')).hex()
         peer.publish({'_v': 1, '_t': 0, '1': {'6a': {'_i': 2, '_o': 1, 'x': payload}}})
-        wait_until(lambda: probe.count_publishers('/bus_1/device_6a/imu/data_raw') == 1)
+        wait_until(lambda: probe.count_publishers('/lsm6ds_b1_6a/data_raw') == 1)
         time.sleep(0.2)
         payload = (b'\x01\x90' + imu.ljust(244, b'\0')).hex()
         peer.publish({'_v': 1, '_t': 0, '1': {'6a': {'_i': 2, '_o': 1, 'x': payload}}})
@@ -322,6 +322,9 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
         assert imus[-1].linear_acceleration.y == pytest.approx(9.80665)
         assert imus[-1].orientation_covariance[0] == -1
         assert imus[-1].header.stamp != imus[-2].header.stamp
+        wait_until(lambda: any(
+            d['address'] == '6a' and d['public_topics'].get('x', {}).get('data_raw')
+            == 'lsm6ds_b1_6a/data_raw' for d in bridge._inventory))
 
         vcp = (
             b'\0\x64'
@@ -346,17 +349,22 @@ def test_live_ros_messages_services_and_two_subscribers(catalogue, connection_cy
         wait_until(lambda: bridge.session.generation > old_generation)
         wait_until(lambda: bridge._subscribed and len(peer.commands) > old_commands)
         assert len(peer.connections) == 1
+        wait_until(lambda: probe.count_publishers('/lsm6ds_b1_6a/data_raw') == 0)
         peer.publish({'_v': 1, '_t': 0, '1': {'29': {'_i': 1, '_o': 1, 'x': '0064000064'}}})
         wait_until(lambda: any(d['address'] == '29' for d in bridge._inventory))
-        wait_until(lambda: probe.count_publishers('/bus_1/device_29/range') == 1)
-        info = probe.get_publishers_info_by_topic('/bus_1/device_29/range')[0]
+        wait_until(lambda: probe.count_publishers('/vl53l4cd_b1_29/range') == 1)
+        info = probe.get_publishers_info_by_topic('/vl53l4cd_b1_29/range')[0]
         # Fast DDS discovery does not expose history depth (reports zero).
-        publisher = bridge.adapters.cache.get('bus_1/device_29/range', Range)
+        publisher = bridge.adapters.cache.get('vl53l4cd_b1_29/range', Range)
         assert publisher.qos_profile.depth == 3
         assert info.qos_profile.reliability.name == 'RELIABLE'
+        wait_until(lambda: probe.count_publishers('/vl53l4cd_b1_29/range') == 1)
+        assert not probe.count_publishers('/bus_1/device_29/range')
+        assert not probe.count_publishers('/bus_1/device_6a/imu/data_raw')
+        assert not any('/bus_' in path for path, _ in probe.get_service_names_and_types())
         peer.publish({'_v': 1, '_t': 0, '1': {'29': {'_i': 1, '_o': 2, 'x': ''}}})
         wait_until(lambda: inventories and all(d['address'] != '29' for d in inventories[-1]))
-        wait_until(lambda: probe.count_publishers('/bus_1/device_29/sample') == 0)
+        wait_until(lambda: probe.count_publishers('/vl53l4cd_b1_29/sample') == 0)
         disconnect = probe.create_client(Disconnect, '/disconnect')
         assert disconnect.wait_for_service(timeout_sec=2)
         future = disconnect.call_async(Disconnect.Request())

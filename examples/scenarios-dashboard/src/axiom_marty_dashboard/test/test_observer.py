@@ -129,20 +129,22 @@ def test_two_board_discovery_keeps_guidance_and_descriptor_services_separate():
 
         driver.create_service(GetConnectionState, "get_connection_state", connection)
         driver.create_service(
-            DeviceCommand, "bus_1/device_23/commands/brightness", lambda request, response: response
+            DeviceCommand, "qwiicledstick_b1_23/commands/brightness",
+            lambda request, response: response
         )
         inventory = driver.create_publisher(
             String, "devices", QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         )
         row = dict(
-            topic="bus_1/device_23",
+            topic="qwiicledstick_b1_23",
             type="QwiicLEDStick",
             online=True,
             metadata_ready=True,
+            public_topics={},
             commands=[
                 dict(
                     name="brightness",
-                    service="bus_1/device_23/commands/brightness",
+                    service="qwiicledstick_b1_23/commands/brightness",
                     descriptor={"n": "brightness", "t": "B", "r": [0, 255]},
                 )
             ],
@@ -174,9 +176,8 @@ def test_two_board_discovery_keeps_guidance_and_descriptor_services_separate():
         payload = snapshot()
         for root, guide in payload["guides"].items():
             commands = [c["command"] for c in guide["commands"] if c["group"] == "Device commands"]
-            assert (
-                len(commands) == 1 and root + "/bus_1/device_23/commands/brightness" in commands[0]
-            )
+            assert len(commands) == 1
+            assert root + "/qwiicledstick_b1_23/commands/brightness" in commands[0]
         wait(lambda: any(s.get("descriptor") for s in snapshot()["graph"]["services"]))
         services = [s for s in snapshot()["graph"]["services"] if s.get("descriptor")]
         assert len(services) == 2

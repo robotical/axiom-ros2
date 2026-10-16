@@ -25,7 +25,7 @@ class TeachingNode(Node):
     def __init__(self):
         super().__init__('teaching_dashboard')
         defaults = {
-            'imu_topic': '/axiom/bus_1/device_76a/imu/data_raw',
+            'imu_topic': '/axiom/lsm6ds_b1_76a/data_raw',
             'dashboard_host': '127.0.0.1',
             'dashboard_port': 8080,
             'recordings_dir': str(Path.home() / 'axiom-recordings'),

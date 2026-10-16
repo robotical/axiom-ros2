@@ -10,7 +10,7 @@ common = '''
 graphs = {
 'ros2-thermal-graph': r'''
   driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
-  grid [label="/axiom/bus_BUS/device_ADDRESS/thermal/grid\naxiom_interfaces/msg/ThermalGrid"];
+  grid [label="/axiom/amg8833_bBUS_ADDRESS/grid\naxiom_interfaces/msg/ThermalGrid"];
   adapter [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/sensing/thermal_grid_visualizer"];
   markers [label="/sensing/thermal_heatmap\nvisualization_msgs/msg/Marker"];
   labels [label="/sensing/thermal_heatmap_labels\nvisualization_msgs/msg/MarkerArray"];
@@ -22,7 +22,7 @@ graphs = {
 ''',
 'ros2-accelerometer-graph': r'''
   driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
-  imu [label="/axiom/bus_BUS/device_ADDRESS/imu/data_raw\nsensor_msgs/msg/Imu"];
+  imu [label="/axiom/lsm6ds_bBUS_ADDRESS/data_raw\nsensor_msgs/msg/Imu"];
   echo [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ros2 topic echo … --once\ntemporary ROS subscriber"];
   driver -> imu [label="publishes • best effort / volatile"];
   imu -> echo [label="subscribes • best effort"];
@@ -31,7 +31,7 @@ graphs = {
   board [shape=box, style="rounded,filled", fillcolor="#f2f4f5", color="#abb8bc", label="Axiom + attached sensors\nHardware"];
   driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
   devices [label="/axiom/devices\n/axiom/device_metadata\nInventory + descriptors"];
-  measures [label="/axiom/bus_BUS/device_ADDRESS/…\nsample • data • typed measurements"];
+  measures [label="/axiom/MODEL_bBUS_ADDRESS/…\nsample • data • typed measurements"];
   diagnostics [label="/axiom/diagnostics\n/axiom/raw/devjson\n/axiom/serial_console"];
   consumer [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ROS node\nor ros2 topic echo"];
   dashboard [shape=ellipse, style="filled,dashed", fillcolor="#e9f3f2", color="#3b7b75", label="/dashboard\nOptional scenarios guide"];
@@ -46,7 +46,7 @@ graphs = {
 ''',
 'ros2-services-graph': r'''
   client [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="ROS node\nor ros2 service call"];
-  services [label="/axiom/connect • disconnect • get_connection_state\n/axiom/publish_data_subscription • set_sample_rate\n/axiom/ric_rest_url • ping\n/axiom/bus_BUS/device_ADDRESS/commands/COMMAND"];
+  services [label="/axiom/connect • disconnect • get_connection_state\n/axiom/publish_data_subscription • set_sample_rate\n/axiom/ric_rest_url • ping\n/axiom/MODEL_bBUS_ADDRESS/commands/COMMAND"];
   driver [shape=ellipse, fillcolor="#e9f3f2", color="#3b7b75", label="/axiom/axiom_bridge_node"];
   client -> services [dir=both, style=dashed, label="request / response"];
   services -> driver [dir=both, style=dashed, label="service server"];

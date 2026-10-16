@@ -10,8 +10,8 @@ class EnvMonitor(Node):
 
     def __init__(self):
         super().__init__('axiom_env_monitor')
-        self.declare_parameter('temp_topic', 'bus_1/device_38/temperature')
-        self.declare_parameter('hum_topic', 'bus_1/device_38/humidity')
+        self.declare_parameter('temp_topic', 'aht20_b1_38/temperature')
+        self.declare_parameter('hum_topic', 'aht20_b1_38/humidity')
         ttopic = self.get_parameter('temp_topic').get_parameter_value().string_value
         htopic = self.get_parameter('hum_topic').get_parameter_value().string_value
         qos = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)

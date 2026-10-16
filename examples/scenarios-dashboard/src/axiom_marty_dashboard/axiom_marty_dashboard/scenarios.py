@@ -3,6 +3,7 @@
 import shlex
 
 from .command_help import explain
+from .commands import measurement_topics
 
 
 def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
@@ -44,22 +45,21 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
                 args = []
             if args[:3] in (["ros2", "topic", "echo"], ["ros2", "topic", "info"]):
                 topic = args[3]
-                topic_root = topic.split("/bus_", 1)[0]
-                if "/bus_" not in topic:
-                    for suffix in ("/imu/data_raw", "/range", "/devices", "/device_metadata",
-                                   "/status"):
-                        if topic.endswith(suffix):
-                            topic_root = topic.removesuffix(suffix)
-                            break
+                topic_root = "/marty" if topic.startswith("/marty/") else root
+                if topic.endswith("/imu/data_raw"):
+                    topic_root = topic.removesuffix("/imu/data_raw")
                 node = topic_root + (
                     "/marty_driver" if topic.startswith("/marty/") else "/axiom_bridge_node"
                 )
+                node = next((publisher for row in graph.get("topics", [])
+                             if row["name"] == topic for publisher in row.get("publishers", [])
+                             if publisher.endswith("/axiom_bridge_node")), node)
                 check = dict(kind="topic", topic=topic, console=args[2] == "echo",
                              terminal=terminal)
                 flow = [dict(kind="node", name=node), dict(kind="topic", name=topic),
                         dict(kind="console", name=f"Terminal {terminal}")]
             elif args[:3] == ["ros2", "service", "call"]:
-                service_root = args[3].split("/bus_", 1)[0].rsplit("/", 1)[0]
+                service_root = args[3].rsplit("/", 1)[0]
                 if check["kind"] in ("connection", "acquisition"):
                     check["namespace"] = service_root
                     node = service_root + (
@@ -110,16 +110,7 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
         )
 
     def sensor_topics(suffix, kind):
-        return sorted(
-            {
-                t["name"]
-                for t in graph.get("topics", [])
-                if t["name"].startswith(root + "/bus_")
-                and t["name"].endswith("/" + suffix)
-                and kind in t.get("types", [])
-                and t.get("publishers")
-            }
-        )
+        return measurement_topics(graph, root, devices, suffix, kind)
 
     startup = [
         run("Axiom driver", 1, "Driver running; connection and acquisition are off."),
@@ -180,7 +171,7 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
             run("RViz", 4, "Fixed Frame sensor_view. Tilt Axiom to change the acceleration arrow."),
         ],
         [stop(4, "Close RViz"), stop(3, "Stop the marker adapter"), *cleanup],
-        sensor_topics("imu/data_raw", "sensor_msgs/msg/Imu"),
+        sensor_topics("data_raw", "sensor_msgs/msg/Imu"),
     )
     distance = scenario(
         "distance",
@@ -193,9 +184,9 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
         [stop(3, "Stop the subscriber"), *cleanup],
         sensor_topics("range", "sensor_msgs/msg/Range"),
     )
-    thermal_topics = sensor_topics("thermal/grid", "axiom_interfaces/msg/ThermalGrid")
+    thermal_topics = sensor_topics("grid", "axiom_interfaces/msg/ThermalGrid")
     thermal_topic = (thermal_topics[0] if len(thermal_topics) == 1 else
-                     root + "/bus_BUS/device_ADDRESS/thermal/grid")
+                     root + "/amg8833_bBUS_ADDRESS/grid")
     thermal = scenario(
         "thermal",
         "Axiom · thermal camera + RViz",
@@ -204,7 +195,7 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
         "thermal publisher is available; otherwise replace BUS/ADDRESS from the topic list.",
         [
             *startup,
-            run("Topic list", 2, "Find the camera's …/thermal/grid topic, "
+            run("Topic list", 2, "Find the camera's …/grid topic, "
                 "with type axiom_interfaces/msg/ThermalGrid."),
             run("Thermal grid readings", 2, "One 8×8 frame, 64 temperatures in °C "
                 "and a nonempty header.frame_id; the prompt returns."),
@@ -272,7 +263,8 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
                       dict(kind="node", name=root + "/axiom_bridge_node"),
                       dict(kind="topic", name=root + "/range")],
             ),
-            run("Topic list", 2, f"{root}/bus_…/device_…/range and {root}/range appear."),
+            run("Topic list", 2,
+                f"{root}/MODEL_bBUS_ADDRESS/range and its configured alias appear."),
             run(
                 "Distance readings",
                 3,
@@ -323,7 +315,7 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
     rate_path = (
         root + "/" + rate["service"]
         if rate
-        else root + "/bus_BUS/device_ADDRESS/commands/set_sample_rate"
+        else root + "/lsm6ds_bBUS_ADDRESS/commands/set_sample_rate"
     )
     config = scenario(
         "descriptor-config",
@@ -405,7 +397,7 @@ def walkthroughs(commands, graph, axiom_namespace="/axiom", devices=()):
             stop(2),
             stop(1),
         ],
-        sensor_topics("imu/data_raw", "sensor_msgs/msg/Imu"),
+        sensor_topics("data_raw", "sensor_msgs/msg/Imu"),
     )
     multiple_steps = [
         run(

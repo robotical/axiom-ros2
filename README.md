@@ -127,14 +127,18 @@ Leave discovery running. In a second prepared terminal:
 
 ```bash
 source scripts/setup_env.sh
-ros2 topic echo /axiom_discovery/boards --qos-durability transient_local --once
+ros2 topic echo /axiom_discovery/boards --qos-reliability reliable \
+  --qos-durability transient_local --qos-depth 1 --full-length --once
 ros2 topic list -t --no-daemon
 ```
 
 The board inventory reports each ID, namespace, transport and connection state.
 Sensors are discovered automatically; they do not need entries in a board file.
-For a supported IMU, copy its full `sensor_msgs/msg/Imu` topic ending in
-`/imu/data_raw`:
+For a supported IMU, copy its full `sensor_msgs/msg/Imu` topic, for example
+`/axiom/lsm6ds_b1_76a/data_raw`. Sensor topics and descriptor-command services use
+model/location instance names. See [sensor naming](src/axiom_driver/README.md#readable-sensor-names)
+for multiple sensors, image outputs, inventory paths and the breaking migration
+of earlier topic/alias-source configurations:
 
 ```bash
 IMU_TOPIC='PASTE_DISCOVERED_IMU_TOPIC_HERE'

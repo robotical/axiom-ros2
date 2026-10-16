@@ -59,7 +59,7 @@ axioms:
     id: '001122334455'
     publish_rate_hz: 20.0
     topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      imu/data_raw: {type: LSM6DS, source: data_raw}
       range: {type: VL53L4CD, source: range}
   robot/rear:
     id: 'aabbccddeeff'

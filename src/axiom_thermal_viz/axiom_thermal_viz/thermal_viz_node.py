@@ -42,7 +42,7 @@ class ThermalGridVisualizer(Node):
 
     def __init__(self) -> None:
         super().__init__('thermal_grid_visualizer')
-        self.declare_parameter('input_topic', 'bus_1/device_169/thermal/grid')
+        self.declare_parameter('input_topic', 'amg8833_b1_169/grid')
         self.declare_parameter('output_topic', 'thermal_heatmap')
         self.declare_parameter('marker_namespace', 'thermal_grid')
         self.declare_parameter('cell_size', 0.02)

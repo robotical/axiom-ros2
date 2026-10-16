@@ -21,9 +21,9 @@ domain/middleware as the driver.
 | Executable | Parameters | Output |
 |---|---|---|
 | `axiom_topic_sniff` | Required `topic` and `type`; optional `depth` (10) | JSON message view and an approximate received rate |
-| `axiom_imu_monitor` | `topic`; built-in relative default `bus_1/device_6a/imu/data_raw` | Acceleration, gyro, running gyro average, approximate rate and simple sanity warnings |
-| `axiom_range_monitor` | `topic`; built-in relative default `bus_1/device_29/range` | Scalar range in metres, approximate rate and min/max checks |
-| `axiom_env_monitor` | `temp_topic` and `hum_topic`; relative defaults under `bus_1/device_38` | Temperature °C, humidity %RH and approximate rates |
+| `axiom_imu_monitor` | `topic`; built-in relative default `lsm6ds_b1_6a/data_raw` | Acceleration, gyro, running gyro average, approximate rate and simple sanity warnings |
+| `axiom_range_monitor` | `topic`; built-in relative default `vl53l4cd_b1_29/range` | Scalar range in metres, approximate rate and min/max checks |
+| `axiom_env_monitor` | `temp_topic` and `hum_topic`; relative defaults under `aht20_b1_38` | Temperature °C, humidity %RH and approximate rates |
 
 Built-in defaults are example identities, not automatic sensor discovery. Use
 explicit absolute topics for your board, or remap the node namespace only when

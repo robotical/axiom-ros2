@@ -14,27 +14,42 @@ In a prepared ROS terminal:
 ```bash
 ros2 topic list -t --no-daemon
 ros2 service list -t
-ros2 topic echo /axiom/devices --qos-durability transient_local --once
+ros2 topic echo /axiom/devices --qos-reliability reliable --qos-durability transient_local --once
 ```
 
-| Topic suffix | Type and units |
+Measurements use names such as `/axiom/lsm6ds_b1_76a/data_raw`,
+`/axiom/vl53l4cd_b1_129/range` and `/axiom/amg8833_b1_169/image`. The pattern is
+`/<board>/<lowercase-model>_b<bus>_<hex-address>/<output>`. Bus and address always
+distinguish sensor instances, so another sensor of the same model does not rename
+an existing one. Unusual model/bus characters are escaped. Copy exact paths from
+the topic list or `public_topics` in the device inventory.
+
+Inventory `topic` is the relative sensor root; unresolved metadata rows have
+`topic: null` and should be skipped. `public_topics.x.data_raw` identifies a
+published IMU topic. Other payload groups have separate `group_<id>` paths.
+The map gains outputs after their first sample and becomes empty when publishers
+retire. Output-only devices can expose commands without measurement topics.
+
+| Output suffix | Type and units |
 |---|---|
-| `imu/data_raw` | `sensor_msgs/msg/Imu`; acceleration m/s², including gravity, and angular velocity rad/s; no fused orientation |
+| `data_raw` | `sensor_msgs/msg/Imu`; acceleration m/s² including gravity, angular velocity rad/s; no fused orientation |
 | `range` | `sensor_msgs/msg/Range`; scalar distance in metres; invalid readings are NaN |
-| `range/image` | `sensor_msgs/msg/Image`; supported multizone distance grids, `32FC1` in metres; invalid zones are NaN |
+| `image` | `sensor_msgs/msg/Image`; thermal °C or supported multizone distances in metres, `32FC1`; invalid pixels are NaN |
 | `temperature` | `sensor_msgs/msg/Temperature`; °C |
 | `humidity` | `sensor_msgs/msg/RelativeHumidity`; fraction from 0 to 1 |
-| `thermal/grid` | `axiom_interfaces/msg/ThermalGrid`; dimensions and pixel temperatures |
-| `thermal/image` | `sensor_msgs/msg/Image`; known Celsius values as `32FC1` for a 2D heatmap |
+| `grid` | `axiom_interfaces/msg/ThermalGrid`; dimensions and pixel temperatures |
 | `sample` | `axiom_interfaces/msg/DeviceSample`; decoded values, validity and timing |
 | `data` | `std_msgs/msg/String`; JSON decoded measurement view |
 
-Identity-based paths contain the firmware bus and normalized hexadecimal device
-address. Use the inventory or topic list, rather than deriving an address from a
-connector number. Profiles with supported layouts/decoding can supply generic
-`sample` and `data` topics. Standard typed topics also need the corresponding ROS
-mapping and known units. A Device Library profile does not automatically add support
-for a new custom binary decoder; see the [driver contracts](../src/axiom_driver/README.md).
+A descriptor with both thermal and distance grids uses `thermal/image` and
+`range/image` to distinguish them. Supported profiles supply generic `sample` and
+`data`; standard typed outputs additionally need a supported mapping and known
+units. A Device Library profile does not automatically add a custom binary decoder.
+
+Old bus/device topic and command paths are removed. Update topic selections,
+recording lists, exact QoS override keys and alias `source` selectors when pulling
+this version. Frame IDs and firmware bus/address fields remain unchanged. See the
+[full contracts and migration keys](../src/axiom_driver/README.md#migrating-topic-configuration).
 
 ## Sensor hot swapping and board reconnection
 
@@ -71,22 +86,26 @@ Merge aliases into an existing board entry, keeping its connection settings:
 
 ```yaml
     topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      imu/data_raw: {type: LSM6DS, source: data_raw}
       range: {type: VL53L4CD, source: range}
-      thermal/image: {type: AMG8833, source: thermal/image}
+      thermal/image: {type: AMG8833, source: image}
 ```
 
 This is a fragment, not a replacement board file. Under board `axiom`, the matching
 aliases become `/axiom/imu/data_raw`, `/axiom/range` and `/axiom/thermal/image`.
-They preserve identity-based topics and share source timestamps and frame IDs.
+They add convenience paths to the sensor topics and share source timestamps and frame IDs.
+Alias `source` values use the canonical output suffixes in the table above.
+If an alias uses a generated readable path, the alias takes precedence: the
+automatic output at that exact path is suppressed, even while the alias is
+unbound, and is not listed in `public_topics`.
 An alias binds only when exactly one matching device is online, resolved and fresh.
 For ambiguity, add string `bus` and `address` selectors from the inventory, or use
-the identity-based topic. Stop acquisition/disconnect, then relaunch the driver
+the canonical sensor topic. Stop acquisition/disconnect, then relaunch the driver
 after changing its read-only configuration.
 
 ## Descriptor services
 
-Commands appear under `/axiom/bus_BUS/device_ADDRESS/commands/COMMAND`. Discover
+Commands appear under `/axiom/MODEL_bBUS_ADDRESS/commands/COMMAND`. Discover
 the exact path and inspect the descriptor's argument order, units and allowed values:
 
 ```bash

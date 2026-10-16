@@ -7,6 +7,7 @@ from axiom_driver.core.custom import crc8, DecodeError
 from axiom_driver.core.decoding import SampleDecoder
 from axiom_driver.core.registry import DeviceKey, DeviceRegistry, parse_devjson, topic_token
 from axiom_driver.core.timing import DeviceTimeline, Receipt
+from axiom_driver.core.topic_names import sensor_topic
 from axiom_driver.core.units import to_si
 import pytest
 
@@ -39,7 +40,9 @@ def test_unsupported_envelopes_are_errors(data):
 
 def test_names_cannot_collide():
     assert topic_token('LTR-329') != topic_token('LTR_2d329')
-    assert DeviceKey('1', '38').topic != DeviceKey('2', '38').topic
+    first, second = DeviceKey('1', '38'), DeviceKey('2', '38')
+    assert first != second and first.frame_suffix != second.frame_suffix
+    assert sensor_topic('AHT20', first) != sensor_topic('AHT20', second)
 
 
 def test_registry_lifecycle_and_stale_metadata(catalogue):

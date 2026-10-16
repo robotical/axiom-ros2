@@ -36,7 +36,7 @@ def test_manual_scenarios_have_help_and_cleanup():
     commands = [s["recipe"]["command"] for s in hotplug["steps"] if s["recipe"]]
     assert sum("/axiom/connect " in c for c in commands) == 1
     assert sum("/axiom/publish_data_subscription " in c for c in commands) == 1
-    assert any("topic echo /axiom/range" in c for c in commands)
+    assert any("topic echo /axiom/vl53l4cd_bBUS_ADDRESS/range" in c for c in commands)
     assert any("Publisher count: 0" in s["expected"] for s in hotplug["steps"])
     assert "Reconnect" in hotplug["steps"][-1]["title"]
 
@@ -50,7 +50,7 @@ def test_board_guidance_uses_its_namespace_and_live_descriptor_service():
             commands=[
                 dict(
                     name="_conf.rate",
-                    service="bus_2/device_76a/commands/set_sample_rate",
+                    service="lsm6ds_b2_76a/commands/set_sample_rate",
                     descriptor={
                         "n": "_conf.rate",
                         "t": "B",
@@ -71,28 +71,37 @@ def test_board_guidance_uses_its_namespace_and_live_descriptor_service():
     )
     config = next(r for r in rows if r["id"] == "descriptor-config")
     assert any(
-        root + "/bus_2/device_76a/commands/set_sample_rate" in s["recipe"]["command"]
+        root + "/lsm6ds_b2_76a/commands/set_sample_rate" in s["recipe"]["command"]
         for s in config["steps"]
         if s["recipe"]
     )
 
 
 @pytest.mark.parametrize("count", [0, 1, 2])
-def test_thermal_scenario_selects_only_an_unambiguous_live_camera(count):
+@pytest.mark.parametrize("with_inventory", [False, True])
+def test_thermal_scenario_selects_only_an_unambiguous_live_camera(count, with_inventory):
     root = "/axiom/rear"
 
     def topic(path, publishers=None):
         return dict(name=path, types=["axiom_interfaces/msg/ThermalGrid"],
                     publishers=publishers or [], subscribers=[])
 
-    live = [topic(f"{root}/bus_{bus}/device_169/thermal/grid", [root + "/axiom_bridge_node"])
+    live = [topic(f"{root}/amg8833_b{bus}_169/grid", [root + "/axiom_bridge_node"])
             for bus in range(1, count + 1)]
-    graph = dict(topics=[*live,
-                        topic("/axiom/front/bus_1/device_169/thermal/grid", ["/other"]),
-                        topic(root + "/bus_5/device_169/thermal/grid")])
-    commands = recipes({"graph": graph}, root)
-    scenario = next(r for r in walkthroughs(commands, graph, root) if r["id"] == "thermal")
-    selected = live[0]["name"] if count == 1 else root + "/bus_BUS/device_ADDRESS/thermal/grid"
+    graph = dict(topics=[
+        *live,
+        topic("/axiom/front/amg8833_b1_169/grid", ["/other"]),
+        topic(root + "/amg8833_b5_169/grid"),
+        topic(root + "/thermal/grid", [root + "/axiom_bridge_node"]),
+        topic(root + "/nested/amg8833_b1_169/grid", [root + "/nested/driver"]),
+    ])
+    devices = [dict(topic=f"amg8833_b{bus}_169", online=True, metadata_ready=True,
+                    public_topics={"x": {"grid": f"amg8833_b{bus}_169/grid"}})
+               for bus in range(1, count + 1)] if with_inventory else []
+    commands = recipes({"graph": graph, "devices": devices}, root)
+    scenario = next(r for r in walkthroughs(commands, graph, root, devices)
+                    if r["id"] == "thermal")
+    selected = live[0]["name"] if count == 1 else root + "/amg8833_bBUS_ADDRESS/grid"
     for title in ("Thermal grid readings", "Read thermal frame", "Thermal heatmap adapter"):
         command = next(r["command"] for r in commands if r["title"] == title)
         assert selected in command
@@ -184,3 +193,17 @@ def test_step_evidence_uses_the_actual_topic_namespace():
     assert unplug["check"] == {"kind": "range", "namespace": "/axiom", "present": False}
     assert hotplug["mode"] == "Manual console"
     assert hotplug["prerequisites"]
+
+
+def test_canonical_sensor_flow_uses_board_publisher_not_sensor_root_as_node():
+    root = "/robot/rear"
+    topic = root + "/lsm6ds_b2_76a/data_raw"
+    graph = {"topics": [dict(
+        name=topic, types=["sensor_msgs/msg/Imu"], publishers=[root + "/axiom_bridge_node"])]}
+    commands = recipes({"graph": graph}, root)
+    scenario = next(row for row in walkthroughs(commands, graph, root)
+                    if row["id"] == "accelerometer")
+    reading = next(step for step in scenario["steps"]
+                   if step["title"] == "Accelerometer readings")
+    assert reading["check"]["topic"] == topic
+    assert reading["flow"][0]["name"] == root + "/axiom_bridge_node"

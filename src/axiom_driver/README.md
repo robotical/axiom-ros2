@@ -70,10 +70,12 @@ For example, inside a parameter file:
 /**:
   ros__parameters:
     sensor_frames: '{"1:6a":"imu_link","1:29":"front_range_link"}'
-    sensor_qos.overrides: '{"bus_1/device_29/range":{"reliability":"reliable","depth":20}}'
+    sensor_qos.overrides: '{"vl53l4cd_b1_29/range":{"reliability":"reliable","depth":20}}'
 ```
 
 QoS override keys are exact relative topic names, without the board namespace.
+Overrides match exact current topic paths only; no old-name fallback is applied.
+Configured aliases use their own override or the default sensor QoS.
 BEST_EFFORT publishers require compatible subscribers. RELIABLE delivery does not
 recover samples already lost in firmware or the bridge's bounded queues.
 
@@ -85,7 +87,7 @@ The driver does not invent calibration, covariance, mounting transforms or fusio
 
 ### Optional topic aliases
 
-Identity-based topics are always preserved. The packaged `config/hotplug.yaml`
+Each sensor has model/location topics. The packaged `config/hotplug.yaml`
 adds `/axiom/imu/data_raw` for LSM6DS and `/axiom/range` for VL53L4CD. No aliases
 are enabled in the normal `axiom.yaml`. For a preferred sensor, use its normalized
 bus/address strings from the inventory:
@@ -122,6 +124,49 @@ All names are relative to the node namespace. Device identity is bus + normalize
 hex address, independent of mutable names/types. Non-alphanumeric identity bytes
 are escaped injectively. Group `x` uses the base path; other groups add `group_<id>`.
 
+### Readable sensor names
+
+Every measurement uses `<model>_b<bus>_<hex-address>/<output>`. The descriptor
+model is lowercased; non-alphanumeric UTF-8 bytes (including literal underscores)
+are escaped as `_<hex-byte>`. A leading-digit or escaped model gets the prefix
+`sensor_`, keeping topics visible in normal ROS listings. Bus values use the same
+escaping. With the illustrative board namespace `/axiom`:
+
+| Measurement | Topic example |
+|---|---|
+| Scalar distance | `/axiom/vl53l4cd_b1_129/range` |
+| Six-axis IMU | `/axiom/lsm6ds_b1_76a/data_raw` |
+| Thermal image | `/axiom/amg8833_b1_169/image` |
+| Multizone distance image | `/axiom/vl53l5cx_b1_129/image` |
+
+The location identifier is always present. Adding a second sensor does not rename
+the first: two distance sensors might use `vl53l4cd_b1_29` and
+`vl53l4cd_b1_129`; the same address on another bus uses `vl53l4cd_b2_29`.
+Reconnecting at the same location preserves its name; moving it to a different
+firmware bus/address can change it. A replacement model changes the public root.
+Non-`x` payload groups use `<sensor-instance>/group_<escaped-id>/<output>`.
+
+The `devices` inventory's `topic` is the relative sensor root, or `null` while
+metadata is unresolved. Raw `bus` and `address` fields remain available for
+firmware operations. `public_topics` maps payload group, then canonical output
+suffix, to an actually published relative topic:
+
+```json
+{"topic":"lsm6ds_b1_76a","public_topics":{"x":{"sample":"lsm6ds_b1_76a/sample","data":"lsm6ds_b1_76a/data","data_raw":"lsm6ds_b1_76a/data_raw"}}}
+```
+
+Consumers should skip unresolved rows and refresh their subscriptions when
+`public_topics` changes: metadata may resolve before the first measurement.
+Output-only devices have a readable root and descriptor-command services, with
+an empty output map. A configured alias reserves its exact path even while
+unbound. The canonical output at that path is suppressed and omitted from
+`public_topics`, so two sources cannot be mixed into that publisher. Offline,
+stale, removed or replaced devices and ended sessions retire their publishers.
+
+### Topic contracts
+
+All `…` paths below are beneath the discovered sensor root (and optional group).
+
 | Topic | Type / contract |
 |---|---|
 | `devices` | String JSON inventory; reliable, transient local |
@@ -129,17 +174,42 @@ are escaped injectively. Group `x` uses the base path; other groups add `group_<
 | `raw/devjson` | String JSON `{generation, received_ns, payload}` before decoding |
 | `diagnostics` | DiagnosticArray: connection, stale RX, errors, counters, queue loss, timing/ownership policy |
 | `serial_console` | Non-JSON console lines |
-| `bus_<bus>/device_<addr>/sample` | DeviceSample for every decoded row, including raw/engineering/SI values and validity |
+| `…/sample` | DeviceSample for every decoded row, including raw/engineering/SI values and validity |
 | `…/data` | String JSON convenience view |
-| `…/imu/data_raw` | sensor_msgs/Imu when all six axes have known SI units |
+| `…/data_raw` | sensor_msgs/Imu when all six axes have known SI units |
 | `…/range` | sensor_msgs/Range for scalar distances in metres; invalid range is NaN |
-| `…/range/image` | sensor_msgs/Image, `32FC1`, multizone distances in metres; invalid zones are NaN |
+| `…/image` | sensor_msgs/Image, `32FC1`; temperatures in °C or multizone distances in metres; invalid zones are NaN |
 | `…/temperature`, `…/humidity` | Temperature (°C), RelativeHumidity (0..1) |
-| `…/thermal/grid` | ThermalGrid preserving the metadata pixel array |
-| `…/thermal/image` | sensor_msgs/Image, `32FC1`, temperatures in °C, when units are known |
+| `…/grid` | ThermalGrid preserving the metadata pixel array |
 | `…/joint_states` | Observed servo angle in radians; no invented velocity/effort |
 | `…/battery` | BatteryState with unavailable quantities NaN |
-| `…/imu/axiom`, `…/range/raw`, `…/power/raw` | Optional compatibility messages |
+| `…/imu/axiom`, `…/range/raw`, `…/power/raw` | Optional specialized messages |
+
+A descriptor declaring both thermal and distance grids uses `thermal/image` and
+`range/image` instead of `image` to keep meanings separate. The decision follows
+descriptor capabilities independently of sample arrival order; only those dual
+profiles use these two output suffixes.
+
+### Migrating topic configuration
+
+This is a breaking naming change. Old bus/device topic and command-service paths
+are removed, with no compatibility option. Select current paths from inventory
+and update subscriber topics, bag-recording lists, QoS override keys and sensor
+preferences. Alias **paths** remain user chosen, but their `source` selectors now
+use `data_raw`, `grid` and `image` rather than the previous `imu/data_raw`,
+`thermal/grid` and ordinary `thermal/image`/`range/image` selectors. For example:
+
+```yaml
+topic_aliases:
+  imu/data_raw: {type: LSM6DS, source: data_raw}
+  thermal/image: {type: AMG8833, source: image}
+```
+
+The dual-image descriptor exception uses its actual `thermal/image` or
+`range/image` source. Other source selectors such as `range`, `sample` and `data`
+stay the same. Frame IDs and mounting/TF contracts, raw bus/address fields and
+firmware requests are unchanged; topic names and command paths are public ROS
+interfaces, not coordinate frames.
 
 Invalid values are NaN in numeric messages and `null` in JSON; raw values and
 validity remain available. Unknown physical units remain engineering values in
@@ -148,8 +218,8 @@ DeviceSample, with SI fields unset. Grams of mass are not acceleration.
 ### Grid images and Foxglove
 
 Thermal grids with a `widthxheight` resolution and known Celsius units also emit
-`thermal/image`. This is additive: the existing `ThermalGrid` and marker visualizer
-remain available. Range arrays advertised as `vt: "zonegrid"` emit `range/image`
+`image` alongside `grid` for the marker visualizer. Range arrays advertised as
+`vt: "zonegrid"` emit `image`
 instead of a scalar `Range`. Other distance arrays remain available in `sample`
 and `data` without being collapsed into one distance.
 
@@ -169,9 +239,9 @@ the existing decode-error diagnostics. Generic messages keep the original
 distances and status codes. Display preferences in `vo` do not change the
 image's pixel order.
 
-Add a `thermal/image` alias source for the selected board to use the
+Add an `image` alias source for the selected board to use the
 [single-camera Foxglove thermal layout](../../examples/foxglove/README.md#thermal-camera-on-one-axiom).
-The `range/image` alias source is available for a separate multizone display.
+An `image` alias selected by type `VL53L5CX` provides a separate multizone display.
 Image topics use the usual sensor QoS, per-topic overrides and publisher lifecycle.
 They are also published when `publish_custom_messages` is false. No additional
 Python imaging dependency or visualization node is needed for the Image panels.
@@ -186,7 +256,7 @@ Unchanged metadata refreshes preserve publishers and device clock estimates.
 
 All success responses require a firmware acknowledgement where an RPC is involved.
 
-Live descriptors also create `bus_<bus>/device_<addr>/commands/<command>` services
+Live descriptors also create `<sensor-instance>/commands/<command>` services
 of type `axiom_interfaces/srv/DeviceCommand`, including output-only devices.
 The inventory includes command names, paths and descriptors. Numeric `values`
 follow descriptor argument order and units; no-argument commands use `[]`.

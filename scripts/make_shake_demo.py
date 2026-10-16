@@ -10,7 +10,7 @@ from sensor_msgs.msg import Imu
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('output', help='New bag directory (must not already exist)')
-parser.add_argument('--topic', default='/axiom/bus_1/device_76a/imu/data_raw')
+parser.add_argument('--topic', default='/axiom/lsm6ds_b1_76a/data_raw')
 args = parser.parse_args()
 writer = rosbag2_py.SequentialWriter()
 writer.open(

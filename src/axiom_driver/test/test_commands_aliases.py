@@ -55,16 +55,27 @@ def test_output_device_discovery_and_retired_command(catalogue):
 
 def test_aliases_do_not_merge_matching_devices():
     rules = validate_aliases({'range': {'type': 'VL53L4CD', 'source': 'range'}})
-    row = {'topic': 'bus_1/device_29', 'revision': 1, 'type': 'VL53L4CD', 'bus': '1',
+    row = {'topic': 'vl53l4cd_b1_29', 'revision': 1, 'type': 'VL53L4CD', 'bus': '1',
            'address': '29', 'online': True, 'stale': False, 'metadata_ready': True}
     assert bindings(rules, [row])['range'][0] == row['topic']
-    other = {**row, 'topic': 'bus_1/device_129', 'address': '129'}
+    other = {**row, 'topic': 'vl53l4cd_b1_129', 'address': '129'}
     assert not bindings(rules, [row, other])
     rules['range']['address'] = '129'
     assert bindings(rules, [row, other])['range'][0] == other['topic']
     assert not bindings(rules, [{**other, 'stale': True}])
     with pytest.raises(ValueError):
         validate_aliases({'devices': {'type': 'VL53L4CD', 'source': 'range'}})
+
+
+@pytest.mark.parametrize('source', ['imu/data_raw', 'thermal/grid'])
+def test_removed_alias_source_spellings_are_rejected(source):
+    with pytest.raises(ValueError, match='supported sensor topic suffix'):
+        validate_aliases({'sensor': {'type': 'LSM6DS', 'source': source}})
+
+
+def test_aliases_use_current_suffixes_and_only_real_board_roots_are_reserved():
+    for source in ('data_raw', 'grid', 'image', 'range/image', 'thermal/image'):
+        assert validate_aliases({'bus_view': {'type': 'CombinedSensor', 'source': source}})
 
 
 def test_unchanged_profile_refresh_does_not_rotate_revision(catalogue):

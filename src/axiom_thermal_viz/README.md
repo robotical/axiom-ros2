@@ -30,7 +30,7 @@ The scenarios dashboard is optional; for a standard Image panel use the
    ```
    Restart the driver, connect and enable acquisition using the README before
    continuing to topic inspection.
-2. Find the topic ending in `/thermal/grid` using `ros2 topic list -t`, then
+2. Find the topic ending in `/grid` using `ros2 topic list -t`, then
    start the visualiser with that exact path, replacing the placeholder:
    ```bash
    THERMAL_TOPIC='PASTE_DISCOVERED_THERMAL_GRID_TOPIC_HERE'
@@ -67,7 +67,7 @@ acquisition and disconnect through the driver before stopping it.
 
 | Parameter            | Default value                     | Description |
 |----------------------|-----------------------------------|-------------|
-| `input_topic` | `bus_1/device_169/thermal/grid` | Built-in relative example; override with the actual camera topic. |
+| `input_topic` | `amg8833_b1_169/grid` | Built-in relative example; override with the actual camera topic. |
 | `output_topic`       | `thermal_heatmap`                 | Marker topic published for RViz. |
 | `marker_namespace`   | `thermal_grid`                    | Namespace used for the marker message. |
 | `cell_size`          | `0.02`                            | Side length (metres) of each base grid cell. |

@@ -25,7 +25,7 @@ class ShakeNode(Node):
     def __init__(self):
         super().__init__('shake_detector')
         defaults = {
-            'imu_topic': '/axiom/bus_1/device_76a/imu/data_raw',
+            'imu_topic': '/axiom/lsm6ds_b1_76a/data_raw',
             'threshold': 3.0,
             'release': 1.2,
             'window': 0.8,

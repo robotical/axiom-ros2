@@ -10,6 +10,6 @@ axioms:
     # No endpoint is needed: USB is preferred when both transports are visible.
     # Optional: transport: serial (USB only), or transport: ws (Wi-Fi only).
     topic_aliases:
-      imu/data_raw: {type: LSM6DS, source: imu/data_raw}
+      imu/data_raw: {type: LSM6DS, source: data_raw}
       range: {type: VL53L4CD, source: range}
-      thermal/image: {type: AMG8833, source: thermal/image}
+      thermal/image: {type: AMG8833, source: image}

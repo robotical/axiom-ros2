@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const graph = require('../src/axiom_marty_dashboard/axiom_marty_dashboard/graph.js');
+const interfaces = require('../src/axiom_marty_dashboard/axiom_marty_dashboard/interface-info.js');
 const topic = (name, publishers, subscribers, infrastructure = false) =>
   ({name, types: ['std_msgs/msg/String'], publishers, subscribers, infrastructure});
 const source = {nodes: ['/driver', '/consumer', '/other', '/idle'], topics: [
@@ -41,4 +42,14 @@ for (const model of [data, cyclic, graph.model({nodes: [], topics: []})]) {
 const gone = graph.model({nodes: ['/driver'], topics: [topic('/sensor/imu', ['/driver'], [])]});
 assert(!gone.links.some(e => e.target.includes('/consumer')),
   'Removed consumers cannot leave stale arrows');
+const imu = interfaces.recipe('topic', {
+  name: '/robot/rear/lsm6ds_b2_76a/data_raw', types: ['sensor_msgs/msg/Imu'],
+});
+assert(imu.help.description.includes('SI units'));
+assert(imu.command.includes('/robot/rear/lsm6ds_b2_76a/data_raw'));
+const placeholder = interfaces.recipe('topic', {
+  name: '/robot/rear/amg8833_bBUS_ADDRESS/grid', types: ['axiom_interfaces/msg/ThermalGrid'],
+}, {reference: true});
+assert(placeholder.help.arguments.some(row => row.name === 'Sensor identity' &&
+  row.description.includes('model and location')));
 console.log('Graph fan-out, waiting inputs, filters, console consumers, cycles and removal passed');

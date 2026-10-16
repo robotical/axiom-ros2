@@ -28,11 +28,11 @@ def generate_launch_description():
         )
     arguments += [
         DeclareLaunchArgument('enable_plotter', default_value='false'),
-        DeclareLaunchArgument('plotter.topic_regex', default_value='/imu/data_raw$'),
+        DeclareLaunchArgument('plotter.topic_regex', default_value='/data_raw$'),
         DeclareLaunchArgument('plotter.field', default_value='linear_acceleration.z'),
         DeclareLaunchArgument('enable_thermal', default_value='false'),
         DeclareLaunchArgument(
-            'thermal.input_topic', default_value='bus_1/device_169/thermal/grid'
+            'thermal.input_topic', default_value='amg8833_b1_169/grid'
         ),
         DeclareLaunchArgument('enable_rqt', default_value='false'),
     ]

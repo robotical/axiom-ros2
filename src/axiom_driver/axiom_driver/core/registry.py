@@ -22,8 +22,8 @@ class DeviceKey:
     address: str
 
     @property
-    def topic(self):
-        return f'bus_{topic_token(self.bus)}/device_{topic_token(self.address)}'
+    def frame_suffix(self):
+        return f'bus_{topic_token(self.bus)}_device_{topic_token(self.address)}'
 
     @property
     def metadata_path(self):
@@ -199,6 +199,8 @@ class DeviceRegistry:
             device.pending_bytes = 0
 
     def snapshot(self, now, stale_after=5.0):
+        from .topic_names import sensor_topic
+
         return [
             {
                 'bus': d.key.bus,
@@ -211,7 +213,7 @@ class DeviceRegistry:
                 'online': d.online,
                 'stale': now - d.last_seen > stale_after,
                 'metadata_ready': bool(d.metadata),
-                'topic': d.key.topic,
+                'topic': sensor_topic(d.device_type, d.key) if d.metadata else None,
                 'age_s': max(0.0, now - d.last_seen),
                 'dropped_pending': d.dropped,
             }

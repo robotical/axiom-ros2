@@ -20,7 +20,7 @@ def test_reference_connections_resolve_to_declared_interfaces():
     }
     assert nodes["/dashboard"]["services"][0]["name"] == "/axiom/get_connection_state"
     assert {t["name"] for t in nodes["/sensing/accelerometer_view"]["subscriptions"]} == {
-        "/axiom/imu/data_raw",
+        "/axiom/lsm6ds_bBUS_ADDRESS/data_raw",
         "/marty/imu/data_raw",
     }
     assert all(

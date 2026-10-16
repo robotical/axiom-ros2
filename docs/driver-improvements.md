@@ -1,6 +1,8 @@
 # Host driver development plan
 
-Status: automatic USB/Wi-Fi startup implemented and validated; measurement/naming work remains.
+Status: automatic USB/Wi-Fi startup implemented and validated; breaking readable
+topic migration implemented and validated in the uncommitted working tree;
+measurement output and descriptor-mapping work remain.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -548,3 +550,68 @@ when a meaningful increment finishes or a decision changes.
   The installed Kilted discovery executable also passed quiet empty scans and
   SIGINT exit with code zero and no traceback. Only one physical board was reachable;
   multi-board acceptance used independent firmware peers.
+
+### 2026-10-16: additive readable sensor topics
+
+- Added `<model>_b<bus>_<hex-address>/<output>` measurement paths with stable
+  location identifiers, ROS-safe visible model names and separate payload groups.
+  Descriptor-declared dual image capabilities retain `range/image` and
+  `thermal/image`; ordinary image, IMU and thermal-grid suffixes are shortened.
+- Preserved every legacy topic, configured alias/source, frame, message contract
+  and command path. Exact configured alias paths take precedence. New topics
+  inherit source QoS overrides unless explicitly overridden. Inventory retains
+  `topic` and adds only emitted readable paths in `public_topics[group][source]`.
+- Added **37 contract tests** and extended real DDS range/IMU/image, hot-plug,
+  replacement, alias, lifecycle and demo-consumer checks. Linux/Jazzy container:
+  all seven core packages built; **267 total tests: 263 passed, four existing
+  skips, zero errors/failures**. Optional demo/dashboard packages built;
+  **37 tests passed, two optional Marty-interface skips**. Installed launch
+  argument checks and `git diff --check` passed.
+- Review fixed hidden names for punctuation/Unicode-leading models. Initial
+  lint findings (an incorrect working directory scanning generated files, then
+  three test indentation errors) were resolved without weakening assertions.
+  No physical Pi validation, firmware/Raft edits or externally published guide
+  updates were performed. This naming increment remains uncommitted and unpushed.
+- Final logs: `/tmp/axiom-topic-naming-colcon-final.log` and
+  `/tmp/axiom-topic-naming-demo-tests.log` on the Mac.
+
+### 2026-10-16: replace public topic names completely
+
+- The user superseded additive compatibility: public measurements and descriptor
+  commands now use only model/location sensor roots. There is no old-topic mode
+  or QoS fallback. Raw bus/address identities, firmware requests and existing TF
+  frame IDs are retained independently of topic names.
+- Inventory `topic` is the new root, or `null` before metadata resolves;
+  `public_topics` uses canonical new output suffixes. Alias paths remain user
+  chosen, with `data_raw`, `grid` and `image` source selectors. Only actual dual
+  image descriptors use the `range/image` and `thermal/image` exception.
+- Migrated bundled monitors, visualizers, plotter filters, shake tools, dashboard
+  discovery/commands, sensor-view subscriptions, configuration templates and
+  current guides. Regenerated the existing Graphviz diagrams. Explicit viewer
+  aliases keep their chosen paths with updated selectors; historical captures
+  and dated validation records are retained as evidence.
+- Runtime/consumer review and migrated tests confirm current-only publisher and
+  descriptor-service paths, metadata resolution, alias routing, exact QoS keys,
+  lifecycle, multi-board/group isolation and unchanged units/frames/timestamps.
+  Viewer tests cover unresolved rows, first outputs after metadata and alias
+  independence; dashboard tests cover alias deduplication, ambiguous cameras,
+  nested namespaces and command flow. Synthetic MCAP files use the new default
+  IMU topic and retain an explicit topic override.
+- Final Linux/Jazzy container validation: all seven core packages built;
+  **273 tests: 269 passed, four existing skips, zero errors/failures**. Optional
+  demo/dashboard packages built; **42 passed, two optional Marty-interface skips**.
+  Supplemental host/helpers: **23 passed**. All **five dashboard JavaScript test
+  scripts**, package/changed-file lint and four installed launch-argument smoke
+  checks passed. The unchanged teaching replay test passed both full runs.
+- Initial findings were stale test expectations for removed `DeviceKey.topic`,
+  formatting errors and JavaScript tests invoked from the wrong directory; all
+  were resolved without weakening assertions. Review also aligned the reference
+  graph's dual-adapter input with its canonical copied command. Final logs:
+  `/tmp/axiom-topic-migration-colcon-final.log`,
+  `/tmp/axiom-topic-migration-demo-tests-final.log`,
+  `/tmp/axiom-topic-migration-helpers.log` and
+  `/tmp/axiom-topic-migration-dashboard-js-final.log` on the Mac.
+- These results supersede the preceding additive implementation's validation.
+  Firmware/Raft, the physical Pi and published userguides remain untouched.
+  Ignored local board configurations require alias-source migration before
+  using this version. Physical Axiom/Pi validation remains pending.

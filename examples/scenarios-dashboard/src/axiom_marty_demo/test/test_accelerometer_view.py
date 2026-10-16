@@ -29,7 +29,7 @@ def wait(predicate, timeout=5):
 @pytest.fixture(params=["axiom-marty", "two-axioms"])
 def dual_stack(request):
     rclpy.init()
-    topics = {"Axiom": "/axiom/bus_3/device_76a/imu/data_raw", "Marty": "/marty/imu/data_raw"}
+    topics = {"Axiom": "/axiom/lsm6ds_b3_76a/data_raw", "Marty": "/marty/imu/data_raw"}
     labels = {"Axiom": "Axiom", "Marty": "Marty"}
     parameters = [Parameter("axiom_topic", value=topics["Axiom"])]
     if request.param == "two-axioms":

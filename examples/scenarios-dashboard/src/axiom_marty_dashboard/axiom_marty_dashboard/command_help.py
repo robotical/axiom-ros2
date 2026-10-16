@@ -172,9 +172,9 @@ FIELDS = {
     "0.0 unsubscribes. This is not an individual sensor's sampling rate.",
     "payload_size": "Optional padding bytes added to the firmware version request. 0 sends "
     "no padding; this is not an echo payload.",
-    "bus": "Bus identifier from /axiom/devices, with the bus_ prefix removed.",
-    "address": "Device address from the inventory, hexadecimal without 0x or the device_ prefix. "
-    "For example, device_129 uses the string 129 as hexadecimal, not decimal.",
+    "bus": "Raw bus identifier from the bus field in /axiom/devices.",
+    "address": "Raw address field from the inventory, hexadecimal without 0x. "
+    "For example, the string 129 is hexadecimal, not decimal.",
     "sample_rate_hz": "Requested sensor sampling rate in hertz. The firmware may apply a "
     "supported rate; read sample_rate_hz in the response for the actual rate.",
     "url_path": "Firmware RICREST path without a leading slash. v reads the version; other "

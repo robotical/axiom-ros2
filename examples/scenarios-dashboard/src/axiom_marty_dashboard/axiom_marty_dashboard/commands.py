@@ -10,18 +10,35 @@ from axiom_driver.config import load_boards
 from .command_help import explain
 
 
+def measurement_topics(graph, root, devices, suffix, kind):
+    """Select actual canonical outputs, without counting optional aliases twice."""
+    advertised = {
+        root + "/" + outputs[suffix]
+        for device in devices
+        if device.get("online") and device.get("metadata_ready") and not device.get("stale")
+        for outputs in device.get("public_topics", {}).values()
+        if suffix in outputs
+    }
+    canonical = re.compile(re.escape(root) + r'/[A-Za-z][A-Za-z0-9_]*_b[A-Za-z0-9_]+_'
+                           + r'[0-9a-f]+/(?:group_[A-Za-z0-9_]+/)?' + re.escape(suffix) + '$')
+    return sorted(t["name"] for t in graph.get("topics", [])
+                  if (t["name"] in advertised or not devices and canonical.fullmatch(t["name"]))
+                  and kind in t.get("types", []) and t.get("publishers"))
+
+
 def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     root = "/" + axiom_namespace.strip("/")
     rows = []
-    thermal_topics = sorted({
-        t["name"] for t in state.get("graph", {}).get("topics", [])
-        if t["name"].startswith(root + "/bus_")
-        and t["name"].endswith("/thermal/grid")
-        and "axiom_interfaces/msg/ThermalGrid" in t.get("types", [])
-        and t.get("publishers")
-    })
-    thermal_topic = (thermal_topics[0] if len(thermal_topics) == 1 else
-                     root + "/bus_BUS/device_ADDRESS/thermal/grid")
+
+    def selected(suffix, kind, fallback):
+        topics = measurement_topics(state.get("graph", {}), root, state.get("devices", []),
+                                    suffix, kind)
+        return topics[0] if len(topics) == 1 else root + "/" + fallback
+
+    thermal_topic = selected("grid", "axiom_interfaces/msg/ThermalGrid",
+                             "amg8833_bBUS_ADDRESS/grid")
+    imu_topic = selected("data_raw", "sensor_msgs/msg/Imu", "lsm6ds_bBUS_ADDRESS/data_raw")
+    range_topic = selected("range", "sensor_msgs/msg/Range", "vl53l4cd_bBUS_ADDRESS/range")
 
     def add(group, title, command, note=""):
         rows.append(
@@ -46,7 +63,8 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     uri = shlex.quote(board["device_uri"]) if board else '"${AXIOM_ROS_URI:-ws://192.168.1.7/ws}"'
     driver_settings = (
         f"boards_file:={shlex.quote(boards_file)} " if boards_file and board else
-        'boards_file:="" params_file:="$(ros2 pkg prefix --share axiom_driver)/config/hotplug.yaml" '
+        'boards_file:="" params_file:="$(ros2 pkg prefix --share axiom_driver)'
+        '/config/hotplug.yaml" '
         f"transport:={transport} device_uri:={uri} "
         'serial.port:="${AXIOM_ROS_SERIAL_PORT:-/dev/ttyACM0}" '
     )
@@ -82,7 +100,7 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
         "    autosub: true\n"
         "    publish_rate_hz: 20.0\n"
         "    topic_aliases:\n"
-        "      imu/data_raw: {type: LSM6DS, source: imu/data_raw}\n"
+        "      imu/data_raw: {type: LSM6DS, source: data_raw}\n"
         "      range: {type: VL53L4CD, source: range}\n"
         "  axiom/rear:\n"
         "    transport: ws\n"
@@ -92,7 +110,7 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
         "    autosub: true\n"
         "    publish_rate_hz: 20.0\n"
         "    topic_aliases:\n"
-        "      imu/data_raw: {type: LSM6DS, source: imu/data_raw}\n"
+        "      imu/data_raw: {type: LSM6DS, source: data_raw}\n"
         "      range: {type: VL53L4CD, source: range}\n"
         "EOF",
         "Writes a local configuration. USB is front; Wi-Fi is rear.",
@@ -152,7 +170,8 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     add(
         "Visualize",
         "Thermal camera RViz",
-        'ros2 run rviz2 rviz2 -d "$(ros2 pkg prefix --share axiom_thermal_viz)/config/thermal.rviz" '
+        'ros2 run rviz2 rviz2 -d "$(ros2 pkg prefix --share axiom_thermal_viz)'
+        '/config/thermal.rviz" '
         '-f "${THERMAL_FRAME:?Run Read thermal frame in this terminal first}"',
         "Read thermal frame in this terminal first. Blue is cooler, red is warmer.",
     )
@@ -160,7 +179,7 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
         "Visualize",
         "Dual accelerometer adapter",
         "ros2 run axiom_marty_demo accelerometer_view --ros-args -r __ns:=/sensing "
-        f"-p axiom_topic:={root}/imu/data_raw -p marty_topic:=/marty/imu/data_raw",
+        f"-p axiom_topic:={imu_topic} -p marty_topic:=/marty/imu/data_raw",
     )
     add(
         "Visualize",
@@ -223,12 +242,12 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
         ),
         (
             "Accelerometer readings",
-            f"ros2 topic echo {root}/imu/data_raw sensor_msgs/msg/Imu "
+            f"ros2 topic echo {imu_topic} sensor_msgs/msg/Imu "
             "--field linear_acceleration --qos-reliability best_effort",
         ),
         (
             "Distance readings",
-            f"ros2 topic echo {root}/range sensor_msgs/msg/Range "
+            f"ros2 topic echo {range_topic} sensor_msgs/msg/Range "
             "--field range --qos-reliability best_effort",
         ),
         (
@@ -241,7 +260,7 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
         ("Motion interface", "ros2 interface show marty_interfaces/action/Motion"),
         (
             "Record telemetry",
-            f"ros2 bag record {root}/devices {root}/imu/data_raw {root}/range /marty/imu/data_raw",
+            f"ros2 bag record {root}/devices {imu_topic} {range_topic} /marty/imu/data_raw",
         ),
     ):
         add("Inspect", title, command)

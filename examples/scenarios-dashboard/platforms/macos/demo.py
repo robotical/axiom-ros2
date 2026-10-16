@@ -178,7 +178,7 @@ def start(args):
                 "transport": "ws", "device_uri": f"ws://host.docker.internal:{port}/ws",
                 "auto_connect": False, "auto_reconnect": False, "autosub": False,
                 "topic_aliases": {
-                    "imu/data_raw": {"type": "LSM6DS", "source": "imu/data_raw"},
+                    "imu/data_raw": {"type": "LSM6DS", "source": "data_raw"},
                     "range": {"type": "VL53L4CD", "source": "range"},
                 },
             }

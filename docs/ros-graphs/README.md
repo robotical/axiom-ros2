@@ -2,10 +2,9 @@
 
 Diagrams used on the Axiom ROS 2 overview, accelerometer and thermal-camera
 userguides. They describe expected data flow, not a live ROS graph. Device topic
-boxes in the overview group related topics. BUS and ADDRESS are discovered
-identities; optional tools only appear when launched. Namespaces are examples,
+boxes in the overview group related topics. MODEL, BUS and ADDRESS identify a discovered sensor instance; optional tools only appear when launched. Namespaces are examples,
 not identifiers for particular boards. The overview groups the main topic families;
-standard `thermal/image` and `range/image` are additional outputs.
+standard `image` outputs contain thermal or multizone range pixels.
 
 The diagrams follow the manual `/axiom` walkthroughs. The thermal visualiser is
 launched under `/sensing`. Other namespaces, aliases and launches can produce a

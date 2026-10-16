@@ -100,7 +100,7 @@ def test_real_mdns_discovers_two_boards_and_keeps_topics_frames_and_lifetimes_is
         )
         services.append(info)
         env.probe.create_subscription(
-            Range, f'/axiom_{identity}/bus_1/device_29/range', ranges[index].append,
+            Range, f'/axiom_{identity}/vl53l4cd_b1_29/range', ranges[index].append,
             qos_profile_sensor_data,
         )
     registered = []
@@ -123,7 +123,7 @@ def test_real_mdns_discovers_two_boards_and_keeps_topics_frames_and_lifetimes_is
 
         publish()
         wait_until(lambda: all(env.probe.count_publishers(
-            f'/axiom_{identity}/bus_1/device_29/range') == 1 for identity in (ID_A, ID_B)))
+            f'/axiom_{identity}/vl53l4cd_b1_29/range') == 1 for identity in (ID_A, ID_B)))
         # Re-publish until DDS discovery has delivered both publishers' measurements.
         for _ in range(3):
             publish()

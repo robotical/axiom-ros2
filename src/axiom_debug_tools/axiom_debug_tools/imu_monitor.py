@@ -11,7 +11,7 @@ class ImuMonitor(Node):
 
     def __init__(self):
         super().__init__('axiom_imu_monitor')
-        self.declare_parameter('topic', 'bus_1/device_6a/imu/data_raw')
+        self.declare_parameter('topic', 'lsm6ds_b1_6a/data_raw')
         topic = self.get_parameter('topic').get_parameter_value().string_value
         qos = QoSProfile(depth=50, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self._last = None

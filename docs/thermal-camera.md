@@ -37,7 +37,7 @@ Leave it running.
 ros2 topic list -t --no-daemon
 ```
 
-Discovery connects and starts acquisition automatically. Find the exact `thermal/grid` topic
+Discovery connects and starts acquisition automatically. Find the exact `grid` topic
 of type `axiom_interfaces/msg/ThermalGrid` and replace the placeholder:
 
 ```bash

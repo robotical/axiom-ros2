@@ -41,7 +41,7 @@ ros2 run axiom_plotter dynamic_grapher \
 ```
 
 The regular expression matches the selected topic. Use a suffix such as
-`/imu/data_raw$` to compare that field across multiple boards. `--sensor-qos` selects
+`/data_raw$` to compare that field across multiple boards. `--sensor-qos` selects
 Best Effort, compatible with the driver's default sensor publishers. The direct
 executable defaults to Reliable; include the flag unless publishers are configured
 otherwise. IMU acceleration includes gravity in m/s²; angular velocity is rad/s.

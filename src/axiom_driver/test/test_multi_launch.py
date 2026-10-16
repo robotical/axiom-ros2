@@ -79,7 +79,7 @@ def test_installed_single_board_uses_machine_config_and_cli_overrides(tmp_path):
     config.write_text(json.dumps({'axioms': {'axiom/configured': {
         'transport': 'ws', 'device_uri': peer.uri,
         'auto_connect': True, 'autosub': True, 'publish_rate_hz': 20.0,
-        'topic_aliases': {'imu/data_raw': {'type': 'LSM6DS', 'source': 'imu/data_raw'}},
+        'topic_aliases': {'imu/data_raw': {'type': 'LSM6DS', 'source': 'data_raw'}},
     }}}))
     log = (tmp_path / 'single-launch.log').open('w+')
     env = {**os.environ, 'AXIOM_ROS_BOARDS_FILE': str(config)}
