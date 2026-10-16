@@ -7,7 +7,7 @@ docker run --rm -v "$repo_root:/work:ro" -w /ws "$image" bash -lc '
   set -eo pipefail
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
-  apt-get install -y -qq python3-serial python3-websocket python3-websockets \
+  apt-get install -y -qq python3-serial python3-websocket python3-websockets python3-zeroconf \
     python3-pytest python3-matplotlib python3-numpy \
     ros-jazzy-diagnostic-msgs ros-jazzy-ament-lint-common ros-jazzy-ament-lint-auto \
     ros-jazzy-rosbag2-storage-mcap
@@ -18,4 +18,5 @@ docker run --rm -v "$repo_root:/work:ro" -w /ws "$image" bash -lc '
   colcon test --base-paths /work/src --event-handlers console_direct+ --return-code-on-test-failure
   colcon test-result --verbose
   ros2 launch axiom_bringup bringup.launch.py --show-args
+  ros2 launch axiom_driver axiom.launch.py --show-args
 '

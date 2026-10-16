@@ -1,45 +1,54 @@
-"""USB waiting, background verification and shutdown without physical ports."""
+"""Discovery lifecycle with real ROS executors and controlled firmware probes."""
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from importlib import import_module, metadata
+import json
 import threading
 import time
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import call, Mock
 
 import pytest
 
 rclpy = pytest.importorskip('rclpy')
 from rclpy.context import Context  # noqa: E402
-from rclpy.executors import (  # noqa: E402
-    ExternalShutdownException,
-    SingleThreadedExecutor,
-)
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor  # noqa: E402
+from rclpy.node import Node  # noqa: E402
+from rclpy.parameter import Parameter  # noqa: E402
+
+ID_A = '001122334455'
+ID_B = 'aabbccddeeff'
+
+
+def port(path, vid=0x303A, pid=0x1001):
+    return SimpleNamespace(device=path, vid=vid, pid=pid)
+
+
+def firmware(identity=ID_A):
+    return {'rslt': 'ok', 'SystemName': 'Axiom018', 'MAC': identity}
 
 
 @pytest.fixture
-def discovery_module(monkeypatch):
+def module(monkeypatch):
     import serial
 
-    # Even an accidental serial open must fail before touching hardware.
-    serial_open = Mock(side_effect=AssertionError('Tests must not open physical serial ports'))
+    serial_open = Mock(side_effect=AssertionError('No physical serial access in discovery tests'))
     monkeypatch.setattr(serial, 'Serial', serial_open)
-    module = import_module('axiom_driver.usb_discovery_node')
-    monkeypatch.setattr(module, 'probe_axiom_firmware', Mock(return_value={
-        'rslt': 'ok', 'SystemName': 'Axiom018',
-    }))
-    yield module
+    value = import_module('axiom_driver.discovery_node')
+    monkeypatch.setattr(value, 'probe_axiom_firmware', Mock(return_value=firmware()))
+    monkeypatch.setattr(value, 'probe_network_firmware', Mock(return_value=firmware()))
+    yield value
     serial_open.assert_not_called()
 
 
 @pytest.fixture
-def probe_pool(discovery_module, monkeypatch):
+def pool(module, monkeypatch):
     jobs = []
-    pool = Mock(spec=['submit', 'shutdown'])
+    worker = Mock(spec=['submit', 'shutdown'])
 
-    def submit(function, *args, **kwargs):
+    def submit(function, *args):
         future = Future()
-        jobs.append(SimpleNamespace(future=future, function=function, args=args, kwargs=kwargs))
+        jobs.append(SimpleNamespace(future=future, function=function, args=args))
         return future
 
     def shutdown(wait=True, cancel_futures=False):
@@ -47,579 +56,526 @@ def probe_pool(discovery_module, monkeypatch):
             for job in jobs:
                 job.future.cancel()
 
-    pool.submit.side_effect = submit
-    pool.shutdown.side_effect = shutdown
-    factory = Mock(return_value=pool)
-    monkeypatch.setattr(discovery_module, 'ThreadPoolExecutor', factory)
-    return SimpleNamespace(pool=pool, jobs=jobs, factory=factory)
+    worker.submit.side_effect = submit
+    worker.shutdown.side_effect = shutdown
+    monkeypatch.setattr(module, 'ThreadPoolExecutor', Mock(return_value=worker))
+    return SimpleNamespace(worker=worker, jobs=jobs)
 
 
 @pytest.fixture
-def retry_clock(discovery_module, monkeypatch):
-    clock = Mock(return_value=100.0)
-    monkeypatch.setattr(discovery_module, 'monotonic', clock)
-    return clock
-
-
-@pytest.fixture
-def make_node(discovery_module, probe_pool, retry_clock, monkeypatch):
+def create(module, pool, monkeypatch, tmp_path):
     context = Context()
     rclpy.init(args=[], context=context)
     executor = SingleThreadedExecutor(context=context)
     logger = Mock(spec=['info', 'warning'])
-    monkeypatch.setattr(discovery_module.UsbDiscoveryNode, 'get_logger', lambda self: logger)
-    nodes = []
+    clock = Mock(return_value=100.0)
+    monkeypatch.setattr(module, 'monotonic', clock)
+    monkeypatch.setattr(module.AxiomDiscoveryNode, 'get_logger', lambda self: logger)
+    nodes, drivers = [], []
 
-    def create(provider=None):
-        node = discovery_module.UsbDiscoveryNode(
-            port_provider=provider, context=context, use_global_arguments=False,
+    def driver_factory(discovery, namespace, params):
+        child = Node('axiom_bridge_node', namespace=namespace, context=context,
+                     use_global_arguments=False)
+        child.config = params
+        child.session = SimpleNamespace(connected=False)
+        child._desired_connection = params['auto_connect']
+        child._desired_rate = params['publish_rate_hz'] if params['autosub'] else 0.0
+        child._identity_changed = False
+        child.destroy_node = Mock(wraps=child.destroy_node)
+        drivers.append(child)
+        return child
+
+    constructor = Mock(side_effect=driver_factory)
+    monkeypatch.setattr(module.AxiomDiscoveryNode, '_create_driver',
+                        lambda self, namespace, params: constructor(self, namespace, params))
+
+    def factory(ports=(), network=(), config=None, wifi=False):
+        provider = Mock(return_value=list(ports))
+        browser = Mock(spec=['snapshot', 'close'])
+        browser.snapshot.return_value = tuple(network)
+        filename = ''
+        if config is not None:
+            path = tmp_path / f'boards-{len(nodes)}.yaml'
+            path.write_text(json.dumps(config))
+            filename = str(path)
+        node = module.AxiomDiscoveryNode(
+            port_provider=provider, network_provider=browser, context=context,
+            use_global_arguments=False, parameter_overrides=[
+                Parameter('boards_file', value=filename), Parameter('wifi', value=wifi),
+            ],
         )
         nodes.append(node)
         executor.add_node(node)
-        return node, logger, executor, context
+        return SimpleNamespace(node=node, ports=provider, network=browser, clock=clock,
+                               executor=executor, context=context, logger=logger,
+                               constructor=constructor, drivers=drivers)
 
     def close(node):
         if node in nodes:
             nodes.remove(node)
             executor.remove_node(node)
-            return node.destroy_node()
+            node.destroy_node()
 
-    create.close = close
+    factory.close = close
     try:
-        yield create
+        yield factory
     finally:
         for node in list(nodes):
             close(node)
         executor.shutdown(timeout_sec=1.0)
-        if context.ok():
-            context.shutdown()
+        context.shutdown()
 
 
-def port(path, vid=None, pid=None):
-    return SimpleNamespace(device=path, vid=vid, pid=pid)
+def test_zero_boards_waits_once_across_real_ros_timer_callbacks(create, pool):
+    env = create()
+    deadline = time.monotonic() + 7
+    while env.ports.call_count < 3 and time.monotonic() < deadline:
+        env.executor.spin_once(timeout_sec=0.1)
+    assert env.ports.call_count >= 3
+    env.logger.info.assert_called_once_with('Waiting for an Axiom...')
+    env.logger.warning.assert_not_called()
+    pool.worker.submit.assert_not_called()
+    env.constructor.assert_not_called()
 
 
-def test_no_boards_scans_immediately_and_keeps_waiting_quietly(make_node, probe_pool):
-    provider = Mock(return_value=[])
-    node, logger, executor, context = make_node(provider)
-
-    provider.assert_called_once_with()
-    logger.info.assert_called_once_with('Waiting for an Axiom...')
-
-    # Exercise two real ROS timer callbacks, rather than only calling _scan.
-    deadline = time.monotonic() + 8.0
-    while provider.call_count < 3 and time.monotonic() < deadline:
-        executor.spin_once(timeout_sec=0.1)
-
-    assert provider.call_count >= 3, 'USB scanning stopped after the initial empty result'
-    assert context.ok() and node.get_name() == 'axiom_usb_discovery'
-    logger.info.assert_called_once_with('Waiting for an Axiom...')
-    logger.warning.assert_not_called()
-    probe_pool.pool.submit.assert_not_called()
+def test_nonmatching_ports_and_reordered_candidates_do_not_create_duplicate_jobs(create, pool):
+    env = create([port('/virtual/b'), port('/virtual/a'), port('/other', vid=1)])
+    assert [job.args for job in pool.jobs] == [('/virtual/a',), ('/virtual/b',)]
+    env.ports.return_value.reverse()
+    env.node._scan()
+    assert env.logger.info.call_count == 1
+    assert len(pool.jobs) == 2
+    env.ports.return_value = []
+    env.node._scan()
+    env.node._scan()
+    assert all(job.future.cancelled() for job in pool.jobs)
+    env.logger.info.assert_called_with('Waiting for an Axiom...')
 
 
-def test_unrelated_serial_ports_still_produce_waiting_state(make_node, probe_pool):
-    provider = Mock(return_value=[
-        port('/virtual/non-usb'),
-        port('/virtual/other-vendor', vid=0x1234, pid=0x1001),
-        port('/virtual/other-product', vid=0x303A, pid=0x9999),
-    ])
-    node, logger, _, _ = make_node(provider)
-    node._scan()
-
-    logger.info.assert_called_once_with('Waiting for an Axiom...')
-    logger.warning.assert_not_called()
-    probe_pool.pool.submit.assert_not_called()
-
-
-def test_candidate_order_changes_do_not_repeat_status_or_submit_duplicate_jobs(
-    make_node, probe_pool,
-):
-    first = port('/virtual/first', vid=0x303A, pid=0x1001)
-    second = port('/virtual/second', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[second, first])
-    node, logger, _, _ = make_node(provider)
-
-    logger.info.assert_called_once_with(
-        'USB candidates found: /virtual/first, /virtual/second',
-    )
-    provider.return_value = [first, second]
-    node._scan()
-    assert logger.info.call_count == 1
-
-    provider.return_value = []
-    node._scan()
-    node._scan()
-    assert logger.info.call_count == 2
-    logger.info.assert_called_with('Waiting for an Axiom...')
-    logger.warning.assert_not_called()
-    assert probe_pool.pool.submit.call_count == 2
-    assert all(job.future.cancelled() for job in probe_pool.jobs)
+def test_verified_board_starts_once_with_automatic_parameters(create, pool):
+    env = create([port('/virtual/a')])
+    env.node._scan()
+    env.constructor.assert_not_called()
+    pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    env.node._scan()
+    assert len(env.drivers) == 1 and len(pool.jobs) == 1
+    driver = env.node._drivers[ID_A][1]
+    assert driver.context is env.context and driver in env.executor.get_nodes()
+    assert driver.get_namespace() == '/axiom_' + ID_A
+    assert driver.config['frame_id'] == 'axiom_' + ID_A
+    assert driver.config['transport'] == 'serial'
+    assert driver.config['serial.port'] == '/virtual/a'
+    assert all(driver.config[name] for name in ('auto_connect', 'auto_reconnect', 'autosub'))
+    assert driver._expected_identity == ID_A
 
 
-def test_enumeration_error_is_reported_once_and_waiting_recovers(make_node):
-    provider = Mock(return_value=[])
-    node, logger, _, context = make_node(provider)
-    provider.side_effect = OSError('temporary enumeration failure')
-    node._scan()
-    node._scan()
-
-    logger.warning.assert_called_once_with(
-        'USB enumeration failed: temporary enumeration failure',
-    )
-    provider.side_effect = None
-    node._scan()
-    node._scan()
-
-    assert context.ok()
-    assert logger.info.call_count == 2
-    logger.info.assert_called_with('Waiting for an Axiom...')
-    assert logger.warning.call_count == 1
+@pytest.mark.parametrize('response', [None, firmware(''), firmware('invalid')])
+def test_unrecognised_or_unidentifiable_board_is_not_started_or_retried(create, pool, response):
+    env = create([port('/virtual/a')])
+    pool.jobs[0].future.set_result(response)
+    env.node._scan()
+    env.clock.return_value = 1000
+    env.node._scan()
+    env.constructor.assert_not_called()
+    assert len(pool.jobs) == 1
+    assert env.logger.warning.call_count == 1
 
 
-def test_default_enumerator_is_used_when_no_provider_is_supplied(
-    discovery_module, make_node, monkeypatch,
-):
-    provider = Mock(return_value=[])
-    monkeypatch.setattr(discovery_module, 'comports', provider)
-    _, logger, _, _ = make_node()
-
-    provider.assert_called_once_with()
-    logger.info.assert_called_once_with('Waiting for an Axiom...')
-
-
-def test_successful_probe_is_reported_once_and_not_resubmitted(make_node, probe_pool):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    node, logger, _, _ = make_node(Mock(return_value=[candidate]))
-    future = probe_pool.jobs[0].future
-
-    node._scan()
-    assert not future.done()
-    assert logger.info.call_count == 1
-    future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    node._scan()
-
-    assert probe_pool.pool.submit.call_count == 1
-    assert logger.info.call_count == 2
-    logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
-    logger.warning.assert_not_called()
+def test_exception_retries_after_delay_and_suppresses_identical_errors(create, pool):
+    env = create([port('/virtual/a')])
+    for index, error in enumerate(['busy', 'busy', 'timeout']):
+        pool.jobs[index].future.set_exception(RuntimeError(error))
+        env.node._scan()
+        assert env.logger.warning.call_count == (1 if index < 2 else 2)
+        env.clock.return_value += 4.99
+        env.node._scan()
+        assert len(pool.jobs) == index + 1
+        env.clock.return_value += 0.01
+        env.node._scan()
+        assert len(pool.jobs) == index + 2
+        env.node._scan()
+        assert len(pool.jobs) == index + 2
+    pool.jobs[-1].future.set_result(firmware())
+    env.node._scan()
+    assert ID_A in env.node._drivers
 
 
-@pytest.mark.parametrize('failed', [False, True], ids=['unrecognised', 'failed'])
-def test_rejected_or_failed_probe_is_reported_once_without_stopping_node(
-    make_node, probe_pool, failed,
-):
-    candidate = port('/virtual/other', vid=0x303A, pid=0x1001)
-    node, logger, _, context = make_node(Mock(return_value=[candidate]))
-    future = probe_pool.jobs[0].future
-    if failed:
-        future.set_exception(RuntimeError('Port busy'))
+def test_retry_of_one_port_does_not_disturb_other_board(create, pool):
+    env = create([port('/virtual/a'), port('/virtual/b')])
+    pool.jobs[0].future.set_exception(RuntimeError('busy'))
+    pool.jobs[1].future.set_result(firmware(ID_B))
+    env.node._scan()
+    second = env.node._drivers[ID_B][1]
+    env.clock.return_value += 5
+    env.node._scan()
+    pool.jobs[2].future.set_result(firmware(ID_A))
+    env.node._scan()
+    assert set(env.node._drivers) == {ID_A, ID_B}
+    assert env.node._drivers[ID_B][1] is second
+    second.destroy_node.assert_not_called()
+
+
+@pytest.mark.parametrize('next_path', ['/virtual/a', '/virtual/renumbered'])
+def test_replug_keeps_identity_namespace_and_other_board_running(create, pool, next_path):
+    env = create([port('/virtual/a'), port('/virtual/b')])
+    for job, identity in zip(pool.jobs, (ID_A, ID_B)):
+        job.future.set_result(firmware(identity))
+    env.node._scan()
+    first, second = (env.node._drivers[identity][1] for identity in (ID_A, ID_B))
+    original_namespace = first.get_namespace()
+    env.ports.return_value = [port('/virtual/b')]
+    env.node._scan()
+    first.destroy_node.assert_called_once_with()
+    assert first not in env.executor.get_nodes()
+    assert env.node._drivers[ID_B][1] is second
+    env.ports.return_value.append(port(next_path))
+    env.node._scan()
+    assert ID_A not in env.node._drivers
+    pool.jobs[2].future.set_result(firmware(ID_A))
+    env.node._scan()
+    replacement = env.node._drivers[ID_A][1]
+    assert replacement is not first
+    assert replacement.get_namespace() == original_namespace
+    assert replacement.config['frame_id'] == first.config['frame_id']
+    assert env.node._drivers[ID_B][1] is second
+    second.destroy_node.assert_not_called()
+
+
+@pytest.mark.parametrize('late_failure', [False, True])
+def test_late_probe_is_discarded_after_path_removal_and_reuse(create, pool, late_failure):
+    env = create([port('/virtual/a')])
+    old = pool.jobs[0].future
+    assert old.set_running_or_notify_cancel()
+    env.ports.return_value = []
+    env.node._scan()
+    env.ports.return_value = [port('/virtual/a')]
+    env.node._scan()
+    if late_failure:
+        old.set_exception(RuntimeError('stale failure'))
     else:
-        future.set_result(None)
-
-    node._scan()
-    node._scan()
-
-    assert context.ok()
-    assert probe_pool.pool.submit.call_count == 1
-    if failed:
-        logger.warning.assert_called_once_with('USB probe failed for /virtual/other: Port busy')
-        assert logger.info.call_count == 1
-    else:
-        logger.info.assert_called_with('USB candidate not recognised: /virtual/other')
-        assert logger.info.call_count == 2
-        logger.warning.assert_not_called()
+        old.set_result(firmware(ID_B))
+    env.node._scan()
+    assert not env.node._drivers
+    pool.jobs[1].future.set_result(firmware(ID_A))
+    env.node._scan()
+    assert set(env.node._drivers) == {ID_A}
+    env.logger.warning.assert_not_called()
 
 
-def test_failed_probe_retries_after_delay_without_disturbing_other_boards(
-    make_node, probe_pool, retry_clock,
+def test_unplug_clears_retry_deadline_and_error_suppression(create, pool):
+    env = create([port('/virtual/a')])
+    pool.jobs[0].future.set_exception(RuntimeError('busy'))
+    env.node._scan()
+    env.ports.return_value = []
+    env.node._scan()
+    env.ports.return_value = [port('/virtual/a')]
+    env.node._scan()
+    assert len(pool.jobs) == 2
+    pool.jobs[1].future.set_exception(RuntimeError('busy'))
+    env.node._scan()
+    assert env.logger.warning.call_count == 2
+
+
+@pytest.mark.parametrize('completed', [False, True])
+def test_enumeration_failure_preserves_pending_probe_or_managed_driver(create, pool, completed):
+    env = create([port('/virtual/a')])
+    if completed:
+        pool.jobs[0].future.set_result(firmware())
+        env.node._scan()
+    env.ports.side_effect = OSError('temporary enumeration failure')
+    env.node._scan()
+    env.node._scan()
+    assert len(pool.jobs) == 1
+    assert not pool.jobs[0].future.cancelled()
+    if completed:
+        env.drivers[0].destroy_node.assert_not_called()
+    env.logger.warning.assert_called_once_with(
+        'USB enumeration failed: temporary enumeration failure')
+    env.ports.side_effect = None
+    if not completed:
+        pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    assert ID_A in env.node._drivers
+
+
+def test_wifi_verification_uses_non_acquiring_probe_and_deduplicates_usb(create, pool, module):
+    uri = 'ws://192.0.2.10/ws'
+    env = create([port('/virtual/a')], [uri], wifi=True)
+    assert pool.jobs[0].function is module.probe_axiom_firmware
+    assert pool.jobs[1].function is module.probe_network_firmware
+    for job in pool.jobs:
+        job.future.set_result(firmware())
+    env.node._scan()
+    assert len(env.drivers) == 1
+    assert env.node._drivers[ID_A][0] == ('serial', '/virtual/a')
+    env.ports.return_value = []
+    env.node._scan()
+    assert env.node._drivers[ID_A][0] == ('ws', uri)
+    assert len(env.drivers) == 2
+    env.drivers[0].destroy_node.assert_called_once_with()
+
+
+@pytest.mark.parametrize('disconnected', [False, True])
+def test_wifi_to_usb_switch_preserves_manual_connection_and_acquisition_choice(
+    create, pool, disconnected,
 ):
-    first = port('/virtual/first', vid=0x303A, pid=0x1001)
-    second = port('/virtual/second', vid=0x303A, pid=0x1001)
-    node, logger, _, _ = make_node(Mock(return_value=[first, second]))
-    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
-    probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
-    node._scan()
-
-    retry_clock.return_value = 104.99
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 2
-
-    retry_clock.return_value = 105.0
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 3
-    assert probe_pool.jobs[2].args == (first.device,)
-
-    # Passing another deadline cannot create a duplicate while this retry runs.
-    retry_clock.return_value = 1000.0
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 3
-
-    probe_pool.jobs[2].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    retry_clock.return_value = 2000.0
-    node._scan()
-
-    assert probe_pool.pool.submit.call_count == 3
-    logger.info.assert_called_with('Axiom verified: /virtual/first (Axiom018)')
-    logger.warning.assert_called_once_with('USB probe failed for /virtual/first: RPC timed out')
+    env = create(network=['ws://192.0.2.10/ws'], wifi=True)
+    pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    original = env.drivers[0]
+    original._desired_connection = not disconnected
+    original._desired_rate = 0.0
+    env.ports.return_value = [port('/virtual/a')]
+    env.node._scan()
+    pool.jobs[1].future.set_result(firmware())
+    env.node._scan()
+    replacement = env.node._drivers[ID_A][1]
+    assert replacement is not original
+    assert replacement._desired_connection is (not disconnected)
+    assert replacement._desired_rate == 0.0
+    original.destroy_node.assert_called_once_with()
 
 
-@pytest.mark.parametrize('response', [None, {'rslt': 'ok', 'SystemName': 'Axiom018'}])
-def test_completed_recognition_is_not_retried_after_delay(
-    make_node, probe_pool, retry_clock, response,
-):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    node, logger, _, _ = make_node(Mock(return_value=[candidate]))
-    probe_pool.jobs[0].future.set_result(response)
-    node._scan()
-
-    retry_clock.return_value = 1000.0
-    node._scan()
-
-    assert probe_pool.pool.submit.call_count == 1
-    logger.warning.assert_not_called()
-
-
-def test_repeated_failure_is_quiet_but_changed_error_and_recovery_are_reported(
-    make_node, probe_pool, retry_clock,
-):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    node, logger, _, _ = make_node(Mock(return_value=[candidate]))
-    for index, message in enumerate(['Port busy', 'Port busy', 'RPC timed out']):
-        probe_pool.jobs[index].future.set_exception(RuntimeError(message))
-        node._scan()
-        assert logger.warning.call_count == (1 if index < 2 else 2)
-
-        retry_clock.return_value += 5.0
-        node._scan()
-        assert probe_pool.pool.submit.call_count == index + 2
-
-    probe_pool.jobs[3].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
-    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: Port busy')
-    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: RPC timed out')
+def test_changed_physical_board_at_same_endpoint_requires_reverification(create, pool):
+    env = create([port('/virtual/a')])
+    pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    original = env.drivers[0]
+    original._identity_changed = True
+    env.node._scan()
+    assert not env.node._drivers
+    original.destroy_node.assert_called_once_with()
+    assert len(pool.jobs) == 2
+    pool.jobs[1].future.set_result(firmware(ID_B))
+    env.node._scan()
+    assert set(env.node._drivers) == {ID_B}
+    assert env.node._drivers[ID_B][1].get_namespace() == '/axiom_' + ID_B
 
 
-def test_replug_clears_retry_delay_and_previous_error(make_node, probe_pool, retry_clock):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
-    node._scan()
-
-    retry_clock.return_value = 101.0
-    provider.return_value = []
-    node._scan()
-    provider.return_value = [candidate]
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 2
-
-    probe_pool.jobs[1].future.set_exception(RuntimeError('RPC timed out'))
-    node._scan()
-    assert logger.warning.call_count == 2
-
-
-def test_enumeration_error_preserves_retry_delay_and_quiet_error_state(
-    make_node, probe_pool, retry_clock,
-):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
-    node._scan()
-
-    retry_clock.return_value = 104.0
-    provider.side_effect = OSError('Temporary enumeration failure')
-    node._scan()
-    provider.side_effect = None
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 1
-
-    retry_clock.return_value = 105.0
-    node._scan()
-    probe_pool.jobs[1].future.set_exception(RuntimeError('RPC timed out'))
-    node._scan()
-
-    assert probe_pool.pool.submit.call_count == 2
-    assert logger.warning.call_count == 2
-    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: RPC timed out')
-    logger.warning.assert_any_call('USB enumeration failed: Temporary enumeration failure')
+def test_optional_identity_rules_apply_aliases_and_limit_robot_membership(create, pool):
+    env = create([port('/virtual/a'), port('/virtual/b')], config={
+        'discovery': {'include_unconfigured': False},
+        'axioms': {'robot/front': {
+            'id': ID_A, 'publish_rate_hz': 20,
+            'topic_aliases': {'range': {'type': 'VL53L4CD', 'source': 'range'}},
+        }},
+    })
+    for job, identity in zip(pool.jobs, (ID_A, ID_B)):
+        job.future.set_result(firmware(identity))
+    env.node._scan()
+    assert set(env.node._drivers) == {ID_A}
+    driver = env.drivers[0]
+    assert driver.get_namespace() == '/robot/front'
+    assert driver.config['frame_id'] == 'robot_front'
+    assert driver.config['publish_rate_hz'] == 20.0
+    assert json.loads(driver.config['topic_aliases'])['range']['source'] == 'range'
 
 
-def test_multiple_candidates_get_independent_jobs_and_results(
-    discovery_module, make_node, probe_pool,
-):
-    first = port('/virtual/first', vid=0x303A, pid=0x1001)
-    second = port('/virtual/second', vid=0x303A, pid=0x1001)
-    node, logger, _, _ = make_node(Mock(return_value=[second, first]))
-
-    probe_pool.factory.assert_called_once_with(
-        max_workers=1, thread_name_prefix='axiom-usb-probe',
-    )
-    assert [job.args for job in probe_pool.jobs] == [('/virtual/first',), ('/virtual/second',)]
-    assert all(job.function is discovery_module.probe_axiom_firmware for job in probe_pool.jobs)
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 2
-
-    probe_pool.jobs[0].future.set_exception(RuntimeError('First probe failed'))
-    probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    node._scan()
-
-    logger.warning.assert_called_once_with(
-        'USB probe failed for /virtual/first: First probe failed',
-    )
-    logger.info.assert_called_with('Axiom verified: /virtual/second (Axiom018)')
-    assert probe_pool.pool.submit.call_count == 2
+def test_explicit_wifi_endpoint_works_without_mdns_and_manual_flags_are_respected(create, pool):
+    uri = 'ws://192.0.2.10/ws'
+    env = create(config={'axioms': {'axiom': {
+        'transport': 'ws', 'device_uri': uri,
+        'auto_connect': False, 'auto_reconnect': False, 'autosub': False,
+    }}})
+    assert pool.jobs[0].args == (uri,)
+    pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    driver = env.drivers[0]
+    assert driver.get_namespace() == '/axiom'
+    assert not driver._desired_connection and driver._desired_rate == 0
 
 
-def test_queued_probe_is_cancelled_on_removal(make_node, probe_pool):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    future = probe_pool.jobs[0].future
-
-    provider.return_value = []
-    node._scan()
-    node._scan()
-
-    assert future.cancelled()
-    logger.info.assert_called_with('Waiting for an Axiom...')
-    logger.warning.assert_not_called()
+def test_endpoint_rule_keeps_its_transport_restriction_when_usb_disappears(create, pool):
+    env = create([port('/virtual/a')], ['ws://192.0.2.10/ws'], wifi=True, config={
+        'axioms': {'front': {'transport': 'serial', 'serial.port': '/virtual/a'}},
+    })
+    for job in pool.jobs:
+        job.future.set_result(firmware())
+    env.node._scan()
+    assert env.node._drivers[ID_A][1].get_namespace() == '/front'
+    env.ports.return_value = []
+    env.node._scan()
+    assert not env.node._drivers, 'A serial-only board must not reappear as unconfigured Wi-Fi'
 
 
-def test_completed_candidate_is_probed_again_after_replug(make_node, probe_pool):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    probe_pool.jobs[0].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
-    node._scan()
-
-    provider.return_value = []
-    node._scan()
-    provider.return_value = [candidate]
-    node._scan()
-    assert probe_pool.pool.submit.call_count == 2
-    probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    node._scan()
-
-    logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
-    assert probe_pool.pool.submit.call_count == 2
+def test_ambiguous_rules_fail_closed_without_duplicate_nodes(create, pool):
+    env = create([port('/virtual/a')], config={'axioms': {
+        'front': {'id': ID_A},
+        'rear': {'transport': 'serial', 'serial.port': '/virtual/a'},
+    }})
+    pool.jobs[0].future.set_result(firmware())
+    env.node._scan()
+    env.node._scan()
+    env.constructor.assert_not_called()
+    env.logger.warning.assert_called_once_with(
+        f'Axiom {ID_A}: Multiple board entries match this physical Axiom')
 
 
-@pytest.mark.parametrize('failed', [False, True], ids=['late-success', 'late-failure'])
-def test_late_result_from_removed_board_is_discarded_when_path_is_reused(
-    make_node, probe_pool, retry_clock, failed,
-):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    old_future = probe_pool.jobs[0].future
-    assert old_future.set_running_or_notify_cancel()
-
-    provider.return_value = []
-    node._scan()
-    provider.return_value = [candidate]
-    node._scan()
-    if failed:
-        old_future.set_exception(RuntimeError('Old probe failed'))
-    else:
-        old_future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
-    node._scan()
-
-    assert all('Axiom verified:' not in call.args[0] for call in logger.info.call_args_list)
-    probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-    node._scan()
-    retry_clock.return_value = 1000.0
-    node._scan()
-
-    logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
-    assert all('Axiom009' not in call.args[0] for call in logger.info.call_args_list)
-    assert probe_pool.pool.submit.call_count == 2
-    logger.warning.assert_not_called()
+def test_no_executor_does_not_construct_bridge(create):
+    env = create()
+    env.node.executor = None
+    with pytest.raises(RuntimeError, match='must be added to an executor'):
+        env.node._start_driver(ID_A, '/axiom', ('serial', '/virtual/a'), {})
+    env.constructor.assert_not_called()
 
 
-def test_enumeration_error_preserves_pending_probe_until_inventory_recovers(make_node, probe_pool):
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
-    provider = Mock(return_value=[candidate])
-    node, logger, _, _ = make_node(provider)
-    future = probe_pool.jobs[0].future
-    future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
-
-    provider.side_effect = OSError('Temporary enumeration failure')
-    node._scan()
-    assert logger.info.call_count == 1
-    provider.side_effect = None
-    node._scan()
-    node._scan()
-
-    logger.info.assert_any_call('Axiom verified: /virtual/axiom (Axiom018)')
-    logger.warning.assert_called_once_with('USB enumeration failed: Temporary enumeration failure')
-    assert probe_pool.pool.submit.call_count == 1
+def test_registration_failure_releases_unowned_bridge(create, monkeypatch):
+    env = create()
+    monkeypatch.setattr(
+        env.executor, 'add_node', Mock(side_effect=RuntimeError('executor failed')))
+    params = {'auto_connect': True, 'autosub': True, 'publish_rate_hz': 10.0}
+    with pytest.raises(RuntimeError, match='executor failed'):
+        env.node._start_driver(ID_A, '/axiom', ('serial', '/virtual/a'), params)
+    env.drivers[0].destroy_node.assert_called_once_with()
+    assert not env.node._drivers
 
 
-def test_running_probe_leaves_ros_callbacks_responsive_and_logs_on_ros_thread(
-    discovery_module, make_node, monkeypatch,
-):
-    started = threading.Event()
-    release = threading.Event()
-    worker_threads = []
-    log_threads = []
-    owner_thread = threading.get_ident()
+@pytest.mark.parametrize('stopped', [False, True])
+def test_shutdown_releases_all_drivers_network_browser_and_probe_worker(create, pool, stopped):
+    env = create([port('/virtual/a'), port('/virtual/b')], wifi=True)
+    for job, identity in zip(pool.jobs, (ID_A, ID_B)):
+        job.future.set_result(firmware(identity))
+    env.node._scan()
+    if stopped:
+        env.executor.shutdown(timeout_sec=1)
+    create.close(env.node)
+    assert not env.node._drivers
+    for driver in env.drivers:
+        driver.destroy_node.assert_called_once_with()
+        assert driver not in env.executor.get_nodes()
+    env.network.close.assert_called_once_with()
+    pool.worker.shutdown.assert_called_once_with(wait=True, cancel_futures=True)
+
+
+def test_pending_probe_keeps_ros_timer_responsive(create, module, monkeypatch):
+    started, release, heartbeat = threading.Event(), threading.Event(), threading.Event()
 
     def probe(path):
-        worker_threads.append(threading.get_ident())
         started.set()
-        if not release.wait(5):
-            raise RuntimeError('Test did not release the probe')
-        return {'rslt': 'ok', 'SystemName': 'Axiom018'}
+        assert release.wait(5)
+        return firmware()
 
-    monkeypatch.setattr(discovery_module, 'ThreadPoolExecutor', ThreadPoolExecutor)
-    monkeypatch.setattr(discovery_module, 'probe_axiom_firmware', probe)
-    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
+    monkeypatch.setattr(module, 'ThreadPoolExecutor', ThreadPoolExecutor)
+    monkeypatch.setattr(module, 'probe_axiom_firmware', probe)
     try:
-        node, logger, executor, _ = make_node(Mock(return_value=[candidate]))
-        logger.info.side_effect = lambda message: log_threads.append(threading.get_ident())
+        env = create([port('/virtual/a')])
         assert started.wait(1)
-        future = node._probe_futures[candidate.device]
-
-        heartbeat = threading.Event()
-        node.create_timer(0.01, heartbeat.set)
-        deadline = time.monotonic() + 1.0
+        env.node.create_timer(0.01, heartbeat.set)
+        deadline = time.monotonic() + 1
         while not heartbeat.is_set() and time.monotonic() < deadline:
-            executor.spin_once(timeout_sec=0.05)
-
-        assert heartbeat.is_set(), 'The pending probe blocked other ROS callbacks'
-        assert not future.done()
-        assert len(worker_threads) == 1
-        assert worker_threads[0] != owner_thread
-        node._scan()
-        assert logger.info.call_count == 1
-
+            env.executor.spin_once(timeout_sec=0.05)
+        assert heartbeat.is_set()
+        assert not env.node._drivers
         release.set()
-        future.result(timeout=1)
-        node._scan()
-        logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
-        assert log_threads == [owner_thread]
+        env.node._probe_futures[('serial', '/virtual/a')].result(timeout=1)
+        env.node._scan()
+        assert ID_A in env.node._drivers
     finally:
         release.set()
 
 
-def test_shutdown_waits_for_active_probe_and_cancels_queued_probe(
-    discovery_module, make_node, monkeypatch,
-):
-    started = threading.Event()
-    release = threading.Event()
-    closed = threading.Event()
-    calls = []
+def test_shutdown_waits_for_active_probe_and_cancels_queued_jobs(create, module, monkeypatch):
+    started, release, closed = threading.Event(), threading.Event(), threading.Event()
     errors = []
 
     def probe(path):
-        calls.append(path)
         started.set()
-        if not release.wait(5):
-            raise RuntimeError('Test did not release the probe')
-        return {'rslt': 'ok', 'SystemName': 'Axiom018'}
+        assert release.wait(5)
+        return firmware()
 
-    monkeypatch.setattr(discovery_module, 'ThreadPoolExecutor', ThreadPoolExecutor)
-    monkeypatch.setattr(discovery_module, 'probe_axiom_firmware', probe)
-    first = port('/virtual/first', vid=0x303A, pid=0x1001)
-    second = port('/virtual/second', vid=0x303A, pid=0x1001)
-    node, _, _, _ = make_node(Mock(return_value=[first, second]))
-    queued = node._probe_futures[second.device]
+    # Deliberately retain one worker to make a queued cancellation deterministic.
+    monkeypatch.setattr(module, 'ThreadPoolExecutor', lambda **kwargs: ThreadPoolExecutor(1))
+    monkeypatch.setattr(module, 'probe_axiom_firmware', probe)
+    env = create([port('/virtual/a'), port('/virtual/b')])
+    queued = env.node._probe_futures[('serial', '/virtual/b')]
 
     def close():
         try:
-            make_node.close(node)
+            create.close(env.node)
         except Exception as exc:
             errors.append(exc)
         finally:
             closed.set()
 
-    closer = threading.Thread(target=close)
+    thread = threading.Thread(target=close)
     try:
         assert started.wait(1)
-        closer.start()
-        deadline = time.monotonic() + 1.0
+        thread.start()
+        deadline = time.monotonic() + 1
         while not queued.cancelled() and time.monotonic() < deadline:
             time.sleep(0.01)
-
-        assert queued.cancelled()
-        assert node._timer.is_canceled()
-        assert not closed.is_set(), 'Shutdown returned while its probe was still running'
+        assert queued.cancelled() and not closed.is_set()
     finally:
         release.set()
-        if closer.ident is not None:
-            closer.join(timeout=2)
-
-    assert closed.is_set() and not closer.is_alive()
-    assert not errors
-    assert calls == ['/virtual/first']
+        thread.join(2)
+    assert closed.is_set() and not errors
 
 
-@pytest.mark.parametrize('shutdown_signal', [
-    None, KeyboardInterrupt(), ExternalShutdownException(),
-], ids=['spin-returns', 'ctrl-c', 'external-shutdown'])
-def test_main_releases_node_and_ros_context(discovery_module, monkeypatch, shutdown_signal):
+@pytest.mark.parametrize('signal', [None, KeyboardInterrupt(), ExternalShutdownException()])
+def test_run_cleans_up_executor_before_node_and_context(module, monkeypatch, signal):
     node = Mock(spec=['destroy_node'])
-    factory = Mock(return_value=node)
-    initialise = Mock()
-    spin = Mock(side_effect=shutdown_signal)
-    shutdown = Mock()
-    monkeypatch.setattr(discovery_module, 'UsbDiscoveryNode', factory)
+    executor = Mock(spec=['add_node', 'spin', 'shutdown'])
+    executor.spin.side_effect = signal
+    lifecycle = Mock()
+    initialise, shutdown = Mock(), Mock()
+    for name, operation in [('init', initialise), ('executor', executor),
+                            ('node', node), ('shutdown', shutdown)]:
+        lifecycle.attach_mock(operation, name)
+    monkeypatch.setattr(module, 'SingleThreadedExecutor', Mock(return_value=executor))
     monkeypatch.setattr(rclpy, 'init', initialise)
-    monkeypatch.setattr(rclpy, 'spin', spin)
     monkeypatch.setattr(rclpy, 'ok', Mock(return_value=True))
     monkeypatch.setattr(rclpy, 'shutdown', shutdown)
+    module.run(Mock(return_value=node), args=[])
+    assert lifecycle.mock_calls == [call.init(args=[]), call.executor.add_node(node),
+                                    call.executor.spin(), call.executor.shutdown(),
+                                    call.node.destroy_node(), call.shutdown()]
 
-    discovery_module.main(args=[])
 
-    initialise.assert_called_once_with(args=[])
-    spin.assert_called_once_with(node)
-    node.destroy_node.assert_called_once_with()
+def test_run_releases_context_if_node_construction_fails(module, monkeypatch):
+    executor, shutdown = Mock(), Mock()
+    monkeypatch.setattr(module, 'SingleThreadedExecutor', Mock(return_value=executor))
+    monkeypatch.setattr(rclpy, 'init', Mock())
+    monkeypatch.setattr(rclpy, 'ok', Mock(return_value=True))
+    monkeypatch.setattr(rclpy, 'shutdown', shutdown)
+    with pytest.raises(ValueError, match='bad config'):
+        module.run(Mock(side_effect=ValueError('bad config')), args=[])
+    executor.shutdown.assert_called_once_with()
     shutdown.assert_called_once_with()
 
 
-def test_main_shuts_down_ros_if_node_construction_fails(discovery_module, monkeypatch):
-    factory = Mock(side_effect=RuntimeError('node construction failed'))
-    shutdown = Mock()
-    spin = Mock()
-    monkeypatch.setattr(discovery_module, 'UsbDiscoveryNode', factory)
-    monkeypatch.setattr(rclpy, 'init', Mock())
-    monkeypatch.setattr(rclpy, 'spin', spin)
-    monkeypatch.setattr(rclpy, 'ok', Mock(return_value=True))
-    monkeypatch.setattr(rclpy, 'shutdown', shutdown)
-
-    with pytest.raises(RuntimeError, match='node construction failed'):
-        discovery_module.main(args=[])
-
-    spin.assert_not_called()
-    shutdown.assert_called_once_with()
-
-
-def test_main_does_not_shutdown_an_already_stopped_context(discovery_module, monkeypatch):
-    node = Mock(spec=['destroy_node'])
-    shutdown = Mock()
-    monkeypatch.setattr(discovery_module, 'UsbDiscoveryNode', Mock(return_value=node))
-    monkeypatch.setattr(rclpy, 'init', Mock())
-    monkeypatch.setattr(rclpy, 'spin', Mock(side_effect=ExternalShutdownException()))
-    monkeypatch.setattr(rclpy, 'ok', Mock(return_value=False))
-    monkeypatch.setattr(rclpy, 'shutdown', shutdown)
-
-    discovery_module.main(args=[])
-
-    node.destroy_node.assert_called_once_with()
-    shutdown.assert_not_called()
+def test_created_bridge_uses_own_context_and_ignores_discovery_cli_overrides(module, pool):
+    context = Context()
+    rclpy.init(context=context, args=[
+        '--ros-args', '-r', '__ns:=/ignored',
+        '-r', '__node:=ignored', '-p', 'auto_connect:=false',
+    ])
+    node = driver = None
+    try:
+        node = module.AxiomDiscoveryNode(
+            port_provider=lambda: [], context=context, use_global_arguments=False,
+            parameter_overrides=[Parameter('wifi', value=False),
+                                 Parameter('boards_file', value='')],
+        )
+        params = module.board_parameters('/axiom_' + ID_A, {
+            'transport': 'serial', 'serial.port': '/virtual/a',
+        })
+        driver = node._create_driver('/axiom_' + ID_A, params)
+        assert driver.context is context
+        assert driver.get_namespace() == '/axiom_' + ID_A
+        assert driver.get_name() == 'axiom_bridge_node'
+        assert driver.config['auto_connect'] and driver.config['autosub']
+        assert driver.executor is None and not driver.session.connected
+    finally:
+        if driver is not None:
+            driver.destroy_node()
+        if node is not None:
+            node.destroy_node()
+        context.shutdown()
 
 
-def test_installed_usb_console_entry_point_is_loadable(discovery_module):
-    distribution = metadata.distribution('axiom_driver')
-    entries = [entry for entry in distribution.entry_points
-               if entry.group == 'console_scripts' and entry.name == 'axiom_usb_discovery']
-
-    assert len(entries) == 1, 'The installed package must expose axiom_usb_discovery'
-    assert entries[0].load() is discovery_module.main
+@pytest.mark.parametrize('name', ['axiom_discovery', 'axiom_usb_discovery'])
+def test_installed_console_entry_points_are_loadable(name):
+    entries = [item for item in metadata.distribution('axiom_driver').entry_points
+               if item.group == 'console_scripts' and item.name == name]
+    assert len(entries) == 1 and callable(entries[0].load())

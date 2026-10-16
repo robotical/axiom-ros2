@@ -10,7 +10,7 @@ bash scripts/ros_tmux.sh
 
 The helper creates four empty panes labelled **Terminal 1–4**, or attaches its
 existing ROS session. Use the labels to follow a walkthrough; screen positions
-can change as the window is resized. Driver connection and acquisition stay manual.
+can change as the window is resized. Start discovery in Terminal 1; it connects and acquires automatically.
 
 Each new pane loads the machine settings, configured ROS installation and built
 workspace through `scripts/setup_env.sh`. It starts at `ROS_WORKSPACE`, which

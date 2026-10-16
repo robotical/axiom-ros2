@@ -6,6 +6,7 @@ import threading
 import time
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
+from .ownership import claim, endpoint_key, normalise_board_id
 from .rpc import Requests, SessionError
 from ..mini_hdlc import MiniHDLC
 from ..protocols.overascii import Decoder as OverAsciiDecoder
@@ -52,6 +53,7 @@ class Session:
         self.socket = None
         self.serial = None
         self.thread = None
+        self._leases = []
         self.opened = threading.Event()
         self.hdlc = MiniHDLC()
         self.ascii_pending = None
@@ -70,6 +72,7 @@ class Session:
         serial_mode='auto',
         baud=115200,
         serial_timeout=0.02,
+        claim_board=True,
     ):
         if transport not in ('ws', 'serial') or ws_mode not in ('RICSerial', 'RICFrame'):
             raise SessionError('Use serial or a framed RICSerial/RICFrame WebSocket')
@@ -98,6 +101,10 @@ class Session:
             oa.on_binary = parser.feed_bytes
         socket = serial = None
         try:
+            with self.lock:
+                if generation != self.generation:
+                    raise SessionError('Connection cancelled')
+                self._leases.append(claim(endpoint_key(transport, uri)))
             if transport == 'serial':
                 serial = SerialTransport(uri, baud, serial_timeout)
                 serial.on_bytes = lambda data: self._serial_bytes(generation, data, oa)
@@ -141,6 +148,9 @@ class Session:
             with self.lock:
                 if generation != self.generation or not self.transport_ready:
                     raise SessionError('Connection cancelled during handshake')
+                identity = normalise_board_id(firmware.get('MAC'))
+                if identity and claim_board:
+                    self._leases.append(claim('board:' + identity))
                 self.firmware = firmware
                 self.connected = True
                 self.connecting = False
@@ -173,12 +183,15 @@ class Session:
             socket, self.socket = self.socket, None
             serial, self.serial = self.serial, None
             thread, self.thread = self.thread, None
+            leases, self._leases = self._leases, []
         if socket:
             socket.close(timeout=0.5)
         if serial:
             serial.stop()
         if thread and thread is not threading.current_thread():
             thread.join(timeout=1.0)
+        for lease in leases:
+            lease.close()
         self.on_state(False, reason)
 
     def _ws_open(self, generation, socket):

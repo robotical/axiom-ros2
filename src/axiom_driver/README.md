@@ -5,8 +5,19 @@ metadata and device lifetime (`core/registry.py`), decoding (`core/attributes.py
 `core/custom.py`, `core/decoding.py`), device clocks (`core/timing.py`), ordered
 processing (`core/pipeline.py`) and ROS message contracts (`ros_adapters.py`).
 The pure client has no `rclpy` dependency. The node owns a bounded receive queue,
-a decode/configuration worker and a four-thread ROS executor. Two RPC service slots
+a decode/configuration worker. Direct bridge execution uses a four-thread ROS
+executor; discovery manages its bridges with one ROS callback thread. Two RPC service slots
 leave room for disconnect/state callbacks while firmware requests wait.
+
+## Automatic discovery
+
+The normal entry point is `ros2 launch axiom_driver axiom.launch.py`. It discovers
+USB and mDNS-advertised Wi-Fi endpoints, verifies the firmware MAC, and runs one
+bridge per physical board. Names and frame prefixes are stable across replug and
+transport changes. USB is preferred. The retained `/axiom_discovery/boards`
+inventory reports board IDs and assigned namespaces. See
+[automatic startup](../../docs/automatic-startup.md) for optional identity rules,
+robot membership, endpoint fallbacks, manual control and ownership limits.
 
 ## Configuration
 
@@ -25,20 +36,21 @@ each board entry. See [sensor/board configuration](../../docs/sensors-and-boards
 
 Copy [config/axiom.yaml](config/axiom.yaml) and pass `params_file:=/absolute/path.yaml`.
 Explicit launch arguments override the file. Connection, reconnection and acquisition
-are manual by default for both launches and direct nodes. Startup parameters are
+are enabled by default. Set `auto_connect`, `auto_reconnect` and `autosub` to false
+for explicit manual operation. Startup parameters are
 read-only. Use services for runtime connection, subscription and sample-rate changes.
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `transport` | `ws` | `ws` or `serial` |
-| `device_uri` | `ws://192.168.1.7/ws` | Built-in example default; configure the actual board's framed `/ws` endpoint |
+| `device_uri` | empty | Configure an explicit framed `/ws` endpoint, or use discovery |
 | `ws_pcol` | `RICSerial` | HDLC-framed RIC; `RICFrame` requires matching firmware endpoint |
-| `serial.port`, `serial.baud` | `/dev/ttyUSB0`, `115200` | USB serial connection |
+| `serial.port`, `serial.baud` | empty, `115200` | Explicit USB serial connection |
 | `serial.mode` | `auto` | `auto`/`overascii` send OverAscii; `ascii` uses console REST |
 | `serial.timeout` | `0.02` | Serial read timeout in seconds |
-| `auto_connect`, `auto_reconnect` | false, false | Opt into startup connection and unexpected-loss retries |
+| `auto_connect`, `auto_reconnect` | true, true | Startup connection and unexpected-loss retries |
 | `reconnect_interval` | `2.0` | Minimum reconnect delay, seconds |
-| `autosub`, `publish_rate_hz` | false, `10.0` | Opt into devjson on connection; delivery rate, not sensor ODR |
+| `autosub`, `publish_rate_hz` | true, `10.0` | Acquire devjson on connection; delivery rate, not sensor ODR |
 | `publish_trigger` | `time` | `time`, `change`, `timeorchange` |
 | `rpc_default_timeout` | `3.0` | Response timeout, seconds, maximum 60 |
 | `metadata_refresh_s` | `30.0` | Refresh active device metadata; changed profiles retire old interfaces and timing |
@@ -101,8 +113,8 @@ Each YAML key is a namespace, e.g. `axiom/front`. Its values are driver paramete
 JSON map parameters can also be YAML mappings here. Each driver has independent
 connection, acquisition, metadata, queues and aliases. A frame prefix is derived
 from the namespace unless explicitly supplied. The launch rejects duplicate
-namespaces, frame prefixes and connections. Default connection and acquisition
-remain manual; call each board's services separately.
+namespaces, frame prefixes and connections. Default connection, recovery and acquisition
+are automatic. Set the three startup flags to false for manual service control.
 
 ## Topics
 
@@ -233,8 +245,10 @@ The node still publishes its connection diagnostics and retained inventory; inve
 ages normally while measurements are stopped. Starting `ros2 topic echo` creates a DDS
 subscriber; it does not request a firmware stream or change sensor sampling.
 
-For an explicitly unattended launch, set `auto_connect:=true autosub:=true
-auto_reconnect:=true`. These flags intentionally combine the manual steps.
+Automatic startup is the default. For an explicitly manual launch, set
+`auto_connect:=false autosub:=false auto_reconnect:=false`. With `autosub=true`,
+explicit connection requests acquisition too; use `autosub=false` to keep these
+steps separate.
 
 ## Recording and time
 

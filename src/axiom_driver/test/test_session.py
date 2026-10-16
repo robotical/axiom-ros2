@@ -2,6 +2,7 @@
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from http import HTTPStatus
 import json
 import threading
 import time
@@ -18,7 +19,7 @@ import websockets
 class FirmwareServer:
     """A real socket peer implementing firmware's numbered RICREST contract."""
 
-    def __init__(self):
+    def __init__(self, firmware=None):
         self.hdlc = MiniHDLC()
         self.paths = []
         self.commands = []
@@ -27,6 +28,7 @@ class FirmwareServer:
         self.respond = True
         self.drop_on_request = False
         self.callback = None
+        self.firmware = firmware or {}
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
         assert self.ready.wait(5)
@@ -36,13 +38,26 @@ class FirmwareServer:
         asyncio.set_event_loop(self.loop)
 
         async def start():
-            self.server = await websockets.serve(self.handle, '127.0.0.1', 0, close_timeout=0.2)
+            self.server = await websockets.serve(
+                self.handle, '127.0.0.1', 0, close_timeout=0.2,
+                process_request=self.http_request,
+            )
             self.port = self.server.sockets[0].getsockname()[1]
             self.ready.set()
 
         self.loop.run_until_complete(start())
         self.loop.run_forever()
         self.loop.close()
+
+    async def http_request(self, connection, request):
+        # websockets before v14 passes (path, headers); newer releases pass objects.
+        path = connection if isinstance(connection, str) else request.path
+        if path != '/api/v':
+            return None
+        body = json.dumps({'rslt': 'ok', **self.firmware})
+        if isinstance(connection, str):
+            return HTTPStatus.OK, [('Content-Type', 'application/json')], body.encode()
+        return connection.respond(HTTPStatus.OK, body)
 
     async def handle(self, socket, path=None):
         self.connections.add(socket)
@@ -59,6 +74,8 @@ class FirmwareServer:
                     request = frame[3:].rstrip(b'\0').decode()
                     self.paths.append(request)
                     response = {'rslt': 'ok', 'req': request, 'version': 'test-fw'}
+                    if request == 'v':
+                        response.update(self.firmware)
                 else:
                     request = json.loads(frame[3:].rstrip(b'\0'))
                     self.commands.append(request)

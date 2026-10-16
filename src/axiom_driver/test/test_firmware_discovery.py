@@ -87,7 +87,7 @@ def test_probe_returns_full_reply_after_closing_session(probe_session, options, 
 
     assert result is response
     probe_session.connect.assert_called_once_with(
-        '/virtual/axiom', transport='serial', timeout=expected_timeout,
+        '/virtual/axiom', transport='serial', timeout=expected_timeout, claim_board=False,
     )
     probe_session.close.assert_called_once_with()
 

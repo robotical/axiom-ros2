@@ -33,7 +33,10 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
     rclpy.init()
     bridges = []
     for name, peer in zip(('front', 'rear'), peers):
-        params = [Parameter('device_uri', value=peer.uri),
+        params = [Parameter('auto_connect', value=False),
+                  Parameter('auto_reconnect', value=False),
+                  Parameter('autosub', value=False),
+                  Parameter('device_uri', value=peer.uri),
                   Parameter('frame_id', value='axiom_' + name),
                   Parameter('stale_after_s', value=1.0),
                   Parameter('topic_aliases', value=json.dumps({

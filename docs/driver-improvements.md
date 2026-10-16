@@ -1,6 +1,6 @@
 # Host driver development plan
 
-Status: fixed-delay failed-probe retries implemented; Pi/Kilted retry check skipped at user request.
+Status: automatic USB/Wi-Fi startup implemented and validated; measurement/naming work remains.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -166,8 +166,8 @@ logged, and successful recognition is reported normally.
 
 Removed ports lose their previous check, retry deadline and error message;
 queued probes are cancelled and late results from removed attempts are discarded.
-Starting sensor drivers is a later increment. Existing launches and defaults
-remain unchanged.
+Single-board sensor driver startup was added in the following increment below.
+Existing launches and standalone bridge parameter defaults remain unchanged.
 
 On shutdown, the timer stops, queued work is cancelled and the worker finishes
 its active probe before the node is destroyed. Tests use controlled probes and
@@ -413,6 +413,106 @@ real Axiom; do not compete with a running driver or browser acquisition session.
 - The user explicitly chose to skip the Pi/Kilted retry check and proceed to
   automatic driver startup. This retry increment has Linux/Jazzy validation only.
 
+### 2026-10-16: single-board driver factory
+
+- Nikos added `_create_driver(port)`, which creates the existing host bridge in
+  `/axiom` using the discovery node's ROS context. It selects the supplied serial
+  port and enables automatic connection, reconnection and acquisition. Global
+  ROS arguments are ignored for the child so discovery-node options do not
+  override that configuration.
+- Review found no functional correction needed. The assistant reordered the
+  imports, capitalised Axiom in the docstring and added two tests: actual ROS
+  configuration/context isolation with conflicting global arguments, and serial
+  handshake plus acquisition subscription against a virtual firmware peer once
+  the returned driver is explicitly added to an executor.
+- Fresh Linux/Jazzy validation against `62cd98a` plus this increment: **all seven
+  packages built; 186 tests, zero errors, zero failures, four existing skips**.
+  ROS lint passed. Source was mounted read-only, domain 86 used Fast DDS with
+  localhost discovery, and no physical devices were passed through. No Pi/Kilted
+  or physical USB validation was performed for this increment.
+- At this stage, the helper was not yet called by discovery. Registering the
+  returned driver with an executor and managing its lifetime were left for the
+  next increment; fixed `/axiom` naming targets one board.
+
+### 2026-10-16: discovery owns the single-board host driver
+
+- Nikos wired successful verification into `_start_driver`, which registers one
+  bridge with discovery's executor. Removing its USB port detaches and destroys
+  that bridge before any replacement is started. Reappearance requires a fresh
+  verification, including when the OS assigns a different serial path.
+- The entry point now explicitly runs a `SingleThreadedExecutor`. Discovery and
+  bridge ROS callbacks run sequentially; probing, connection and decoding retain
+  their existing workers. Shutdown stops the executor, then cancels scanning,
+  destroys the managed bridge, finishes probe cleanup and releases ROS resources.
+- The assistant corrected `get_logger().ino` to `.info`, `_stop_Driver` to
+  `_stop_driver`, removed duplicated removal code and cleaned up whitespace.
+  No design changes were needed for this single-board increment.
+- Updated tests for one-time driver registration, non-Axiom/failed probes,
+  unplug/replug, changed port paths, enumeration failures, failed registration,
+  cleanup ordering and executor shutdown. Real ROS/virtual serial coverage now
+  exercises discovery's actual probe-to-driver handoff and replug, asserting
+  that serial owners never overlap and that shutdown closes the connection.
+- Fresh Linux/Jazzy validation against `62cd98a` plus the factory and lifecycle
+  increments: **all seven packages built; 193 tests, zero errors, zero failures,
+  four existing skips**. All 36 discovery cases and ROS lint passed. The source
+  was mounted read-only, domain 86 used Fast DDS with localhost discovery, and
+  no physical devices were passed through. No Pi/Kilted or physical USB
+  acceptance was performed for these increments.
+- An installed `ros2 run axiom_driver axiom_usb_discovery` smoke check stayed
+  alive across empty scans, logged waiting once and exited with code zero on
+  SIGINT without a traceback.
+- Only one bridge under `/axiom` is managed. Additional verified boards do not
+  replace the active driver; automatic selection of an already-checked second
+  board after the first disappears and independent multi-board namespaces remain
+  future work. This increment should be tested with one Axiom connected.
+
 For later entries, record: objective, behaviour/decision, changed files, tests and
 environment, hardware evidence (if any), commit and remaining issues. Add entries
 when a meaningful increment finishes or a decision changes.
+
+### 2026-10-16: complete the startup feedback
+
+- The user delegated the remaining startup work to the assistant. The normal
+  launch is now `ros2 launch axiom_driver axiom.launch.py`, requiring no board
+  file, USB path or IP. Connection, acquisition and recovery default to enabled;
+  all three flags can still be disabled for explicit manual operation.
+- Discovery manages one bridge per firmware MAC with stable `/axiom_<MAC>` names
+  and distinct frames. It re-verifies removed/reappearing endpoints, discards late
+  probes, retries exceptions and keeps other boards running independently.
+- Wi-Fi uses the existing Raft HTTP mDNS advertisement and a non-acquiring
+  `/api/v` check. USB wins over Wi-Fi for the same identity; transport changes
+  preserve namespace, manual disconnect and requested acquisition rate. The old
+  USB-only executable remains available. Firmware and Raft libraries were untouched.
+- Optional `id` rules extend the existing board-file format, applying names,
+  frames, aliases and driver parameters. Explicit endpoints still work. Setting
+  `discovery.include_unconfigured: false` selects a robot's boards on shared LANs;
+  ROS domains remain a host/process setting. Endpoint-only rules retain their
+  transport restrictions after a matching board's other transport remains visible.
+- Host sessions take per-user nonblocking endpoint and board locks. Probes claim
+  the serial endpoint but do not claim acquisition ownership; otherwise a live
+  Wi-Fi owner would prevent discovering its USB alternative. Discovery also checks
+  reconnected firmware identity before acquisition. Locks are advisory on one
+  computer; they cannot coordinate other computers or unrelated/older clients.
+- Updated the normal quick start, driver reference, sample configurations,
+  visualization walkthroughs, tmux guidance and clean validation dependencies.
+  Published wiki sources were prepared from these generic repository instructions.
+- Final Linux/Jazzy container result: **all seven packages built; 229 tests,
+  zero errors, zero failures, four existing skips**. Pi/Kilted: the same result
+  after an isolated rerun of the unchanged teaching-demo package. That replay
+  test intermittently lost samples/events on the Pi; no assertion was weakened
+  and no teaching-demo runtime code changed. The startup tests passed. A separate
+  host configuration/helper suite passed **17 tests**.
+- Actual Pi hardware: host firmware `0.1.19-devlib-host`, a physical Axiom on USB
+  and its mDNS-discovered Wi-Fi endpoint. Verified automatic acquisition, an IMU
+  alias, a distinct configured frame prefix, stable identity, USB-to-Wi-Fi fallback,
+  return to USB, one acquisition owner and retained manual stop/disconnect. Received
+  362 IMU messages and 45 raw packets; the short USB observation measured about
+  62 IMU messages/s. This is a received-rate observation, not a timing benchmark.
+- USB appearance/removal in the automated hardware check was controlled at the
+  discovery enumerator boundary while the cable stayed attached. Virtual serial
+  tests cover changed device paths; no physical cable/power-cycle claim is made.
+  Pi validation ran in a separate temporary workspace and ROS domain 87.
+- Validation logs: `/tmp/axiom-auto-startup-final-jazzy.log` on the Mac and
+  `/tmp/axiom-auto-startup-kilted-tests.log`,
+  `/tmp/axiom-auto-startup-kilted-teaching-recheck.log` and
+  `/tmp/axiom-real-startup-result.json` on the Pi.

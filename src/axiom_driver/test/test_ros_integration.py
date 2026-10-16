@@ -1,9 +1,11 @@
-"""Real rclpy messages, DDS fan-out and services against a socket firmware peer."""
+"""Real rclpy messages, DDS fan-out and services against virtual firmware peers."""
 
 import json
 import struct
 import threading
 import time
+from types import SimpleNamespace
+from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -12,6 +14,7 @@ rclpy = pytest.importorskip('rclpy')
 from axiom_driver.axiom_bridge_node import (  # noqa: E402,I100 (optional ROS imports)
     AxiomBridgeNode,
 )
+from axiom_driver.usb_discovery_node import UsbDiscoveryNode  # noqa: E402
 from axiom_interfaces.msg import (  # noqa: E402 (ROS is optional for pure tests)
     DeviceSample,
     VL53L4CDReading,
@@ -23,8 +26,13 @@ from axiom_interfaces.srv import (  # noqa: E402 (ROS is optional for pure tests
     PublishedDataSubscription,
     SetSampleRate,
 )
-from rclpy.executors import MultiThreadedExecutor  # noqa: E402 (ROS is optional for pure tests)
+from rclpy.context import Context  # noqa: E402 (ROS is optional for pure tests)
+from rclpy.executors import (  # noqa: E402 (ROS is optional for pure tests)
+    MultiThreadedExecutor,
+    SingleThreadedExecutor,
+)
 from rclpy.node import Node  # noqa: E402 (ROS is optional for pure tests)
+from rclpy.parameter import Parameter  # noqa: E402
 from rclpy.qos import (  # noqa: E402 (ROS is optional for pure tests)
     DurabilityPolicy,
     qos_profile_sensor_data,
@@ -32,6 +40,7 @@ from rclpy.qos import (  # noqa: E402 (ROS is optional for pure tests)
 )
 from sensor_msgs.msg import Imu, Range  # noqa: E402 (ROS is optional for pure tests)
 from std_msgs.msg import String  # noqa: E402 (ROS is optional for pure tests)
+from test_serial_integration import SerialFirmware  # noqa: E402 (ROS is optional for pure tests)
 from test_session import FirmwareServer  # noqa: E402 (ROS is optional for pure tests)
 
 
@@ -44,6 +53,92 @@ def wait_until(predicate, timeout=4):
     assert predicate(), 'Timed out waiting for ROS integration condition'
 
 
+def test_discovery_hands_serial_port_to_driver_and_restarts_it_after_replug(monkeypatch):
+    import serial
+
+    identity = '001122334455'
+    peer = SerialFirmware(version_response={'SystemName': 'Axiom018', 'MAC': identity})
+    serial_open = serial.Serial
+    opened = []
+
+    def open_virtual_serial(path, *args, **kwargs):
+        assert path == peer.path, 'This test must only open its virtual serial device'
+        assert all(not connection.is_open for connection in opened), 'Serial owners overlapped'
+        connection = serial_open(path, *args, **kwargs)
+        opened.append(connection)
+        return connection
+
+    monkeypatch.setattr(serial, 'Serial', open_virtual_serial)
+    candidate = SimpleNamespace(device=peer.path, vid=0x303A, pid=0x1001)
+    provider = Mock(return_value=[candidate])
+    context = Context()
+    rclpy.init(args=[], context=context)
+    executor = SingleThreadedExecutor(context=context)
+    discovery = spinning = None
+    driver = replacement = None
+    try:
+        discovery = UsbDiscoveryNode(
+            port_provider=provider, context=context, use_global_arguments=False,
+            parameter_overrides=[Parameter('boards_file', value='')],
+        )
+        assert not discovery._drivers
+        # Accelerate only the scan timer; use the real probe, driver and callbacks.
+        discovery._timer.timer_period_ns = 20_000_000
+
+        executor.add_node(discovery)
+        spinning = threading.Thread(target=executor.spin, daemon=True)
+        spinning.start()
+        wait_until(lambda: identity in discovery._drivers
+                   and discovery._drivers[identity][1]._subscribed)
+        driver = discovery._drivers[identity][1]
+        assert driver.session.connected
+        assert driver.context is context and driver in executor.get_nodes()
+        assert driver.get_fully_qualified_name() == f'/axiom_{identity}/axiom_bridge_node'
+
+        subscription = {
+            'cmdName': 'subscription',
+            'action': 'update',
+            'pubRecs': [{'name': 'devjson', 'rateHz': 10.0, 'trigger': 'time'}],
+        }
+        # One version request verifies the board; the second belongs to the driver.
+        assert list(peer.commands) == ['v', 'v', subscription]
+        assert len(opened) == 2 and not opened[0].is_open and opened[1].is_open
+        scans = provider.call_count
+        wait_until(lambda: provider.call_count >= scans + 3)
+        assert len(opened) == 2, 'Discovery must not reprobe a port owned by its driver'
+        assert discovery._drivers[identity][1] is driver
+        assert driver.session.firmware['SystemName'] == 'Axiom018'
+
+        provider.return_value = []
+        wait_until(lambda: not discovery._drivers and not driver._worker.is_alive())
+        assert driver not in executor.get_nodes()
+        assert not driver.session.connected and not driver._worker.is_alive()
+        assert all(not connection.is_open for connection in opened)
+
+        provider.return_value = [candidate]
+        wait_until(lambda: identity in discovery._drivers
+                   and discovery._drivers[identity][1]._subscribed)
+        replacement = discovery._drivers[identity][1]
+        assert replacement is not driver and replacement in executor.get_nodes()
+        assert replacement.session.connected
+        assert list(peer.commands) == ['v', 'v', subscription] * 2
+        assert len(opened) == 4
+        assert all(not connection.is_open for connection in opened[:-1])
+        assert opened[-1].is_open
+    finally:
+        executor.shutdown(timeout_sec=3)
+        if spinning is not None:
+            spinning.join(3)
+        if discovery is not None:
+            discovery.destroy_node()
+        context.shutdown()
+        peer.close()
+
+    assert all(not connection.is_open for connection in opened)
+    assert not replacement._worker.is_alive()
+    assert not replacement.session.connected
+
+
 def test_manual_connection_acquisition_stop_and_reconnect(catalogue):
     peer = FirmwareServer()
 
@@ -53,7 +148,9 @@ def test_manual_connection_acquisition_stop_and_reconnect(catalogue):
         return response
 
     peer.callback = reply
-    rclpy.init(args=['--ros-args', '-p', f'device_uri:={peer.uri}'])
+    rclpy.init(args=['--ros-args', '-p', f'device_uri:={peer.uri}',
+                     '-p', 'auto_connect:=false', '-p', 'auto_reconnect:=false',
+                     '-p', 'autosub:=false'])
     bridge = AxiomBridgeNode()
     probe = Node('manual_probe', use_global_arguments=False)
     executor = MultiThreadedExecutor(num_threads=4)

@@ -3,7 +3,8 @@
 Complete the [host-driver setup](../README.md), using a supported AMG8833 profile
 and a working USB or Wi-Fi connection. This example uses board key `axiom` and
 namespace `/axiom`; substitute another configured namespace throughout if needed.
-Keep `auto_connect`, `auto_reconnect` and `autosub` false. Attach the camera.
+Use the automatic startup defaults; remove explicit false overrides for
+`auto_connect`, `auto_reconnect` and `autosub` in this walkthrough. Attach the camera.
 
 The core build includes `axiom_thermal_viz` and its RViz configuration. The scenarios
 dashboard is optional. Run RViz in a graphical desktop session. If rebuilding or
@@ -25,22 +26,18 @@ inspection rather than starting a second driver.
 ## Terminal 1: driver
 
 ```bash
-ros2 launch axiom_driver axiom_minimal_launch.py \
-  namespace:=axiom boards_file:="$AXIOM_ROS_BOARDS_FILE"
+ros2 launch axiom_driver axiom.launch.py
 ```
 
 Leave it running.
 
-## Terminal 2: connect, acquire and inspect
+## Terminal 2: inspect
 
 ```bash
-ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
-ros2 service call /axiom/publish_data_subscription \
-  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
 ros2 topic list -t --no-daemon
 ```
 
-Both services should return `success: true`. Find the exact `thermal/grid` topic
+Discovery connects and starts acquisition automatically. Find the exact `thermal/grid` topic
 of type `axiom_interfaces/msg/ThermalGrid` and replace the placeholder:
 
 ```bash

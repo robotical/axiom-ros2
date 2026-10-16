@@ -1,6 +1,8 @@
 # Sensors and multiple Axioms
 
-Complete the [host-driver setup](../README.md) and leave acquisition running.
+Complete the [host-driver setup](../README.md) and leave discovery running.
+Automatic startup, stable board names and optional identity rules are described
+in [automatic startup](automatic-startup.md).
 The examples use the namespace `/axiom`. Substitute your configured namespace
 and the actual discovered sensor identities. `boards.yaml` describes board
 connections and optional aliases; sensors do not need to be listed individually.
@@ -152,12 +154,14 @@ ros2 service call /axiom/rear/publish_data_subscription \
 
 Each driver has independent connection, acquisition, metadata, queues, aliases and
 frame prefix. Duplicate namespaces, frame prefixes and configured endpoints are
-rejected within this launch. The check does not detect drivers in other launches
-or identify one physical board reached through different transports.
+rejected within this launch. Current host-driver sessions also take per-user endpoint and firmware-MAC locks
+on the same computer. Discovery deduplicates USB and Wi-Fi endpoints by firmware
+MAC; advisory locks do not coordinate other computers or unrelated applications.
 
-For unattended startup, opt into `auto_connect: true` and `autosub: true`.
-`auto_reconnect: true` separately enables unexpected-loss retries. The manual
-example above enables none of these flags.
+Automatic connection, recovery and acquisition are the defaults. The explicit
+manual example above disables all three flags. For automatic multi-board startup
+without endpoint configuration, use `axiom.launch.py` with optional identity rules
+as described in [automatic startup](automatic-startup.md).
 
 Stop echoes/viewers, then clean up in Terminal 2 while the launch is still running:
 

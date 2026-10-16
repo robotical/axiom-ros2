@@ -14,7 +14,7 @@ setup(
         ('share/' + package_name + '/launch', glob('launch/*.py')),
         ('share/' + package_name + '/config', glob('config/*.yaml')),
     ],
-    install_requires=['setuptools', 'pyserial>=3.5', 'websocket-client>=1.6'],
+    install_requires=['setuptools', 'pyserial>=3.5', 'websocket-client>=1.6', 'zeroconf>=0.38'],
     zip_safe=True,
     maintainer='Nikos',
     maintainer_email='nikos@robotical.io',
@@ -31,7 +31,8 @@ setup(
     entry_points={
         'console_scripts': [
             'axiom_bridge_node = axiom_driver.axiom_bridge_node:main',
-            'axiom_usb_discovery = axiom_driver.usb_discovery_node:main'
+            'axiom_usb_discovery = axiom_driver.usb_discovery_node:main',
+            'axiom_discovery = axiom_driver.discovery_node:main',
         ],
     },
 )

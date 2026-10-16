@@ -2,24 +2,27 @@
 
 import json
 from pathlib import Path
+import re
 
 import yaml
 
+from .core.ownership import endpoint_key, normalise_board_id
+
 DEFAULT_PARAMETERS = {
     'transport': 'ws',
-    'device_uri': 'ws://192.168.1.7/ws',
-    'auto_connect': False,
-    'auto_reconnect': False,
+    'device_uri': '',
+    'auto_connect': True,
+    'auto_reconnect': True,
     'reconnect_interval': 2.0,
     'frame_id': 'axiom',
     'sensor_frames': '{}',
     'topic_aliases': '{}',
     'ws_pcol': 'RICSerial',
-    'serial.port': '/dev/ttyUSB0',
+    'serial.port': '',
     'serial.baud': 115200,
     'serial.timeout': 0.02,
     'serial.mode': 'auto',
-    'autosub': False,
+    'autosub': True,
     'publish_rate_hz': 10.0,
     'publish_trigger': 'time',
     'rpc_default_timeout': 3.0,
@@ -34,6 +37,26 @@ DEFAULT_PARAMETERS = {
 }
 
 
+def board_parameters(namespace, values):
+    """Validate shared parameter types and derive a distinct board frame prefix."""
+    if not re.fullmatch(r'/[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*', namespace):
+        raise ValueError(f'Invalid board namespace: {namespace}')
+    if not isinstance(values, dict) or set(values) - DEFAULT_PARAMETERS.keys():
+        raise ValueError(f'Invalid driver parameters for {namespace}')
+    params = {**DEFAULT_PARAMETERS, 'frame_id': namespace.strip('/').replace('/', '_'), **values}
+    for key in ('topic_aliases', 'sensor_frames', 'sensor_qos.overrides'):
+        if isinstance(params[key], dict):
+            params[key] = json.dumps(params[key])
+    for key, default in DEFAULT_PARAMETERS.items():
+        value = params[key]
+        if type(value) is not type(default):
+            if isinstance(default, float) and type(value) is int:
+                params[key] = float(value)
+            else:
+                raise ValueError(f'{namespace}: {key} must be {type(default).__name__}')
+    return params
+
+
 def load_boards(filename):
     """Read the same board parameters for single/multiple launches and the guide."""
     config = yaml.safe_load(Path(filename).expanduser().read_text())
@@ -43,19 +66,7 @@ def load_boards(filename):
     boards, frames, connections = {}, set(), set()
     for namespace, values in rows.items():
         name = '/' + str(namespace).strip('/')
-        if name == '/' or not isinstance(values, dict) or set(values) - DEFAULT_PARAMETERS.keys():
-            raise ValueError(f'Invalid driver parameters for {name}')
-        params = {**DEFAULT_PARAMETERS, 'frame_id': name.strip('/').replace('/', '_'), **values}
-        for key in ('topic_aliases', 'sensor_frames', 'sensor_qos.overrides'):
-            if isinstance(params[key], dict):
-                params[key] = json.dumps(params[key])
-        for key, default in DEFAULT_PARAMETERS.items():
-            value = params[key]
-            if type(value) is not type(default):
-                if isinstance(default, float) and type(value) is int:
-                    params[key] = float(value)
-                else:
-                    raise ValueError(f'{name}: {key} must be {type(default).__name__}')
+        params = board_parameters(name, values)
         frame = params['frame_id']
         connection = (params['transport'], params['serial.port']
                       if params['transport'] == 'serial' else params['device_uri'])
@@ -65,3 +76,56 @@ def load_boards(filename):
         connections.add(connection)
         boards[name] = params
     return boards
+
+
+def load_discovery_config(filename):
+    """Read optional identity/endpoint rules from the existing board file format."""
+    settings = {'usb': True, 'wifi': True, 'include_unconfigured': True}
+    if not filename:
+        return settings, {}
+    config = yaml.safe_load(Path(filename).expanduser().read_text())
+    if not isinstance(config, dict) or set(config) - {'discovery', 'axioms'}:
+        raise ValueError('Expected discovery and/or axioms mappings in boards_file')
+    options, rows = config.get('discovery', {}), config.get('axioms', {})
+    if not isinstance(options, dict) or set(options) - settings.keys():
+        raise ValueError('Unknown discovery setting')
+    if any(type(value) is not bool for value in options.values()):
+        raise ValueError('Discovery settings must be booleans')
+    settings.update(options)
+    if not isinstance(rows, dict):
+        raise ValueError('axioms must be a mapping')
+    rules, identities, endpoints, frames = {}, set(), set(), set()
+    for namespace, values in rows.items():
+        name = '/' + str(namespace).strip('/')
+        if not isinstance(values, dict):
+            raise ValueError(f'Invalid board configuration for {name}')
+        parameters = {key: value for key, value in values.items() if key != 'id'}
+        params = board_parameters(name, parameters)
+        identity = normalise_board_id(values.get('id'))
+        if 'id' in values and identity is None:
+            raise ValueError(f'{name}: id must be a 12-digit firmware MAC')
+        transport = values.get('transport')
+        if transport is not None and transport not in ('serial', 'ws'):
+            raise ValueError(f'{name}: transport must be serial or ws')
+        if values.get('serial.port') and values.get('device_uri'):
+            raise ValueError(f'{name}: configure one endpoint, or use id for either transport')
+        address = values.get('serial.port') or values.get('device_uri')
+        if address:
+            inferred = 'serial' if values.get('serial.port') else 'ws'
+            if transport is not None and transport != inferred:
+                raise ValueError(f'{name}: transport does not match its endpoint')
+            transport = inferred
+        if not identity and not address:
+            raise ValueError(f'{name}: set id or an explicit endpoint')
+        endpoint = endpoint_key(transport, address) if address else None
+        if (name in rules or params['frame_id'] in frames
+                or identity and identity in identities or endpoint and endpoint in endpoints):
+            raise ValueError('Board namespace, frame_id, identity and endpoint must be unique')
+        identities.add(identity)
+        endpoints.add(endpoint)
+        frames.add(params['frame_id'])
+        rules[name] = {
+            'id': identity, 'transport': transport, 'address': address,
+            'endpoint': endpoint, 'parameters': params,
+        }
+    return settings, rules

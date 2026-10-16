@@ -27,6 +27,7 @@ from std_msgs.msg import String
 
 from .config import DEFAULT_PARAMETERS
 from .core.aliases import validate_aliases
+from .core.ownership import normalise_board_id
 from .core.pipeline import Pipeline
 from .core.registry import DeviceKey
 from .core.rpc import SessionError
@@ -82,6 +83,8 @@ class AxiomBridgeNode(Node):
         self._desired_connection = self.config['auto_connect']
         self._desired_rate = self.config['publish_rate_hz'] if self.config['autosub'] else 0.0
         self._subscribed = False
+        self._expected_identity = None  # Set by the discovery owner before executor registration.
+        self._identity_changed = False
         self._next_reconnect = 0.0
         self._connect_task = None
         self._last_rx = None
@@ -317,10 +320,12 @@ class AxiomBridgeNode(Node):
             raise SessionError('Connection already in progress')
         try:
             cfg = self.config
+            if self._stop.is_set():
+                raise SessionError('Node is shutting down')
             target = uri or (
                 cfg['serial.port'] if cfg['transport'] == 'serial' else cfg['device_uri']
             )
-            self.session.connect(
+            firmware = self.session.connect(
                 target,
                 transport=cfg['transport'],
                 ws_mode=cfg['ws_pcol'],
@@ -329,6 +334,12 @@ class AxiomBridgeNode(Node):
                 serial_timeout=cfg['serial.timeout'],
                 timeout=cfg['rpc_default_timeout'],
             )
+            if (self._expected_identity is not None
+                    and normalise_board_id(firmware.get('MAC')) != self._expected_identity):
+                self._identity_changed = True
+                raise SessionError('A different Axiom is using this endpoint; rediscover it')
+            if self._stop.is_set():
+                raise SessionError('Node is shutting down')
             if self._desired_rate > 0:
                 self.session.subscribe(
                     self._desired_rate, cfg['publish_trigger'], cfg['rpc_default_timeout']

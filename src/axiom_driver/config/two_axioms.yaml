@@ -1,5 +1,5 @@
 # Replace the USB paths with each board's /dev/serial/by-id path on Linux.
-# This starts two disconnected drivers; connect and enable acquisition yourself.
+# These explicitly configured drivers connect and acquire automatically.
 axioms:
   axiom/front:
     transport: serial

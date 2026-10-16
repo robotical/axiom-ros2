@@ -2,19 +2,19 @@
 /**:
   ros__parameters:
     transport: ws
-    device_uri: ws://192.168.1.7/ws
-    auto_connect: false
-    auto_reconnect: false
+    device_uri: ""
+    auto_connect: true
+    auto_reconnect: true
     reconnect_interval: 2.0
     frame_id: axiom
     sensor_frames: '{}'
     topic_aliases: '{}'
     ws_pcol: RICSerial
-    serial.port: /dev/ttyUSB0
+    serial.port: ""
     serial.baud: 115200
     serial.timeout: 0.02
     serial.mode: auto
-    autosub: false
+    autosub: true
     publish_rate_hz: 10.0
     publish_trigger: time
     rpc_default_timeout: 3.0

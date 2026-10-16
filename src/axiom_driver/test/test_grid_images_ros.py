@@ -41,7 +41,10 @@ def test_two_boards_grid_images_and_alias_lifetime(grid_profiles):
     probe = Node('grid_image_probe', use_global_arguments=False)
     executor.add_node(probe)
     for name, peer in zip(('axiom1', 'axiom2'), peers):
-        params = [Parameter('device_uri', value=peer.uri),
+        params = [Parameter('auto_connect', value=False),
+                  Parameter('auto_reconnect', value=False),
+                  Parameter('autosub', value=False),
+                  Parameter('device_uri', value=peer.uri),
                   Parameter('publish_custom_messages', value=False),
                   Parameter('frame_id', value=name),
                   Parameter('stale_after_s', value=10.0),

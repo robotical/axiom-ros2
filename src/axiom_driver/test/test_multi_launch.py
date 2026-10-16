@@ -4,6 +4,7 @@ import json
 import os
 import signal
 import subprocess
+import time
 
 import pytest
 
@@ -17,7 +18,10 @@ def test_installed_multi_board_launch(tmp_path):
     peers = [FirmwareServer(), FirmwareServer()]
     config = tmp_path / 'boards.yaml'
     config.write_text(json.dumps({'axioms': {
-        'axiom/' + name: {'transport': 'ws', 'device_uri': peer.uri}
+        'axiom/' + name: {
+            'transport': 'ws', 'device_uri': peer.uri,
+            'auto_connect': False, 'auto_reconnect': False, 'autosub': False,
+        }
         for name, peer in zip(('front', 'rear'), peers)}}))
     log = (tmp_path / 'launch.log').open('w+')
     launch = subprocess.Popen([
@@ -115,3 +119,57 @@ def test_installed_single_board_uses_machine_config_and_cli_overrides(tmp_path):
         print(log.read())
         log.close()
         peer.close()
+
+
+def test_installed_discovery_launch_automatically_starts_configured_boards(tmp_path):
+    identities = ['001122334455', 'aabbccddeeff']
+    peers = [FirmwareServer(firmware={'SystemName': 'Axiom018', 'MAC': identity})
+             for identity in identities]
+    config = tmp_path / 'automatic boards.yaml'
+    config.write_text(json.dumps({
+        'discovery': {'usb': False, 'wifi': False, 'include_unconfigured': False},
+        'axioms': {'automatic/' + name: {'device_uri': peer.uri}
+                   for name, peer in zip(('front', 'rear'), peers)},
+    }))
+    log = (tmp_path / 'automatic-launch.log').open('w+')
+    process = subprocess.Popen([
+        'ros2', 'launch', 'axiom_driver', 'axiom.launch.py',
+        'boards_file:=' + str(config)], stdout=log, stderr=subprocess.STDOUT,
+        start_new_session=True)
+    rclpy.init()
+    probe = rclpy.create_node('automatic_launch_probe')
+    try:
+        for name in ('front', 'rear'):
+            client = probe.create_client(
+                GetConnectionState, f'/automatic/{name}/get_connection_state')
+            assert client.wait_for_service(timeout_sec=12)
+            deadline = time.monotonic() + 6
+            connected = False
+            while not connected and time.monotonic() < deadline:
+                future = client.call_async(GetConnectionState.Request())
+                rclpy.spin_until_future_complete(probe, future, timeout_sec=2)
+                assert future.done()
+                connected = future.result().connected
+            assert connected
+            probe.destroy_client(client)
+        assert all(len(peer.connections) == 1 for peer in peers)
+        # Acquisition starts without either a Connect or Subscription service call.
+        deadline = time.monotonic() + 3
+        while not all(peer.commands for peer in peers) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert all(any(cmd.get('cmdName') == 'subscription' for cmd in peer.commands)
+                   for peer in peers)
+    finally:
+        probe.destroy_node()
+        rclpy.shutdown()
+        os.killpg(process.pid, signal.SIGINT)
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=3)
+        log.seek(0)
+        print(log.read())
+        log.close()
+        for peer in peers:
+            peer.close()

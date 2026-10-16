@@ -61,147 +61,80 @@ The dependency step also installs the core visualisation dependencies. A graphic
 desktop is needed on the computer running RViz or a viewer; the driver can run
 without a desktop.
 
-## 2. Configure the host and board
+## 2. Start automatically
 
-From the repository root, create only missing local configuration files:
-
-```bash
-if [[ ! -e config/machine.env ]]; then
-  cp config/machine.env.example config/machine.env
-fi
-if [[ ! -e config/boards.yaml ]]; then
-  cp config/boards.yaml.example config/boards.yaml
-fi
-```
-
-Both files are ignored by Git. Existing files are preserved. Edit
-`config/machine.env` for the ROS installation on your host:
+Connect a host-firmware Axiom over USB, or power a Wi-Fi Axiom on the same local
+network. From the checkout:
 
 ```bash
-ROS_SETUP_FILE=/opt/ros/jazzy/setup.bash
-ROS_DOMAIN_ID=0
-AXIOM_ROS_BOARDS_FILE="$AXIOM_ROS_ROOT/config/boards.yaml"
+source scripts/setup_env.sh
+ros2 launch axiom_driver axiom.launch.py
 ```
 
-The workspace defaults to this checkout. Set `ROS_WORKSPACE` only if you built in
-a separate workspace. All ROS processes in this session must use the same domain
-and compatible middleware settings. The setup script prepares a terminal; it starts
-no nodes.
+No board file, serial path or IP address is required. With no boards, discovery
+waits quietly. Verified boards connect and start acquisition automatically; each
+gets a stable namespace `/axiom_<firmware-MAC>`. Multiple boards run independently,
+and a board visible over USB and Wi-Fi gets one bridge, preferring USB.
 
-Choose either USB or Wi-Fi below, keeping one `axioms` mapping in `config/boards.yaml`.
-The board key `axiom` selects the example namespace `/axiom`; it is not a hardware ID.
-
-### USB
-
-Find the stable Linux device path:
+For USB, ensure your account can access the port. On systems using `dialout`:
 
 ```bash
 ls -l /dev/serial/by-id/
-```
-
-Configure the actual device path:
-
-```yaml
-axioms:
-  axiom:
-    transport: serial
-    serial.port: /dev/serial/by-id/REPLACE_WITH_AXIOM_DEVICE
-    auto_connect: false
-    auto_reconnect: false
-    autosub: false
-```
-
-If no by-id path is supplied, use the actual `/dev/ttyACM…` or `/dev/ttyUSB…` path.
-Check its permissions and your account's groups:
-
-```bash
-ls -l /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
 id -nG
-```
-
-If the device belongs to `dialout` and your account is not a member:
-
-```bash
+# Only if your account is missing the device's group:
 sudo usermod -aG dialout "$USER"
 ```
 
-Log out and back in before connecting. Use one application with the serial device
-at a time; close an updater, serial monitor or USB router using this board first.
+Log out and back in after changing groups. Close updaters, serial monitors and USB
+routers using the same board. Wi-Fi discovery uses the firmware's mDNS HTTP
+advertisement; the network must allow multicast. An explicit endpoint remains
+available when multicast is blocked.
 
-### Wi-Fi
-
-Connect Axiom to your Wi-Fi network first. Replace the illustrative address
-`192.0.2.10` with its reachable IP in both the board file and the check below:
-
-```yaml
-axioms:
-  axiom:
-    transport: ws
-    device_uri: ws://192.0.2.10/ws
-    auto_connect: false
-    auto_reconnect: false
-    autosub: false
-```
+The optional `config/machine.env` selects a host's ROS setup, workspace and domain:
 
 ```bash
-curl --max-time 5 http://192.0.2.10/api/v
+# Create only if you need host-specific settings; preserve an existing file.
+if [[ ! -e config/machine.env ]]; then
+  cp config/machine.env.example config/machine.env
+fi
 ```
 
-Expect a JSON reply with `rslt` equal to `ok` and a firmware version. This checks
-reachability; the driver uses the framed `/ws` endpoint for control and data.
+Edit `ROS_SETUP_FILE` for your installed distribution, for example
+`/opt/ros/kilted/setup.bash` or `/opt/ros/jazzy/setup.bash`. All participating ROS
+terminals must share a domain and compatible middleware settings. Sourcing the
+setup script prepares a terminal without starting nodes.
 
-Sensors are discovered automatically. `boards.yaml` configures boards and optional
-aliases, rather than a required list of sensors. The single-board launch loads the
-[driver defaults](src/axiom_driver/config/axiom.yaml), then board settings, then
-explicit launch arguments. The multi-board launch uses the same driver defaults
-and each board's settings.
+See [automatic startup](docs/automatic-startup.md) for optional board names, aliases,
+shared-network board selection, explicit endpoints and manual startup. Existing
+board files can still name configured endpoints. New identity rules need no
+endpoint. For example, a rule named `axiom` makes a selected board use `/axiom`
+for the optional viewer examples below.
 
 ### Optional tmux consoles
-
-After building and configuring the host, run from an outer terminal at the checkout:
 
 ```bash
 sudo apt install tmux
 bash scripts/ros_tmux.sh
 ```
 
-The helper opens four empty panes labelled **Terminal 1–4**. New panes automatically
-load `scripts/setup_env.sh`; start the driver and service calls yourself. Use the
-labels rather than screen positions. Press Ctrl+b, release both keys, then an arrow
-to switch panes, z to zoom, or d to detach. Rerun the helper to reattach.
+The helper opens four prepared consoles without starting a driver. Run the launch
+above in Terminal 1. New panes load the ROS environment automatically; after a
+rebuild, source `scripts/setup_env.sh` in reused panes. See [tmux controls](docs/tmux.md).
 
-See [tmux controls](docs/tmux.md) for copy/paste, scrolling and environment refresh.
-In separate terminal windows, change to the checkout and source
-`scripts/setup_env.sh` in each one. Do the same in reused panes after a rebuild.
+## 3. Inspect a measurement
 
-## 3. Connect and inspect a measurement
-
-In **Terminal 1**, from the repository root:
+Leave discovery running. In a second prepared terminal:
 
 ```bash
 source scripts/setup_env.sh
-ros2 launch axiom_driver axiom_minimal_launch.py \
-  namespace:=axiom boards_file:="$AXIOM_ROS_BOARDS_FILE"
-```
-
-Leave it running. The configuration above starts disconnected with acquisition off.
-
-In **Terminal 2**:
-
-```bash
-source scripts/setup_env.sh
-ros2 service call /axiom/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
-ros2 service call /axiom/publish_data_subscription \
-  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
+ros2 topic echo /axiom_discovery/boards --qos-durability transient_local --once
 ros2 topic list -t --no-daemon
 ```
 
-Both services should return `success: true`. The empty URI uses the board's configured
-USB port or Wi-Fi endpoint. Connection alone does not enable acquisition. The 20 Hz
-request controls firmware packet delivery, not each sensor's sampling rate.
-
-For a connected supported IMU, find its full `sensor_msgs/msg/Imu` topic ending in
-`/imu/data_raw`. Replace the placeholder below with that discovered path:
+The board inventory reports each ID, namespace, transport and connection state.
+Sensors are discovered automatically; they do not need entries in a board file.
+For a supported IMU, copy its full `sensor_msgs/msg/Imu` topic ending in
+`/imu/data_raw`:
 
 ```bash
 IMU_TOPIC='PASTE_DISCOVERED_IMU_TOPIC_HERE'
@@ -210,22 +143,15 @@ ros2 topic echo "$IMU_TOPIC" sensor_msgs/msg/Imu \
 ros2 topic hz "$IMU_TOPIC"
 ```
 
-The echo prints X/Y/Z acceleration in m/s², including gravity. The six-axis message
-also contains angular velocity in rad/s, with no fused orientation. For another
-sensor, choose its published topic and ROS type. On Jazzy, `topic hz` uses sensor-data
-QoS by default. Its received message rate can differ from the requested delivery
-rate because sensors sample independently and firmware can batch samples.
+Acceleration is in m/s², including gravity; gyroscope values are in rad/s. The IMU
+has no fused orientation. Packet delivery defaults to 10 Hz; a sensor's message
+rate can differ because its sampling and firmware batching are independent.
+Stop the rate command with Ctrl+C. Viewers subscribe to ROS topics and need no
+additional connection or acquisition calls.
 
-Stop the rate command with Ctrl+C. To inspect inventory:
-
-```bash
-ros2 topic echo /axiom/devices --qos-durability transient_local --once
-```
-
-An echo or viewer subscribes to ROS topics; it does not start firmware acquisition.
-See [sensors and multiple boards](docs/sensors-and-boards.md) for aliases, commands
-and reconnecting. After reconnecting an Axiom with manual settings, request
-acquisition again.
+The remaining examples use a configured board name `/axiom`. Replace it with your
+actual namespace, or add that optional name through the board file. See
+[sensors and multiple boards](docs/sensors-and-boards.md) for services and aliases.
 
 ## 4. Optional acceleration display in RViz
 

@@ -19,7 +19,8 @@ def test_board_file_normalizes_names_frames_and_mapping_parameters(tmp_path):
     assert boards['/axiom/usb']['frame_id'] == 'axiom_usb'
     assert json.loads(boards['/axiom/usb']['topic_aliases'])['imu/data_raw']['type'] == 'LSM6DS'
     assert boards['/axiom/wifi']['publish_rate_hz'] == 20.0
-    assert all(not b['auto_connect'] and not b['autosub'] for b in boards.values())
+    assert all(b['auto_connect'] and b['auto_reconnect'] and b['autosub']
+               for b in boards.values())
 
 
 @pytest.mark.parametrize('rows, message', [

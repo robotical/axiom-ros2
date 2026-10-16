@@ -83,7 +83,9 @@ and restart.
 
 In `config/boards.yaml`, use board key `axiom1` for this example. If renaming the
 earlier `axiom` key, stop its driver first, preserve the USB or Wi-Fi settings,
-and keep `auto_connect`, `auto_reconnect` and `autosub` false. Merge this alias
+and use automatic startup: remove explicit false overrides for
+`auto_connect`, `auto_reconnect` and `autosub`. An identity rule can select the
+board without a USB path or IP; see [automatic startup](../../docs/automatic-startup.md). Merge this alias
 into the board's existing `topic_aliases` mapping:
 
 ```yaml
@@ -107,28 +109,24 @@ or reused panes after a rebuild, source `scripts/setup_env.sh` first.
 Terminal 1:
 
 ```bash
-ros2 launch axiom_driver axiom_minimal_launch.py \
-  namespace:=axiom1 boards_file:="$AXIOM_ROS_BOARDS_FILE"
+ros2 launch axiom_driver axiom.launch.py
 ```
 
 Terminal 2:
 
 ```bash
-ros2 service call /axiom1/connect axiom_interfaces/srv/Connect '{device_uri: ""}'
-ros2 service call /axiom1/publish_data_subscription \
-  axiom_interfaces/srv/PublishedDataSubscription '{rate_hz: 20.0}'
 ros2 topic list -t --no-daemon
 ros2 topic info /axiom1/thermal/image
 ros2 topic echo /axiom1/thermal/image --once --qos-reliability best_effort
 ```
 
-Expect both service replies to say `success: true`, and the topic to be
+Discovery connects and acquires automatically. Expect the topic to be
 `sensor_msgs/msg/Image` with one publisher. A frame has width/height 8, encoding
 `32FC1`, `is_bigendian: 0`, `step: 32`, and 256 bytes representing 64 little-endian
 float32 temperatures in °C. Its header has the sample timestamp and sensor frame.
 The `thermal/grid` topic remains available for RViz.
 
-The camera must be connected with a supported firmware profile. The 20 Hz request
+The camera must be connected with a supported firmware profile. The publication rate
 controls delivery, not camera sampling. An echo or viewer alone does not enable
 acquisition.
 
@@ -189,7 +187,7 @@ for display controls.
 
 [two-axiom-imu.json](two-axiom-imu.json) plots X/Y/Z acceleration and angular
 velocity for `/axiom1/imu/data_raw` and `/axiom2/imu/data_raw`. Use board keys
-`axiom1` and `axiom2`, each with its actual endpoint and this alias fragment:
+`axiom1` and `axiom2`, each with its firmware `id` or explicit endpoint and this alias fragment:
 
 ```yaml
     topic_aliases:
@@ -198,7 +196,8 @@ velocity for `/axiom1/imu/data_raw` and `/axiom2/imu/data_raw`. Use board keys
 
 Each alias needs exactly one matching online IMU; use bus/address selectors if
 needed. Follow the [multi-board workflow](../../docs/sensors-and-boards.md#multiple-boards)
-with those namespace names to launch, connect and request acquisition separately.
+with those namespace names and automatic startup. Both boards connect and acquire
+automatically; explicit manual control remains available.
 Use a single Foxglove bridge for the ROS session.
 
 Import `examples/foxglove/two-axiom-imu.json` on the viewer computer using the
