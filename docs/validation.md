@@ -6,6 +6,36 @@ current installation and firmware selection. Historical firmware versions, test
 environments and sensor identities below describe those checks, not requirements
 for a user's host or boards. Results apply to their recorded source snapshots.
 
+## Foxglove sound layout — 2026-10-16
+
+The [sound demo](../examples/foxglove/sound-demo.md) adds a single-import layout
+with six scalar time plots, a latest-message nine-band spectrum and a guide panel.
+All 15 scalar attributes use the existing Float64 outputs. Its embedded user
+script reads the timestamped DeviceSample JSON through a sensor alias; no ROS
+driver, interface or firmware changes are needed for this layout.
+
+Validation completed with Node.js 24.14.0: **eight focused tests passed**, covering
+the actual descriptor's scalar coverage and frequency labels, embedded-source
+consistency, panel references, engineering/negative values, invalid bins,
+malformed input and recovery. Run them from the repository root:
+
+```bash
+node --test examples/foxglove/test_sound_demo.mjs
+```
+
+All seven Plot settings, the Markdown settings and UserScript payload round-trip
+exactly through the official Foxglove SDK 0.29.2 configuration classes, with
+configured enum values checked. TypeScript 7.0.2 passes strict no-emit checking
+against a representative generated ROS input/Header schema. The documented
+16-alias YAML fragment validates through the real driver alias helpers, binds
+to one sensor and remains unbound for ambiguous matches. Local documentation
+links resolve, all seven shell blocks pass `bash -n`, and `git diff --check`
+passes.
+
+These are source/configuration checks with synthetic samples. Live Foxglove
+script compilation/layout import/rendering, DDS delivery from a physical sound
+sensor and Pi/Kilted acceptance were not exercised in this run.
+
 ## Host grid images — 2026-10-14
 
 The host driver now adds `thermal/image` and `range/image` as standard

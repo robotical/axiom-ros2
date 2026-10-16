@@ -11,9 +11,12 @@ Ready-made layouts:
 |---|---|
 | [one-axiom-thermal.json](one-axiom-thermal.json) | One AMG8833 8×8 thermal Image panel |
 | [two-axiom-imu.json](two-axiom-imu.json) | Acceleration and angular velocity plots for two boards |
+| [one-axiom-sound.json](one-axiom-sound.json) | All sound scalars and the latest nine-band spectrum, with an embedded user script |
 
-Both use example board namespaces. Match those namespaces/aliases in your board
+These use example board namespaces. Match those namespaces/aliases in your board
 configuration, or select your actual topics in the imported panel settings.
+For the sound sensor's alias configuration, script and walkthrough, see
+[Sound sensor demo](sound-demo.md).
 
 ## Install the bridge and connect a viewer
 

@@ -1,0 +1,325 @@
+{
+  "configById": {
+    "Markdown!axiom1soundguide": {
+      "foxglovePanelTitle": "Axiom 1: Sound guide",
+      "renderMode": "static",
+      "fontSize": 12,
+      "markdown": "**Robotical sound sensor** · 30-second scalar history\n\n**Spectrum index → Hz:** 0 → 31.5 · 1 → 63 · 2 → 125 · 3 → 250 · 4 → 500 · 5 → 1k · 6 → 2k · 7 → 4k · 8 → 8k\n\nThe spectrum shows the latest nine band levels, with gaps for invalid bins. dBA and dB use separate plots; calibration/reference follows the sensor. Flux is the firmware value. Status is an undecoded bitmask; seq and clipCount are 8-bit values.\n\nScalar plots use receipt time. The script retains the sample header. Check `/axiom1/devices` for freshness: disconnecting can leave the last spectrum visible. This sensor reports features, not recorded audio."
+    },
+    "Plot!axiom1soundspl": {
+      "foxglovePanelTitle": "Axiom 1: Sound pressure levels",
+      "paths": [
+        {
+          "value": "/axiom1/sound/splSlow.data",
+          "label": "splSlow",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/splFast.data",
+          "label": "splFast",
+          "color": "#efb34c",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Level (dBA)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom1soundlevels": {
+      "foxglovePanelTitle": "Axiom 1: Signal levels",
+      "paths": [
+        {
+          "value": "/axiom1/sound/rms.data",
+          "label": "rms",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/peak.data",
+          "label": "peak",
+          "color": "#efb34c",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/crest.data",
+          "label": "crest",
+          "color": "#20c7a2",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Level / crest factor (dB)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom1soundhealth": {
+      "foxglovePanelTitle": "Axiom 1: Sequence, status and clipping",
+      "paths": [
+        {
+          "value": "/axiom1/sound/seq.data",
+          "label": "seq",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime",
+          "lineInterpolation": "step"
+        },
+        {
+          "value": "/axiom1/sound/status.data",
+          "label": "status",
+          "color": "#efb34c",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime",
+          "lineInterpolation": "step"
+        },
+        {
+          "value": "/axiom1/sound/clipCount.data",
+          "label": "clipCount",
+          "color": "#20c7a2",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime",
+          "lineInterpolation": "step"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Firmware value (0–255)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "minYValue": 0,
+      "maxYValue": 255
+    },
+    "Plot!axiom1soundspectrum": {
+      "foxglovePanelTitle": "Axiom 1: Latest sound spectrum",
+      "paths": [
+        {
+          "value": "/foxglove_script/axiom1/sound/spectrum.bands_db[:]",
+          "label": "Band level",
+          "color": "#34b8dc",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "index",
+      "xAxisLabel": "Band index (frequency key in Sound guide)",
+      "yAxisLabel": "Band level (dB)",
+      "isSynced": false,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true
+    },
+    "Plot!axiom1soundfrequency": {
+      "foxglovePanelTitle": "Axiom 1: Spectral frequencies",
+      "paths": [
+        {
+          "value": "/axiom1/sound/centroid.data",
+          "label": "centroid",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/spread.data",
+          "label": "spread",
+          "color": "#efb34c",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/rolloff85.data",
+          "label": "rolloff85",
+          "color": "#20c7a2",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/f0.data",
+          "label": "f0",
+          "color": "#6557e8",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Frequency (Hz)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "minYValue": 0
+    },
+    "Plot!axiom1soundratios": {
+      "foxglovePanelTitle": "Axiom 1: Spectral ratios",
+      "paths": [
+        {
+          "value": "/axiom1/sound/zcr.data",
+          "label": "zcr",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/axiom1/sound/flatness.data",
+          "label": "flatness",
+          "color": "#efb34c",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Dimensionless",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "minYValue": 0,
+      "maxYValue": 1
+    },
+    "Plot!axiom1soundflux": {
+      "foxglovePanelTitle": "Axiom 1: Spectral flux",
+      "paths": [
+        {
+          "value": "/axiom1/sound/flux.data",
+          "label": "flux",
+          "color": "#d64cde",
+          "enabled": true,
+          "showLine": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "xAxisVal": "timestamp",
+      "xAxisLabel": "Time (s)",
+      "xAxisDisplayMethod": "relative",
+      "yAxisLabel": "Firmware value (0–255)",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 30,
+      "playbackBarPosition": "right",
+      "isSynced": true,
+      "showLegend": true,
+      "legendDisplay": "top",
+      "showPlotValuesInLegend": true,
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showYAxisGridLines": true,
+      "minYValue": 0,
+      "maxYValue": 255
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {
+    "e50638aa-4f54-4f13-a50d-8e301dfd35bd": {
+      "name": "Axiom sound spectrum",
+      "sourceCode": "// Embedded in one-axiom-sound.json as the \"Axiom sound spectrum\" user script.\n// These are already decoded engineering values: do not apply offsets again.\nimport type { Input, Message } from \"./types.ts\";\n\ntype Output = {\n  header: Message<\"std_msgs/msg/Header\">;\n  frequency_hz: number[];\n  bands_db: number[];\n};\n\ntype BandEntry = {\n  value?: unknown;\n  unit?: unknown;\n  valid?: unknown;\n};\n\nexport const inputs = [\"/axiom1/sound/sample\"];\nexport const output = \"/foxglove_script/axiom1/sound/spectrum\";\n\nexport default function script(event: Input<\"/axiom1/sound/sample\">): Output | undefined {\n  if (event.message.device_type !== \"RoboticalSoundSensor\") {\n    return undefined;\n  }\n\n  let values: { bands?: BandEntry } | null;\n  try {\n    values = JSON.parse(event.message.values_json);\n  } catch {\n    return undefined;\n  }\n\n  const bands = values?.bands;\n  if (\n    bands?.unit !== \"dB\" ||\n    !Array.isArray(bands.value) ||\n    bands.value.length !== 9 ||\n    (Array.isArray(bands.valid) && bands.valid.length !== 9)\n  ) {\n    return undefined;\n  }\n\n  const validity = bands.valid;\n  return {\n    header: event.message.header,\n    // Fixed order from the RoboticalSoundSensor descriptor's bands.el labels.\n    frequency_hz: [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000],\n    bands_db: bands.value.map((value, index) =>\n      validity === false ||\n      (Array.isArray(validity) && validity[index] !== true) ||\n      typeof value !== \"number\" ||\n      !Number.isFinite(value)\n        ? NaN\n        : value,\n    ),\n  };\n}\n"
+    }
+  },
+  "linkedGlobalVariables": [],
+  "playbackConfig": {
+    "speed": 1,
+    "messageOrder": "receiveTime"
+  },
+  "layout": {
+    "direction": "row",
+    "splitPercentage": 45,
+    "first": {
+      "direction": "column",
+      "splitPercentage": 50,
+      "first": {
+        "direction": "column",
+        "splitPercentage": 40,
+        "first": "Markdown!axiom1soundguide",
+        "second": "Plot!axiom1soundspl"
+      },
+      "second": {
+        "direction": "column",
+        "splitPercentage": 50,
+        "first": "Plot!axiom1soundlevels",
+        "second": "Plot!axiom1soundhealth"
+      }
+    },
+    "second": {
+      "direction": "column",
+      "splitPercentage": 60,
+      "first": {
+        "direction": "column",
+        "splitPercentage": 50,
+        "first": "Plot!axiom1soundspectrum",
+        "second": "Plot!axiom1soundfrequency"
+      },
+      "second": {
+        "direction": "column",
+        "splitPercentage": 50,
+        "first": "Plot!axiom1soundratios",
+        "second": "Plot!axiom1soundflux"
+      }
+    }
+  }
+}
