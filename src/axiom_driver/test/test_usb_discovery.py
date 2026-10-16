@@ -55,7 +55,14 @@ def probe_pool(discovery_module, monkeypatch):
 
 
 @pytest.fixture
-def make_node(discovery_module, probe_pool, monkeypatch):
+def retry_clock(discovery_module, monkeypatch):
+    clock = Mock(return_value=100.0)
+    monkeypatch.setattr(discovery_module, 'monotonic', clock)
+    return clock
+
+
+@pytest.fixture
+def make_node(discovery_module, probe_pool, retry_clock, monkeypatch):
     context = Context()
     rclpy.init(args=[], context=context)
     executor = SingleThreadedExecutor(context=context)
@@ -225,6 +232,123 @@ def test_rejected_or_failed_probe_is_reported_once_without_stopping_node(
         logger.warning.assert_not_called()
 
 
+def test_failed_probe_retries_after_delay_without_disturbing_other_boards(
+    make_node, probe_pool, retry_clock,
+):
+    first = port('/virtual/first', vid=0x303A, pid=0x1001)
+    second = port('/virtual/second', vid=0x303A, pid=0x1001)
+    node, logger, _, _ = make_node(Mock(return_value=[first, second]))
+    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
+    probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
+    node._scan()
+
+    retry_clock.return_value = 104.99
+    node._scan()
+    assert probe_pool.pool.submit.call_count == 2
+
+    retry_clock.return_value = 105.0
+    node._scan()
+    assert probe_pool.pool.submit.call_count == 3
+    assert probe_pool.jobs[2].args == (first.device,)
+
+    # Passing another deadline cannot create a duplicate while this retry runs.
+    retry_clock.return_value = 1000.0
+    node._scan()
+    assert probe_pool.pool.submit.call_count == 3
+
+    probe_pool.jobs[2].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
+    node._scan()
+    retry_clock.return_value = 2000.0
+    node._scan()
+
+    assert probe_pool.pool.submit.call_count == 3
+    logger.info.assert_called_with('Axiom verified: /virtual/first (Axiom018)')
+    logger.warning.assert_called_once_with('USB probe failed for /virtual/first: RPC timed out')
+
+
+@pytest.mark.parametrize('response', [None, {'rslt': 'ok', 'SystemName': 'Axiom018'}])
+def test_completed_recognition_is_not_retried_after_delay(
+    make_node, probe_pool, retry_clock, response,
+):
+    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
+    node, logger, _, _ = make_node(Mock(return_value=[candidate]))
+    probe_pool.jobs[0].future.set_result(response)
+    node._scan()
+
+    retry_clock.return_value = 1000.0
+    node._scan()
+
+    assert probe_pool.pool.submit.call_count == 1
+    logger.warning.assert_not_called()
+
+
+def test_repeated_failure_is_quiet_but_changed_error_and_recovery_are_reported(
+    make_node, probe_pool, retry_clock,
+):
+    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
+    node, logger, _, _ = make_node(Mock(return_value=[candidate]))
+    for index, message in enumerate(['Port busy', 'Port busy', 'RPC timed out']):
+        probe_pool.jobs[index].future.set_exception(RuntimeError(message))
+        node._scan()
+        assert logger.warning.call_count == (1 if index < 2 else 2)
+
+        retry_clock.return_value += 5.0
+        node._scan()
+        assert probe_pool.pool.submit.call_count == index + 2
+
+    probe_pool.jobs[3].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
+    node._scan()
+    logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
+    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: Port busy')
+    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: RPC timed out')
+
+
+def test_replug_clears_retry_delay_and_previous_error(make_node, probe_pool, retry_clock):
+    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
+    provider = Mock(return_value=[candidate])
+    node, logger, _, _ = make_node(provider)
+    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
+    node._scan()
+
+    retry_clock.return_value = 101.0
+    provider.return_value = []
+    node._scan()
+    provider.return_value = [candidate]
+    node._scan()
+    assert probe_pool.pool.submit.call_count == 2
+
+    probe_pool.jobs[1].future.set_exception(RuntimeError('RPC timed out'))
+    node._scan()
+    assert logger.warning.call_count == 2
+
+
+def test_enumeration_error_preserves_retry_delay_and_quiet_error_state(
+    make_node, probe_pool, retry_clock,
+):
+    candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
+    provider = Mock(return_value=[candidate])
+    node, logger, _, _ = make_node(provider)
+    probe_pool.jobs[0].future.set_exception(RuntimeError('RPC timed out'))
+    node._scan()
+
+    retry_clock.return_value = 104.0
+    provider.side_effect = OSError('Temporary enumeration failure')
+    node._scan()
+    provider.side_effect = None
+    node._scan()
+    assert probe_pool.pool.submit.call_count == 1
+
+    retry_clock.return_value = 105.0
+    node._scan()
+    probe_pool.jobs[1].future.set_exception(RuntimeError('RPC timed out'))
+    node._scan()
+
+    assert probe_pool.pool.submit.call_count == 2
+    assert logger.warning.call_count == 2
+    logger.warning.assert_any_call('USB probe failed for /virtual/axiom: RPC timed out')
+    logger.warning.assert_any_call('USB enumeration failed: Temporary enumeration failure')
+
+
 def test_multiple_candidates_get_independent_jobs_and_results(
     discovery_module, make_node, probe_pool,
 ):
@@ -287,7 +411,10 @@ def test_completed_candidate_is_probed_again_after_replug(make_node, probe_pool)
     assert probe_pool.pool.submit.call_count == 2
 
 
-def test_late_result_from_removed_board_is_discarded_when_path_is_reused(make_node, probe_pool):
+@pytest.mark.parametrize('failed', [False, True], ids=['late-success', 'late-failure'])
+def test_late_result_from_removed_board_is_discarded_when_path_is_reused(
+    make_node, probe_pool, retry_clock, failed,
+):
     candidate = port('/virtual/axiom', vid=0x303A, pid=0x1001)
     provider = Mock(return_value=[candidate])
     node, logger, _, _ = make_node(provider)
@@ -298,16 +425,22 @@ def test_late_result_from_removed_board_is_discarded_when_path_is_reused(make_no
     node._scan()
     provider.return_value = [candidate]
     node._scan()
-    old_future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
+    if failed:
+        old_future.set_exception(RuntimeError('Old probe failed'))
+    else:
+        old_future.set_result({'rslt': 'ok', 'SystemName': 'Axiom009'})
     node._scan()
 
     assert all('Axiom verified:' not in call.args[0] for call in logger.info.call_args_list)
     probe_pool.jobs[1].future.set_result({'rslt': 'ok', 'SystemName': 'Axiom018'})
     node._scan()
+    retry_clock.return_value = 1000.0
+    node._scan()
 
     logger.info.assert_called_with('Axiom verified: /virtual/axiom (Axiom018)')
     assert all('Axiom009' not in call.args[0] for call in logger.info.call_args_list)
     assert probe_pool.pool.submit.call_count == 2
+    logger.warning.assert_not_called()
 
 
 def test_enumeration_error_preserves_pending_probe_until_inventory_recovers(make_node, probe_pool):

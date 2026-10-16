@@ -1,6 +1,7 @@
 """Discover USB candidates while waiting for Axiom boards."""
 
 from concurrent.futures import ThreadPoolExecutor
+from time import monotonic
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -10,6 +11,7 @@ from serial.tools.list_ports import comports
 from .core.discovery import probe_axiom_firmware
 
 USB_CANDIDATE_IDS = {(0X303A, 0X1001)}
+PROBE_RETRY_DELAY_S = 5.0
 
 
 class UsbDiscoveryNode(Node):
@@ -28,6 +30,7 @@ class UsbDiscoveryNode(Node):
         )
         self._probe_futures = {}
         self._checked_ports = set()
+        self._probe_retries = {}  # Port -> (retry deadline, last error message).
 
         self._timer = self.create_timer(2.0, self._scan)
         self._scan()
@@ -62,6 +65,8 @@ class UsbDiscoveryNode(Node):
         current = set(candidates)
 
         self._checked_ports.intersection_update(current)
+        for port in set(self._probe_retries) - current:
+            del self._probe_retries[port]
 
         missing = set(self._probe_futures) - current
         for port in missing:
@@ -74,15 +79,19 @@ class UsbDiscoveryNode(Node):
                 continue
 
             del self._probe_futures[port]
-            self._checked_ports.add(port)
 
             try:
                 firmware = future.result()
             except Exception as exc:
                 message = f'USB probe failed for {port}: {exc}'
-                self.get_logger().warning(message)
+                previous = self._probe_retries.get(port)
+                if previous is None or previous[1] != message:
+                    self.get_logger().warning(message)
+                self._probe_retries[port] = (monotonic() + PROBE_RETRY_DELAY_S, message)
                 continue
 
+            self._checked_ports.add(port)
+            self._probe_retries.pop(port, None)
             if firmware is None:
                 message = f'USB candidate not recognised: {port}'
             else:
@@ -93,6 +102,9 @@ class UsbDiscoveryNode(Node):
 
         for port in sorted(current):
             if port in self._checked_ports or port in self._probe_futures:
+                continue
+            retry = self._probe_retries.get(port)
+            if retry is not None and monotonic() < retry[0]:
                 continue
 
             self._probe_futures[port] = self._probe_executor.submit(

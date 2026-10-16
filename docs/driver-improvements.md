@@ -1,6 +1,6 @@
 # Host driver development plan
 
-Status: background USB verification implemented; Pi/Kilted worker validation pending.
+Status: fixed-delay failed-probe retries implemented; Pi/Kilted retry check skipped at user request.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -157,16 +157,22 @@ Recognition checks only a successful `rslt` and a string `SystemName` beginning
 with `Axiom`. This prefix is a firmware naming convention, not an immutable
 hardware property. Version and MAC fields do not gate recognition.
 
-The ROS timer collects completed results and logs each outcome once. Removed
-ports lose their previous check; queued probes are cancelled and late results
-from removed attempts are discarded. Each port is checked once per observed
-appearance, including failed attempts. Timed retries and starting sensor drivers
-are later increments. Existing launches and defaults remain unchanged.
+The ROS timer collects completed results. Recognised and unrecognised replies
+are checked once per observed appearance. Probe exceptions become eligible for
+another attempt on the first successful scan at least five seconds after the
+failure is collected. A pending probe prevents overlapping submissions for that
+port. Repeated identical failures stay quiet; the first or a changed error is
+logged, and successful recognition is reported normally.
+
+Removed ports lose their previous check, retry deadline and error message;
+queued probes are cancelled and late results from removed attempts are discarded.
+Starting sensor drivers is a later increment. Existing launches and defaults
+remain unchanged.
 
 On shutdown, the timer stops, queued work is cancelled and the worker finishes
 its active probe before the node is destroyed. Tests use controlled probes and
-virtual serial peers rather than physical hardware. Pi/Kilted acceptance for
-this worker increment is pending.
+virtual serial peers rather than physical hardware. The user completed Pi/Kilted
+acceptance for the worker; acceptance of the subsequent retry change is pending.
 
 ## Later proposal: define and test measurement output
 
@@ -384,6 +390,28 @@ real Axiom; do not compete with a running driver or browser acquisition session.
   checks background verification and unplug/replug using an otherwise unused
   Axiom serial port. This increment verifies candidates without starting sensor
   acquisition.
+
+### 2026-10-16: simple failed-probe retries
+
+- The user completed acceptance of `bd8711d` on Pi/Kilted: all 62 discovery,
+  recognition and serial tests passed; a connected Axiom was verified once,
+  unplug/replug triggered fresh verification and Ctrl+C exited cleanly.
+- At the user's request, the assistant added a fixed five-second retry using
+  the existing scan timer and worker. One per-port record stores a monotonic
+  deadline and last error. Only exceptions retry; recognised and unrecognised
+  replies remain checked until removal. Identical errors are suppressed and
+  unplug/replug clears the retry state. No extra threads, timers or configuration
+  options were added.
+- Added controlled-clock coverage for the retry boundary, recovery, other-board
+  isolation, in-flight duplicate prevention, warning suppression, removal,
+  enumeration recovery and stale failures.
+- Fresh Linux/Jazzy validation against `bd8711d` plus this increment: **all seven
+  packages built; 184 tests, zero errors, zero failures, four existing skips**.
+  All 28 discovery-node cases and ROS lint passed. Source was mounted read-only,
+  domain 86 used Fast DDS with localhost discovery, and no physical devices were
+  passed through.
+- The user explicitly chose to skip the Pi/Kilted retry check and proceed to
+  automatic driver startup. This retry increment has Linux/Jazzy validation only.
 
 For later entries, record: objective, behaviour/decision, changed files, tests and
 environment, hardware evidence (if any), commit and remaining issues. Add entries
