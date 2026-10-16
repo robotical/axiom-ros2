@@ -1,6 +1,5 @@
 # Also source overlays when a terminal is reopened from the panel.
-source /opt/ros/jazzy/setup.bash
-source /ws/install/setup.bash
+source /axiom/scripts/setup_env.sh || return
 export PS1='\[\e[38;5;109m\]ROS\[\e[0m\] \w $ '
 # Each learning session starts with an empty command history, without deleting files.
 export HISTFILE=/dev/null

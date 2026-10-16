@@ -42,3 +42,16 @@ def test_restart_uses_owned_container_id_even_if_name_is_reassigned(tmp_path):
     commands = [call.args[0] for call in docker.call_args_list]
     assert commands[1][:3] == ["docker", "exec", identity]
     assert commands[2][-1] == identity
+
+
+def test_restart_waits_on_configured_guide_port(tmp_path):
+    (tmp_path / '.runtime').mkdir()
+    (tmp_path / '.runtime/demo.json').write_text(json.dumps({
+        'demo': 'learning', 'dashboard_port': 8085,
+    }))
+    result = Mock(stdout='true|' + 'a' * 64)
+    response = io.BytesIO(json.dumps({'commands': [{}], 'graph': {'available': True}}).encode())
+    with patch('session_reset.subprocess.run', return_value=result), \
+            patch('session_reset.urlopen', return_value=response) as fetch:
+        restart(tmp_path)
+    fetch.assert_called_once_with('http://127.0.0.1:8085/api/state', timeout=1)

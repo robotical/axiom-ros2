@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Native applications in the optional Linux desktop.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-source /ws/install/setup.bash
-cd /ws
+source /axiom/scripts/setup_env.sh
+cd "$ROS_WORKSPACE"
 case "${1:-}" in
   rviz)
     exec rviz2 -d /tmp/axiom-desktop.rviz

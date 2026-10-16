@@ -61,4 +61,6 @@ def test_scenario_topic_commands_parse_with_installed_ros_cli():
                 verbs[tokens[2]]().add_arguments(parser, "ros2 topic")
                 args = parser.parse_args(tokens[3:])
                 if tokens[2] == "echo" and "--field" in tokens:
-                    assert args.field in ("linear_acceleration", "range")
+                    # Newer ROS CLIs allow multiple fields and return a list.
+                    fields = [args.field] if isinstance(args.field, str) else args.field
+                    assert fields in (["linear_acceleration"], ["range"])

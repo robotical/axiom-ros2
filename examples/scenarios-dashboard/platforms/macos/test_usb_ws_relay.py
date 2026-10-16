@@ -62,9 +62,14 @@ def test_usb_absence_replug_port_change_and_single_owner(monkeypatch):
             ports.append(SimpleNamespace(device='/usb/first', vid=0x1A86, pid=0x7523))
             async with websockets.connect(uri) as client:
                 assert sessions[-1].port == '/usb/first'
-                with pytest.raises(websockets.InvalidStatus):
+                with pytest.raises((websockets.InvalidStatus,
+                                    websockets.InvalidStatusCode)) as rejection:
                     async with websockets.connect(uri):
                         pass
+                error = rejection.value
+                status = (error.status_code if hasattr(error, 'status_code')
+                          else error.response.status_code)
+                assert status == 503
                 assert len(sessions) == 1 and bridge.busy
                 payload = bytes(range(256))
                 await client.send(payload)

@@ -48,7 +48,8 @@ def stop_nodes():
         try:
             args = (entry / "cmdline").read_bytes().decode().split("\0")
             executable = args[1] if "python" in Path(args[0]).name and len(args) > 1 else args[0]
-            installed = executable.startswith(("/ws/install/", "/opt/ros/jazzy/lib/"))
+            workspace = os.environ.get("ROS_WORKSPACE", "/ws")
+            installed = executable.startswith((workspace + "/install/", "/opt/ros/jazzy/lib/"))
             console = executable == "/opt/ros/jazzy/bin/ros2" and not any(
                 arg in ("run", "launch") for arg in args[2:3]
             )
@@ -65,16 +66,19 @@ def stop_nodes():
 
 def restart(root):
     container = assert_learning_owned(root)
+    port = json.loads((root / ".runtime/demo.json").read_text()).get("dashboard_port", 8083)
     subprocess.run([
         "docker", "exec", container, "python3",
         "/demo/platforms/macos/session_reset.py", "stop-nodes",
     ], timeout=12, check=True)
     subprocess.run(["docker", "restart", "--signal", "SIGINT", "--timeout", "15", container],
                    timeout=45, check=True)
+    if not port:
+        return
     deadline = time.monotonic() + 35
     while time.monotonic() < deadline:
         try:
-            with urlopen("http://127.0.0.1:8083/api/state", timeout=1) as response:
+            with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=1) as response:
                 state = json.load(response)
             if state.get("commands") and state.get("graph", {}).get("available"):
                 return
@@ -160,7 +164,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["watch", "request", "stop-nodes"])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
-    parser.add_argument("--directory", type=Path, default=Path("/ws/.session-reset"))
+    parser.add_argument("--directory", type=Path,
+                        default=Path(os.environ.get("ROS_WORKSPACE", "/ws")) / ".session-reset")
     args = parser.parse_args()
     if args.operation == "watch":
         watch(args.root)

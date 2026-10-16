@@ -1,7 +1,6 @@
 """Optional Linux desktop. ROS drivers and acquisition are always manual."""
 
 import argparse
-import json
 import os
 from pathlib import Path
 import signal
@@ -18,15 +17,8 @@ def main():
     parser.add_argument("--marty-ip")
     parser.add_argument("--with-dashboard", action="store_true")
     args, options = parser.parse_known_args()
-    boards = json.loads(os.environ.get("AXIOM_ROS_BOARDS", "{}"))
-    if boards:
-        for board in boards.values():
-            board["topic_aliases"] = {
-                "imu/data_raw": {"type": "LSM6DS", "source": "imu/data_raw"},
-                "range": {"type": "VL53L4CD", "source": "range"},
-            }
-        Path("/ws/axioms.yaml").write_text(json.dumps({"axioms": boards}, indent=2))
-    port = 8083 if args.with_dashboard else 0
+    workspace = Path(os.environ.get("ROS_WORKSPACE", "/ws"))
+    port = int(os.environ.get("AXIOM_DASHBOARD_PORT", "8083")) if args.with_dashboard else 0
     for option in options:
         if option.startswith("dashboard_port:="):
             port = int(option.split(":=", 1)[1])
@@ -56,7 +48,7 @@ def main():
                     "-p",
                     f"port:={port}",
                     "-p",
-                    "workstation_reset_dir:=/ws/.session-reset",
+                    f"workstation_reset_dir:={workspace / '.session-reset'}",
                 ],
                 start_new_session=True,
             )

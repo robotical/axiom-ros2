@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
+source "${ROS_SETUP_FILE:-/opt/ros/jazzy/setup.bash}"
 paths=(/axiom/src /demo/src)
 if [[ -d /marty/src ]]; then
   paths+=(/marty/src)

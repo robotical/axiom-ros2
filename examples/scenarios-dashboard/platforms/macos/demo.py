@@ -27,6 +27,46 @@ CORE_IMAGE = "axiom-marty-demo-core:jazzy"
 PANEL_PORT = 8083
 
 
+def machine_environment():
+    """Read the machine profile using Linux paths, without sourcing ROS on macOS."""
+    values = {
+        "AXIOM_ROS_ROOT": "/axiom",
+        "ROS_WORKSPACE": "/ws",
+        "ROS_SETUP_FILE": "/opt/ros/jazzy/setup.bash",
+        "ROS_DOMAIN_ID": "43",
+        "AXIOM_DASHBOARD_PORT": str(PANEL_PORT),
+        "AXIOM_ROS_BOARDS_FILE": (
+            "/axiom/config/boards.yaml" if (AXIOM / "config/boards.yaml").is_file() else ""
+        ),
+    }
+    config = Path(os.environ.get("AXIOM_MACHINE_CONFIG", AXIOM / "config/machine.env"))
+    config = config.expanduser().resolve()
+    mounts = []
+    if config.is_file():
+        result = subprocess.run(
+            ["bash", "-ec", 'set -a; source "$1"; shift; '
+             'for key in "$@"; do printf "%s\\0" "${!key}"; done',
+             "machine-config", str(config), *values],
+            env={**os.environ, **values, "HOME": "/root"},
+            capture_output=True, text=True, check=True,
+        )
+        values = dict(zip(values, result.stdout.split("\0")[:-1]))
+        mounts = ["-v", f"{config}:/machine.env:ro"]
+        values["AXIOM_MACHINE_CONFIG"] = "/machine.env"
+    elif os.environ.get("AXIOM_MACHINE_CONFIG"):
+        raise ValueError(f"Machine configuration not found: {config}")
+    for key in ("ROS_WORKSPACE", "AXIOM_ROS_BOARDS_FILE"):
+        if values[key] and not values[key].startswith("/"):
+            values[key] = "/axiom/" + values[key]
+    if not values["ROS_WORKSPACE"] or values["ROS_WORKSPACE"] in ("/", "/axiom", "/demo", "/marty"):
+        raise ValueError("ROS_WORKSPACE must be a separate Linux build directory")
+    port = int(values["AXIOM_DASHBOARD_PORT"])
+    if not 1 <= port <= 65535:
+        raise ValueError("AXIOM_DASHBOARD_PORT must be between 1 and 65535")
+    int(values["ROS_DOMAIN_ID"])
+    return values, mounts
+
+
 def run(*args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
@@ -107,10 +147,12 @@ def start(args):
     STATE.mkdir(parents=True, exist_ok=True)
     if (STATE / "relays.json").exists():
         stop()
+    machine, config_mounts = machine_environment()
+    panel_port = int(machine["AXIOM_DASHBOARD_PORT"])
     axioms = axiom_connections(args)
     ports = [*[port for _, port, _ in axioms], 6080]
     if args.with_dashboard:
-        ports.append(PANEL_PORT)
+        ports.append(panel_port)
     if not args.marty_ip:
         ports.append(8785)
     for port in ports:
@@ -126,6 +168,23 @@ def start(args):
         str(ROOT / "scripts"),
     )
     run("docker", "build", "-t", IMAGE, "-f", str(MAC / "Dockerfile"), str(MAC))
+    if not machine["AXIOM_ROS_BOARDS_FILE"]:
+        # Legacy CLI-only setup still works; a persistent board profile takes precedence.
+        workspace = STATE / "ws"
+        workspace.mkdir(exist_ok=True)
+        machine["AXIOM_ROS_BOARDS_FILE"] = machine["ROS_WORKSPACE"] + "/axioms.yaml"
+        boards = {
+            name: {
+                "transport": "ws", "device_uri": f"ws://host.docker.internal:{port}/ws",
+                "auto_connect": False, "auto_reconnect": False, "autosub": False,
+                "topic_aliases": {
+                    "imu/data_raw": {"type": "LSM6DS", "source": "imu/data_raw"},
+                    "range": {"type": "VL53L4CD", "source": "range"},
+                },
+            }
+            for name, port, _ in axioms
+        }
+        (workspace / "axioms.yaml").write_text(json.dumps({"axioms": boards}, indent=2))
     relays = []
     try:
         devices = [("axiom", port, explicit) for _, port, explicit in axioms]
@@ -149,13 +208,16 @@ def start(args):
             os.kill(child["pid"], 0)
         options = ["--demo", args.demo]
         if args.with_dashboard:
-            options += ["--with-dashboard", f"dashboard_port:={PANEL_PORT}"]
-        (STATE / "demo.json").write_text(json.dumps({"demo": args.demo}))
+            options += ["--with-dashboard", f"dashboard_port:={panel_port}"]
+        (STATE / "demo.json").write_text(json.dumps({
+            "demo": args.demo, "dashboard_port": panel_port if args.with_dashboard else 0,
+        }))
         if args.demo == "learning":
             start_controller(ROOT)
         if args.marty_ip:
             options += ["--marty-ip", args.marty_ip]
-        gui_ports = ["-p", f"127.0.0.1:{PANEL_PORT}:{PANEL_PORT}"] if args.with_dashboard else []
+        gui_ports = ["-p", f"127.0.0.1:{panel_port}:{panel_port}"] if args.with_dashboard else []
+        machine_args = [arg for key, value in machine.items() for arg in ("-e", f"{key}={value}")]
         build_target = " axiom_marty_dashboard" if args.with_dashboard else ""
         run(
             "docker",
@@ -169,28 +231,13 @@ def start(args):
             *gui_ports,
             "-p",
             "127.0.0.1:6080:6080",
-            "-e",
-            "ROS_DOMAIN_ID=43",
+            *machine_args,
             "-e",
             "ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST",
             "-e",
             "AXIOM_ROS_TRANSPORT=ws",
             "-e",
             "AXIOM_ROS_URI=ws://host.docker.internal:8765/ws",
-            "-e",
-            "AXIOM_ROS_BOARDS_FILE=/ws/axioms.yaml",
-            "-e",
-            "AXIOM_ROS_ROOT=/axiom",
-            "-e",
-            "ROS_WORKSPACE=/ws",
-            "-e",
-            "AXIOM_ROS_BOARDS="
-            + json.dumps(
-                {
-                    name: {"transport": "ws", "device_uri": f"ws://host.docker.internal:{port}/ws"}
-                    for name, port, _ in axioms
-                }
-            ),
             "-e",
             "MARTY_ROS_METHOD=wifi",
             "-e",
@@ -206,14 +253,16 @@ def start(args):
             "-v",
             f"{NAME}-browser:/home/ubuntu/.axiom-dashboard",
             "-v",
-            f"{STATE / 'ws'}:/ws",
+            f"{STATE / 'ws'}:{machine['ROS_WORKSPACE']}",
+            *config_mounts,
+            "-w",
+            machine["ROS_WORKSPACE"],
             IMAGE,
             "bash",
             "-lc",
             "set -eo pipefail\n"
             "bash /demo/scripts/build_workspace.sh" + build_target + "\n"
-            "source /opt/ros/jazzy/setup.bash\n"
-            "source /ws/install/setup.bash\n"
+            "source /axiom/scripts/setup_env.sh\n"
             'exec python3 /demo/platforms/macos/container_demo.py "$@"',
             "demo",
             *options,
@@ -223,7 +272,7 @@ def start(args):
         raise
     print(
         (
-            f"Dashboard port available: http://127.0.0.1:{PANEL_PORT}\n"
+            f"Dashboard port available: http://127.0.0.1:{panel_port}\n"
             if args.with_dashboard
             else ""
         )
@@ -238,7 +287,9 @@ def status():
         print("Demo is stopped")
         return
     print("Linux desktop: http://127.0.0.1:6080/desktop.html")
-    print("Guide: http://127.0.0.1:8083 · ROS nodes and acquisition are manual.")
+    port = json.loads((STATE / "demo.json").read_text()).get("dashboard_port", PANEL_PORT)
+    if port:
+        print(f"Guide: http://127.0.0.1:{port} · ROS nodes and acquisition are manual.")
 
 
 def axiom_connections(args):

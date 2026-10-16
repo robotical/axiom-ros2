@@ -16,6 +16,16 @@ below:
 cd examples/scenarios-dashboard
 ```
 
+The adapter reads the repository's `config/machine.env` and `config/boards.yaml`
+when present. Paths in the Mac machine profile refer to the Linux container:
+use `ROS_WORKSPACE=/ws` and `ROS_SETUP_FILE=/opt/ros/jazzy/setup.bash`.
+The guide, consoles and reset controller use the configured ROS domain and guide
+port. The board's USB relay endpoint is `ws://host.docker.internal:8765/ws`;
+a Wi-Fi board can use its own IP directly. Connections and acquisition remain
+manual. These local files are ignored by Git.
+After changing `machine.env`, stop and start the adapter to recreate its mounts
+and port mappings. Board settings are read when a driver is launched.
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install pyserial websockets
@@ -35,11 +45,13 @@ different physical devices:
   --axiom front=/dev/cu.usbmodemREPLACE_WITH_FRONT --axiom rear=/dev/cu.usbmodemREPLACE_WITH_REAR
 ```
 
-Each board has a separate relay. The adapter writes `/ws/axioms.yaml` with
+Each board has a separate relay. Without a persistent board file, the adapter writes `/ws/axioms.yaml` with
 namespaces `axiom/front` and `axiom/rear` and exposes its path in
 `AXIOM_ROS_BOARDS_FILE`. Start the multiple-driver command from the guide,
 then connect and request acquisition separately for each board. A relay only
 opens its USB connection when the ROS driver connects.
+With `config/boards.yaml`, configure these namespaces and relay endpoints there
+instead (`8765` for the first USB board, `8766` for the second).
 
 For an optional Marty Wi-Fi connection, add `--marty-ip MARTY_IP` with its
 actual address. Marty scenarios need its packages/hardware; Axiom-only scenarios
