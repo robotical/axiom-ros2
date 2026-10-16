@@ -65,7 +65,7 @@ def running_discovery(tmp_path):
         thread = threading.Thread(target=spin, daemon=True)
         threads.append(thread)
         thread.start()
-        return SimpleNamespace(node=node, probe=probe, executor=executor)
+        return SimpleNamespace(node=node, probe=probe, executor=executor, thread=thread)
 
     try:
         yield start
@@ -192,7 +192,54 @@ def test_live_wifi_to_usb_handover_and_fallback_have_one_acquisition_owner(runni
     finally:
         # Stop the driver before its peer, keeping cleanup independent of retries.
         env.executor.shutdown(timeout_sec=5)
+        env.thread.join(5)
         for identity in list(env.node._drivers):
             env.node._stop_driver(identity)
         usb.close()
         wifi.close()
+
+
+def test_two_usb_firmware_peers_acquire_and_replug_independently(running_discovery):
+    peers = [SerialFirmware(version_response=version(identity)) for identity in (ID_A, ID_B)]
+    ports = Mock(return_value=[
+        SimpleNamespace(device=peer.path, vid=0x303A, pid=0x1001) for peer in peers
+    ])
+    network = Mock(spec=['snapshot', 'close'])
+    network.snapshot.return_value = []
+    env = running_discovery(ports, network)
+    replacement_peer = None
+    try:
+        wait_until(lambda: set(env.node._drivers) == {ID_A, ID_B}
+                   and all(driver._subscribed for _, driver in env.node._drivers.values()))
+        first, second = (env.node._drivers[identity][1] for identity in (ID_A, ID_B))
+        for peer, driver in zip(peers, (first, second)):
+            assert driver.session.connected and driver.config['serial.port'] == peer.path
+            assert peer.commands[:2] == ['v', 'v']
+            assert peer.commands[2]['cmdName'] == 'subscription'
+        second_generation = second.session.generation
+        ports.return_value = ports.return_value[1:]
+        wait_until(lambda: ID_A not in env.node._drivers and not first._worker.is_alive())
+        assert env.node._drivers[ID_B][1] is second and second._subscribed
+        assert second.session.ping(timeout=1) >= 0
+        assert second.session.generation == second_generation
+
+        # Keep the old PTY allocated so the OS must assign a different path.
+        replacement_peer = SerialFirmware(version_response=version(ID_A))
+        assert replacement_peer.path != peers[0].path
+        ports.return_value.append(SimpleNamespace(
+            device=replacement_peer.path, vid=0x303A, pid=0x1001))
+        wait_until(lambda: ID_A in env.node._drivers and env.node._drivers[ID_A][1]._subscribed)
+        replacement = env.node._drivers[ID_A][1]
+        assert replacement is not first and replacement.get_namespace() == '/axiom_' + ID_A
+        assert replacement.config['serial.port'] == replacement_peer.path
+        assert env.node._drivers[ID_B][1] is second and second._subscribed
+        assert second.session.generation == second_generation
+    finally:
+        env.executor.shutdown(timeout_sec=5)
+        env.thread.join(5)
+        for identity in list(env.node._drivers):
+            env.node._stop_driver(identity)
+        for peer in peers:
+            peer.close()
+        if replacement_peer is not None:
+            replacement_peer.close()

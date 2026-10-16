@@ -516,3 +516,35 @@ when a meaningful increment finishes or a decision changes.
   `/tmp/axiom-auto-startup-kilted-tests.log`,
   `/tmp/axiom-auto-startup-kilted-teaching-recheck.log` and
   `/tmp/axiom-real-startup-result.json` on the Pi.
+
+### 2026-10-16: final startup acceptance and publication
+
+- Added an additional end-to-end check using two independent pseudo-terminal
+  firmware peers and actual ROS bridges. Both acquire automatically; removing and
+  replacing one at a different serial path preserves its namespace and leaves the
+  other board's connection generation and acquisition unchanged. This closes the
+  serial-specific multi-board acceptance check without requiring a second physical
+  board or someone to move cables.
+- Final fresh Linux/Jazzy build and full test run: **230 tests, zero errors,
+  zero failures, four existing skips**. Final Pi/Kilted colcon results likewise
+  report **230 tests, zero errors, zero failures, four skips**, after the driver
+  package was rerun with the additional serial case. The previously noted
+  intermittent teaching test was checked in isolation. Its source is unchanged.
+  The final fresh Jazzy log is `/tmp/axiom-automatic-final-clean.log`; the Pi's
+  final driver log is `/tmp/axiom-auto-startup-kilted-final-driver.log`.
+- Committed and pushed the implementation as `b2dd9cc`. Updated and verified all
+  six existing published ROS guide pages plus the new `automatic_startup` page,
+  preserving their wiki revision history, images and tmux anchor. The repo and
+  published instructions describe automatic startup and retain explicit manual
+  operation. No firmware/Raft repository changes were made.
+- Pulled and rebuilt the Pi's normal checkout. Its generated driver build/install
+  artifacts required regeneration; the old artifacts and board file were backed
+  up outside the checkout. Converted the known board's local `axiom1` entry to an
+  identity rule while preserving its aliases/settings and the other board entry.
+  Installed the mDNS dependency in the Pi user's Python site packages.
+- The normal discovery launch is running in the existing tmux Terminal 1, with
+  the existing Foxglove bridge preserved. A fresh ROS subscriber confirmed one
+  connected USB owner under `/axiom1` and live IMU messages with its expected frame.
+  The installed Kilted discovery executable also passed quiet empty scans and
+  SIGINT exit with code zero and no traceback. Only one physical board was reachable;
+  multi-board acceptance used independent firmware peers.
