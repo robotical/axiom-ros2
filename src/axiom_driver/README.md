@@ -217,7 +217,7 @@ retains raw values. Descriptor booleans use Bool and decoded text uses String.
 Invalid/nonfinite numeric readings publish NaN; invalid boolean/text readings
 are omitted. Negative illuminance also publishes NaN.
 
-Existing semantic adapters take priority: IMU axes, range values and their
+By default, existing semantic adapters take priority: IMU axes, range values and their
 validity flag, temperature/humidity, servo position, battery voltage and image
 pixels/dimensions are not duplicated as scalar outputs. Other attributes such
 as sensor status or auxiliary readings can still publish scalars. Arrays and
@@ -242,7 +242,66 @@ topic_aliases:
   uv: {type: LTR-390, source: UVI}
 ```
 
-No descriptor-defined message-selection schema is implemented in this increment.
+### Optional ROS mappings in descriptors
+
+A descriptor can explicitly select a supported scalar message type with an
+optional `ros` block inside `devInfoJson`. The host receives this as `devinfo.ros`
+through the existing metadata endpoint. For example, add this fragment alongside
+`type`, `resp` and `actions` in a Device Library descriptor's `devInfoJson`:
+
+```json
+"ros": {
+  "version": 1,
+  "attributes": {
+    "photodiode": {"message_type": "sensor_msgs/msg/Illuminance"},
+    "tempC": {"message_type": "sensor_msgs/msg/Temperature"},
+    "UVI": {"message_type": "std_msgs/msg/Float64"}
+  }
+}
+```
+
+Each key is an exact, case-sensitive attribute name declared in `resp.a`.
+`photodiode`, for example, must have a scalar numeric layout and a known lux
+unit; declaring Illuminance does not convert a raw count into lux. A valid
+declaration removes the need for the automatic light-name rule. Output suffixes
+still follow the attribute's name and the escaping/reservation rules above.
+
+| `message_type` | Required decoded input |
+|---|---|
+| `sensor_msgs/msg/Illuminance` | Numeric scalar with normalised unit `lux` |
+| `sensor_msgs/msg/Temperature` | Numeric scalar with normalised unit `degC` |
+| `sensor_msgs/msg/RelativeHumidity` | Numeric scalar with normalised unit `fraction`, e.g. converted from `%RH` |
+| `std_msgs/msg/Float64` | Numeric scalar; decoded SI value when available, otherwise engineering value |
+| `std_msgs/msg/Bool` | Descriptor boolean (`o: bool` or a `?` wire field) |
+| `std_msgs/msg/String` | Decoded scalar text |
+
+Mapped sensor messages use the sample timestamp, configured sensor frame and
+unknown variance (`0`). The same invalid-reading rules apply as for automatic
+scalar outputs. Existing descriptor scaling is applied once; mappings have no
+extra scaling, unit override, topic rename or arbitrary field-assignment options.
+
+A valid mapping selects that attribute's output type. For example, mapping
+`temperature` to Float64 replaces its automatic Temperature publisher at the
+same suffix. Compound IMU, range, image, joint and battery outputs continue to
+work; an explicitly mapped component such as `gx` additionally gets its own
+scalar topic. Unmapped component attributes remain consumed by those adapters.
+Arrays are unsupported in this scalar schema and retain their existing image
+or generic output handling.
+
+Absent mappings leave the existing behavior unchanged. An unsupported version or
+malformed block is ignored with a warning. Unknown attributes, unsupported types,
+extra declaration fields and incompatible units/shapes warn and retain that
+attribute's automatic mapping/fallback; valid peer declarations still apply.
+Warnings appear once per issue per device revision. An attribute absent from one
+payload group is simply skipped there. Metadata refresh/replacement retires the
+old publishers before the new types appear, including configured aliases.
+
+Aliases and exact QoS overrides work through the same output suffixes, and
+`output_info` describes the actual resulting message types and units. Profiles
+without this block continue working. The feature is implemented in the host
+driver; it adds no native firmware ROS mapping behavior. Firmware/Raft sources
+and catalogue profiles are unchanged. Physical Device Library upload, restart
+and metadata readback acceptance for this block remains pending.
 
 ### Migrating topic configuration
 

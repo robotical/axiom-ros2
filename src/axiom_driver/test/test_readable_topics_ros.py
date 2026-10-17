@@ -22,6 +22,10 @@ class RecordingNode:
 
     def __init__(self):
         self.publishers = []
+        self.warnings = []
+
+    def get_logger(self):
+        return SimpleNamespace(warning=self.warnings.append)
 
     def create_publisher(self, msg_type, topic, qos):
         publisher = SimpleNamespace(topic=topic, msg_type=msg_type, qos_profile=qos,

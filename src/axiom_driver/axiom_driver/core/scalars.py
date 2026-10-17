@@ -4,6 +4,21 @@ import math
 import re
 
 
+def scalar_kind(entry):
+    """Identify the native scalar contract even when an invalid reading is NaN."""
+    value = entry['value']
+    if isinstance(value, (list, tuple, dict)):
+        return None
+    attr = entry['meta']
+    wire_type = attr.get('t', '').lstrip('@=<>!')
+    if attr.get('o') == 'bool' or wire_type == '?':
+        return 'bool'
+    if (re.fullmatch(r'(\d*[scp]|[sp]\[\d+\])', wire_type)
+            or attr.get('o') in ('str', 'string')):
+        return 'string'
+    return 'float' if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
 def scalar_output(name, entry):
     """
     Return (kind, value, published unit), or None for unsupported values.
@@ -11,19 +26,14 @@ def scalar_output(name, entry):
     Boolean/text contracts follow the descriptor even when validation replaced
     a reading with NaN. Numeric values are engineering values, never raw counts.
     """
-    value = entry['value']
-    if isinstance(value, (list, tuple, dict)):
+    kind = scalar_kind(entry)
+    if kind is None:
         return None
-    attr = entry['meta']
-    wire_type = attr.get('t', '').lstrip('@=<>!')
-    valid = entry['valid']
-    if attr.get('o') == 'bool' or wire_type == '?':
+    value, valid = entry['value'], entry['valid']
+    if kind == 'bool':
         return ('bool', bool(value), None) if valid and isinstance(value, (bool, int)) else None
-    if (re.fullmatch(r'(\d*[scp]|[sp]\[\d+\])', wire_type)
-            or attr.get('o') in ('str', 'string')):
+    if kind == 'string':
         return ('string', value, None) if valid and isinstance(value, str) else None
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        return None
     si_value = entry['si_value']
     unit = entry['si_unit'] if si_value is not None else entry['unit']
     number = float(si_value if si_value is not None else value)

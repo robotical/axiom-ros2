@@ -13,6 +13,7 @@ from std_msgs.msg import Bool, Float64, String
 
 from .core.aliases import bindings
 from .core.grids import float32_image_data, zone_grid
+from .core.ros_mappings import mapped_scalar_output, parse_ros_mappings
 from .core.scalars import scalar_output
 from .core.topic_names import attribute_topic, image_suffix, measurement_topic, sensor_topic
 from .publisher_cache import PublisherCache
@@ -67,12 +68,15 @@ class RosAdapters:
         self.devices = {}
         self.public_topics = {}
         self.output_info = {}
+        self._logger = node.get_logger()
+        self._mapping_state = {}
 
     def sync(self, devices):
         active = {row['topic']: row['revision'] for row in devices
                   if row['topic'] and row['online'] and not row['stale'] and row['metadata_ready']}
         for topic in self.devices.keys() | self.public_topics.keys():
             if topic not in active or active[topic] != self.devices.get(topic):
+                self._mapping_state.pop(topic, None)
                 self.output_info.pop(topic, None)
                 for group in self.public_topics.pop(topic, {}).values():
                     for public_topic in group.values():
@@ -101,11 +105,35 @@ class RosAdapters:
             identity, self.frame_prefix + '_' + device.key.frame_suffix
         )
 
+    def _mapped_outputs(self, device, values):
+        base = sensor_topic(device.device_type, device.key)
+        state = self._mapping_state.get(base)
+        if state is None or state[0] != device.revision:
+            rules, warnings = parse_ros_mappings(device.metadata)
+            state = (device.revision, rules, set())
+            self._mapping_state[base] = state
+        else:
+            warnings = []
+        outputs = {}
+        for name, message_type in state[1].items():
+            if name not in values:
+                continue  # Another payload group may carry this attribute.
+            try:
+                outputs[name] = mapped_scalar_output(message_type, values[name])
+            except ValueError as exc:
+                warnings.append(f'ros.attributes.{name}: {exc}')
+        for warning in warnings:
+            if warning not in state[2]:
+                state[2].add(warning)
+                self._logger.warning(f'{base}: {warning}; keeping automatic outputs')
+        return outputs
+
     def publish(self, device, group, sample):
         base = sensor_topic(device.device_type, device.key)
         frame = self.frame(device)
         stamp = Time(nanoseconds=sample['stamp_ns']).to_msg()
         values = sample['values']
+        mapped = self._mapped_outputs(device, values)
         consumed = set()
 
         def emit(suffix, msg, unit=None):
@@ -247,13 +275,13 @@ class RosAdapters:
                     if temperature.get('si_unit') == 'degC':
                         emit_image(image_suffix(device, 'thermal'), width, height,
                                    temperature['si_value'], 'degC')
-            elif temperature.get('si_unit') == 'degC':
+            elif temperature.get('si_unit') == 'degC' and 'temperature' not in mapped:
                 msg = Temperature()
                 msg.temperature = float(temperature['si_value'])
                 emit('temperature', msg, 'degC')
                 consumed.add('temperature')
         humidity = values.get('humidity')
-        if humidity and humidity.get('si_unit') == 'fraction':
+        if humidity and humidity.get('si_unit') == 'fraction' and 'humidity' not in mapped:
             msg = RelativeHumidity()
             msg.relative_humidity = float(humidity['si_value'])
             emit('humidity', msg, 'fraction')
@@ -291,14 +319,21 @@ class RosAdapters:
                 emit('power/raw', AxiomPowerState(batt_v=voltage), 'V')
 
         for name, entry in values.items():
-            if name in consumed:
+            if name in mapped:
+                output = mapped[name]
+            elif name in consumed:
                 continue
-            output = scalar_output(name, entry)
+            else:
+                output = scalar_output(name, entry)
             if output is None:
                 continue
             kind, reading, unit = output
             if kind == 'illuminance':
                 msg = Illuminance(illuminance=reading, variance=0.0)
+            elif kind == 'temperature':
+                msg = Temperature(temperature=reading, variance=0.0)
+            elif kind == 'humidity':
+                msg = RelativeHumidity(relative_humidity=reading, variance=0.0)
             else:
                 msg = {'float': Float64, 'bool': Bool, 'string': String}[kind](data=reading)
             emit(attribute_topic(name), msg, unit)

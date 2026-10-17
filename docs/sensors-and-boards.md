@@ -67,6 +67,17 @@ unsafe names are escaped and collisions such as a numeric `data` attribute use
 [scalar contracts](../src/axiom_driver/README.md#descriptor-driven-light-and-scalar-outputs)
 for the light mapping rules and fallback limits.
 
+Profiles can optionally select supported scalar message types through
+`devInfoJson.ros`, with `version: 1` and an `attributes` map keyed by exact
+descriptor attribute names. This allows an unfamiliar lux attribute such as
+`photodiode` to request Illuminance. Known units and compatible scalar types are
+required; the declaration does not perform additional scaling. Supported types
+are Illuminance, Temperature, RelativeHumidity, Float64, Bool and String.
+Invalid declarations warn and keep the existing automatic mapping/fallback;
+profiles without a mapping block are unchanged. Compound IMU/range/image outputs
+remain available, while an explicit component mapping can add a scalar topic.
+See the [mapping schema and precedence](../src/axiom_driver/README.md#optional-ros-mappings-in-descriptors).
+
 Old bus/device topic and command paths are removed. Update topic selections,
 recording lists, exact QoS override keys and alias `source` selectors when pulling
 this version. Frame IDs and firmware bus/address fields remain unchanged. See the

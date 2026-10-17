@@ -2,8 +2,8 @@
 
 Status: automatic USB/Wi-Fi startup implemented and validated; breaking readable
 topic migration committed and published as `7e5bec9`; Illuminance and scalar
-fallbacks implemented and validated. Optional descriptor ROS
-mapping metadata remains a later increment.
+fallbacks committed as `2e0c1f6`. Optional descriptor ROS scalar mappings are
+implemented and validated for publication on `main`; validation is recorded below.
 Prepared: 2026-10-16.
 Working branch: `main`, as requested.
 
@@ -655,3 +655,62 @@ when a meaningful increment finishes or a decision changes.
   Axiom or Pi/Kilted testing. Changes remain uncommitted and unpushed.
 - The user subsequently authorised committing and pushing this increment to
   `main`. Physical Pi/Kilted acceptance remains pending.
+
+### 2026-10-16: optional descriptor ROS scalar mappings
+
+- Implemented `devInfoJson.ros` / returned `devinfo.ros` with `version: 1` and
+  exact attribute-name declarations containing `message_type`. Supported types
+  are Illuminance, Temperature, RelativeHumidity, Float64, Bool and String.
+  Mapping helpers remain ROS-independent and use existing decoded values and
+  normalised units without applying descriptor scaling again.
+- Absent, malformed, unsupported or incompatible declarations retain the
+  existing automatic mapping/fallback. Valid peer entries still apply. Each
+  issue warns once per device revision; revision/removal clears mapping state.
+  Invalid Bool/String readings remain omitted and numeric readings retain NaN
+  semantics. Explicit scalar temperature/humidity types replace the automatic
+  scalar type at the same suffix. Existing compound outputs remain; an explicit
+  component declaration can additionally expose one scalar.
+- Reused publisher ownership, aliases, exact QoS, frames/timestamps, retained
+  output inventory and revision cleanup. Added no firmware, Raft, catalogue,
+  transport or arbitrary-message-loading changes. Updated the driver and sensor
+  guides with schema, required units, precedence, fallback and limitations.
+- Added **52 test cases**, including unfamiliar attribute names, all six types,
+  unknown/malformed declarations, units, arrays, invalid first readings, scalar
+  replacement, aliases/QoS, compound IMU/image preservation, revision type
+  replacement and independent payload groups. Real DDS now checks mapping-absent,
+  explicitly mapped and unsupported-version firmware metadata.
+- Independent review found no actionable mapping bugs; **104 focused tests
+  passed** independently. Initial local tests caught a structured-value early
+  return regression during the scalar helper extraction and two lint findings;
+  these were fixed before final validation without weakening assertions.
+- Final Linux/Jazzy validation: all seven core packages built; **364 tests,
+  360 passed, four existing copyright skips, zero errors/failures**. Package lint,
+  local documentation links and `git diff --check` passed. One earlier focused
+  run reported an intermittent rclpy `InvalidHandle` warning during offline
+  publisher retirement in the no-mapping scenario; the final full run did not.
+  Its lifecycle/source investigation is recorded separately below.
+- The reviewer ran the archived committed baseline's original DDS test eight
+  times with thread warnings treated as errors: **8/8 passed**, without
+  reproducing the warning. Source inspection identifies the unchanged path
+  where the decode worker retires a publisher while Jazzy's executor builds its
+  event wait set. No mapping-specific cause was found, but the baseline runs do
+  not prove the warning predates this change. It remains an intermittent,
+  unresolved observation; no warning suppression or lifecycle rewrite is included.
+- All three current DDS mapping modes were then rerun three times with thread
+  warnings treated as errors: **9/9 passed**, without the warning recurring.
+- Evidence is retained in `/tmp/axiom-mappings-evidence` on the Mac. Physical
+  Axiom/Pi/Kilted and Device Library upload/restart/readback acceptance were not
+  performed. At the end of this increment, changes were left uncommitted and
+  unpushed as requested.
+
+### 2026-10-17: publication and pre-push validation
+
+- The user authorised committing and pushing the remaining descriptor mapping
+  increment to `main`, alongside the sound demo already committed as `b4bb4c3`.
+- Rebuilt all seven core packages and reran the full Linux/Jazzy suite:
+  **364 tests, zero errors/failures and four existing copyright skips**.
+  The focused pure scalar/mapping/alias run passed **78 tests** and the Foxglove
+  sound script/layout run passed **eight tests**. `git diff --check` passed.
+- Physical Pi/Kilted, live sound layout rendering and Device Library
+  upload/restart/readback acceptance remain pending. Firmware and Raft libraries
+  are outside this publication.
