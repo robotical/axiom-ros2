@@ -1,0 +1,25 @@
+{
+  "name": "axiom-spectrum",
+  "displayName": "Axiom Spectrum",
+  "description": "Frequency-labelled colour bars from existing Axiom DeviceSample messages.",
+  "publisher": "robotical",
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "package": "npm run build && node scripts/package.mjs",
+    "demo": "node demo/make-recording.mjs"
+  },
+  "devDependencies": {
+    "@foxglove/extension": "3.4.0",
+    "@mcap/core": "2.3.0",
+    "esbuild": "0.25.12",
+    "fflate": "0.8.3",
+    "linkedom": "0.18.12",
+    "typescript": "5.9.3"
+  }
+}

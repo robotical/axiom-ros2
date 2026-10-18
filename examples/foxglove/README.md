@@ -18,6 +18,13 @@ configuration, or select your actual topics in the imported panel settings.
 For the sound sensor's alias configuration, script and walkthrough, see
 [Sound sensor demo](sound-demo.md).
 
+For frequency-labelled, coloured spectrum bars, use the optional
+[Axiom Spectrum panel extension](spectrum-panel/README.md). It reads the existing
+sound `DeviceSample` topic directly and includes a spectrum-only layout and
+synthetic recording for trying it without hardware. Install the extension on
+the viewer computer before importing its layout. The layouts above continue to
+work without this extension.
+
 ## Install the bridge and connect a viewer
 
 In a prepared terminal at the repository root, install the bridge once for the

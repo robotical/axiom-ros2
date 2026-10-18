@@ -6,6 +6,12 @@ levels. The spectrum user script is embedded in the layout: importing the JSON
 also installs the script in that layout. No custom Foxglove extension is needed.
 The readable source is [sound-spectrum.ts](sound-spectrum.ts).
 
+For coloured bars with frequency labels instead of the built-in spectrum Plot,
+install the optional [Axiom Spectrum panel](spectrum-panel/README.md). It reads
+the same existing `sample` topic directly, without the user script or a separate
+ROS `bands` topic. You can add it alongside these scalar plots or import its
+spectrum-only layout. Host setup and acquisition are the same for both options.
+
 ## Prepare the host and select the sensor
 
 Complete the repository's [host setup](../../README.md) and the
