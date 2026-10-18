@@ -16,7 +16,7 @@ npm test
 npm run package
 ```
 
-The installable file is `dist/robotical.axiom-spectrum-0.1.0.foxe`.
+The installable file is `dist/robotical.axiom-spectrum-0.1.1.foxe`.
 In Foxglove's user profile menu, choose **Extensions → Install local extension…**
 and select that file, or drag the `.foxe` file into an open visualization.
 Install it on the computer running the viewer;
@@ -35,6 +35,8 @@ to keep its scalar plots alongside the bars. No ROS rebuild is required.
 The **Spectrum scale** panel settings control the minimum and maximum dB. The
 default range is −20 to 100 dB. Bars clip at those limits, while their numeric
 labels and tooltips retain the actual measurement. Negative dB values are valid.
+The colours and surfaces follow the Axiom Experiment App: teal, pale blue, cream,
+yellow and orange, with light/dark appearance following Foxglove.
 Colours distinguish frequencies; they do not indicate calibrated safety
 thresholds. The dB reference and calibration remain properties of the sensor.
 

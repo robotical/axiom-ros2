@@ -72,6 +72,17 @@ export function barFraction(db: number, config: Config): number {
 }
 
 export function bandColor(index: number, count: number): string {
-  const hue = 187 + (index / Math.max(1, count - 1)) * 102;
-  return `hsl(${hue.toFixed(0)} 78% 59%)`;
+  // Axiom Experiment App palette, ordered from cool to warm by frequency.
+  const palette = [0x27788c, 0x37abc8, 0x73c4d9, 0xf9eebe, 0xffda61, 0xffa000];
+  const position = (index / Math.max(1, count - 1)) * (palette.length - 1);
+  const lower = Math.floor(position);
+  const start = palette[lower]!;
+  const end = palette[Math.min(lower + 1, palette.length - 1)]!;
+  const fraction = position - lower;
+  const rgb = [16, 8, 0].map((shift) => {
+    const from = (start >> shift) & 255;
+    const to = (end >> shift) & 255;
+    return Math.round(from + (to - from) * fraction).toString(16).padStart(2, "0");
+  });
+  return `#${rgb.join("")}`;
 }

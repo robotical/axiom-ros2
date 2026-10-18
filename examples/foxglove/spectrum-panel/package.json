@@ -3,7 +3,7 @@
   "displayName": "Axiom Spectrum",
   "description": "Frequency-labelled colour bars from existing Axiom DeviceSample messages.",
   "publisher": "robotical",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/extension.js",

@@ -17,8 +17,11 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
   const style = element("style", "");
   style.textContent = CSS;
   const top = element("div", "top");
-  const title = element("div", "");
-  title.append(element("div", "eyebrow", "AXIOM · AUDIO FEATURES"), element("h2", "", "Sound spectrum"));
+  const title = element("div", "heading");
+  const eyebrow = element("div", "eyebrow");
+  eyebrow.append(element("span", "brand", "AXIOM"), element("span", "divider"),
+    element("span", "", "SOUND SENSOR"));
+  title.append(eyebrow, element("h2", "", "Sound spectrum"));
   const badge = element("span", "badge", "Waiting for samples");
   badge.setAttribute("role", "status");
   top.append(title, badge);
@@ -31,11 +34,13 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
   chart.setAttribute("role", "img");
   chart.setAttribute("aria-label", "Sound band levels in dB by frequency in Hz");
   const message = element("div", "message", "Waiting for a sound sample. Select its DeviceSample topic above.");
+  const plot = element("div", "plot");
+  plot.append(message, chart);
   const footer = element("div", "footer");
   const summary = element("span", "", "Frequency labels come from the sensor descriptor");
   const frame = element("span", "", "");
   footer.append(summary, frame);
-  root.append(style, top, source, message, chart, footer);
+  root.append(style, top, source, plot, footer);
   context.panelElement.append(root);
 
   let config = readConfig(context.initialState);
@@ -62,6 +67,7 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
       && currentTime - lastReceived > 5;
     root.classList.toggle("stale", stale);
     if (!spectrum) {
+      root.dataset.state = result?.error ? "invalid" : "waiting";
       message.textContent = result?.error ?? "Waiting for a sound sample. Select its DeviceSample topic above.";
       badge.textContent = result?.error ? "Invalid sample" : "Waiting for samples";
       summary.textContent = "Frequency labels come from the sensor descriptor";
@@ -69,14 +75,15 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
       return;
     }
     const invalid = spectrum.bands.filter((band) => band.db === null).length;
+    root.dataset.state = invalid === spectrum.bands.length ? "invalid" : invalid > 0 ? "partial" : "ready";
     badge.textContent = stale ? "Stale · no recent samples" : invalid === spectrum.bands.length
       ? "No valid bands" : invalid > 0 ? `${invalid} invalid band${invalid === 1 ? "" : "s"}` : "Latest sample";
     summary.textContent = `${spectrum.bands.length} bands · scale ${config.minDb} to ${config.maxDb} dB`;
     frame.textContent = spectrum.frame;
     frame.title = spectrum.frame;
-    const width = Math.max(360, root.clientWidth - 48);
-    const height = Math.max(170, root.clientHeight - 150);
-    const left = 48, right = width - 12, topY = 26, bottom = height - 52;
+    const width = Math.max(320, plot.clientWidth || root.clientWidth - 32);
+    const height = Math.max(160, plot.clientHeight || root.clientHeight - 150);
+    const left = 48, right = width - 20, topY = 32, bottom = height - 48;
     const plotHeight = bottom - topY;
     chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
     for (let i = 0; i <= 6; i++) {
@@ -87,7 +94,7 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
     }
     svg("text", { class: "axis", x: 8, y: 14 }, "dB");
     const step = (right - left) / spectrum.bands.length;
-    const barWidth = Math.min(78, step * .65);
+    const barWidth = Math.min(80, step * .6);
     spectrum.bands.forEach((band, index) => {
       const center = left + step * (index + .5);
       const x = center - barWidth / 2;
@@ -176,7 +183,7 @@ export function initSpectrumPanel(context: PanelExtensionContext): () => void {
     }
   };
   const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => draw());
-  observer?.observe(root);
+  observer?.observe(plot);
   draw();
   return () => {
     disposed = true;
