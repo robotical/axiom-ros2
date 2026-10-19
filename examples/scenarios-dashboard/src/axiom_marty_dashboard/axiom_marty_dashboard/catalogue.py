@@ -146,6 +146,12 @@ def catalogue(axiom_namespace="/axiom"):
             note="Created from the live descriptor; removed when the device goes offline.",
         )
     )
+    axiom["subscriptions"].extend([
+        dict(name=root + "/MODEL_bBUS_ADDRESS/commands/angle",
+             types=["std_msgs/msg/Float64"], note="Servo target in radians."),
+        dict(name=root + "/MODEL_bBUS_ADDRESS/commands/pixels/pixel_INDEX",
+             types=["std_msgs/msg/ColorRGBA"], note="Per-pixel normalized RGB target."),
+    ])
     marty["services"] = [
         dict(name="/marty/" + name, type="std_srvs/srv/Trigger", role="server")
         for name in ("connect", "disconnect", "stop")

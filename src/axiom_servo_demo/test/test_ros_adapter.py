@@ -1,4 +1,4 @@
-"""Real DDS joint input and acknowledged descriptor service calls; no hardware."""
+"""Real DDS angle topics and acknowledged enable calls; no hardware."""
 
 import copy
 import json
@@ -17,12 +17,12 @@ from rclpy.parameter import Parameter  # noqa: E402
 from rclpy.qos import DurabilityPolicy, QoSProfile  # noqa: E402
 from rclpy.task import Future  # noqa: E402
 from sensor_msgs.msg import JointState  # noqa: E402
-from std_msgs.msg import String  # noqa: E402
+from std_msgs.msg import Float64, String  # noqa: E402
 from std_srvs.srv import SetBool  # noqa: E402
 
 
 class Rig:
-    """Run the real adapter against controllable ROS descriptor-service peers."""
+    """Run the real adapter against angle-topic and enable-service peers."""
 
     def __init__(self, device, *, start_enabled=None, slider_live=True):
         rclpy.init()
@@ -44,9 +44,9 @@ class Rig:
         self.rows = [copy.deepcopy(device)]
         self.position = 0.0
         self.inventory_live, self.slider_live = True, slider_live
-        self.angle_calls, self.enable_calls, self.observed = [], [], []
-        self.hold_angle = self.hold_enable = None
-        self.fail_angle = self.fail_enable = False
+        self.angle_targets, self.enable_calls, self.observed = [], [], []
+        self.hold_enable = None
+        self.fail_enable = False
         retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.inventory = self.peer.create_publisher(String, '/servo_test_board/devices', retained)
         self.slider = self.peer.create_publisher(
@@ -57,7 +57,10 @@ class Rig:
             JointState, '/servo_test_demo/observed_joint_states', self.observed.append, 10)
         group = ReentrantCallbackGroup()
         self.services = {}
-        for kind, callback in (('angle', self.angle), ('enable', self.enable)):
+        self.angle_subscription = self.peer.create_subscription(
+            Float64, '/servo_test_board/' + device['topic'] + '/commands/angle',
+            lambda message: self.angle_targets.append(message.data), 1)
+        for kind, callback in (('enable', self.enable),):
             path = '/servo_test_board/' + device['topic'] + '/commands/' + kind
             self.services[kind] = self.peer.create_service(
                 DeviceCommand, path, callback, callback_group=group)
@@ -73,15 +76,6 @@ class Rig:
             self.inventory.publish(String(data=json.dumps(self.rows)))
         if self.slider_live:
             self.slider.publish(JointState(name=['servo_joint'], position=[self.position]))
-
-    async def angle(self, request, response):
-        """Optionally hold or reject an angle acknowledgement."""
-        self.angle_calls.append(list(request.values))
-        if self.hold_angle:
-            await self.hold_angle
-        response.success = not self.fail_angle
-        response.message = 'Rejected by test firmware' if self.fail_angle else 'ok'
-        return response
 
     async def enable(self, request, response):
         """Record both enable and disable writes."""
@@ -113,12 +107,13 @@ class Rig:
 
     def close(self):
         """Release pending callbacks and the ROS context."""
-        for future in (self.hold_angle, self.hold_enable):
+        self.inventory_live = self.slider_live = False
+        for future in (self.hold_enable,):
             if future is not None and not future.done():
                 future.set_result(None)
-        self.adapter.unbind('Test finished')
         self.spin(0.05)
         self.executor.shutdown()
+        self.adapter.unbind('Test finished')
         self.adapter.destroy_node()
         self.peer.destroy_node()
         rclpy.shutdown()
@@ -148,7 +143,7 @@ def test_default_startup_waits_for_input_service_and_acknowledgement(auto_rig, d
     """Enable once after readiness, using the initial nonzero angle only as a baseline."""
     rig = auto_rig
     rig.spin()
-    assert not rig.enable_calls and not rig.angle_calls
+    assert not rig.enable_calls and not rig.angle_targets
     rig.peer.destroy_service(rig.services['enable'])
     rig.wait(lambda: not rig.adapter.enable_client.service_is_ready())
     rig.position, rig.slider_live = math.radians(20), True
@@ -159,16 +154,16 @@ def test_default_startup_waits_for_input_service_and_acknowledgement(auto_rig, d
         DeviceCommand, '/servo_test_board/' + device['topic'] + '/commands/enable',
         rig.enable, callback_group=ReentrantCallbackGroup())
     rig.wait(lambda: rig.enable_calls == [[1.0]])
-    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert not rig.adapter.gate.armed and not rig.angle_targets
     rig.position = math.radians(22)
-    rig.wait(lambda: rig.adapter.gate.latest == 22.0)
+    rig.wait(lambda: rig.adapter.gate.latest == math.radians(22))
     rig.hold_enable.set_result(None)
     rig.hold_enable = None
     rig.wait(lambda: rig.adapter.gate.armed)
     rig.spin()
-    assert not rig.angle_calls and rig.enable_calls == [[1.0]]
+    assert not rig.angle_targets and rig.enable_calls == [[1.0]]
     rig.position = math.radians(25)
-    rig.wait(lambda: rig.angle_calls == [[25.0]])
+    rig.wait(lambda: rig.angle_targets == [math.radians(25)])
 
 
 @pytest.mark.parametrize('failure', ['rejected', 'timeout'])
@@ -187,10 +182,10 @@ def test_startup_failure_is_not_retried_and_manual_enable_recovers(auto_rig, fai
     rig.fail_enable = False
     rig.position = 0.2
     rig.spin()
-    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert not rig.adapter.gate.armed and not rig.angle_targets
     assert rig.enable_calls == [[1.0]]
     assert rig.set_enabled(True).success
-    assert rig.adapter.gate.armed and not rig.angle_calls
+    assert rig.adapter.gate.armed and not rig.angle_targets
 
 
 @pytest.mark.parametrize('inflight', [False, True])
@@ -211,7 +206,7 @@ def test_explicit_disable_cancels_startup_enable(auto_rig, inflight):
     rig.position, rig.slider_live = 0.2, True
     rig.spin()
     assert rig.enable_calls == ([[1.0], [0.0]] if inflight else [[0.0]])
-    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert not rig.adapter.gate.armed and not rig.angle_targets
 
 
 @pytest.mark.parametrize('enabled_before_loss', [False, True])
@@ -228,20 +223,20 @@ def test_device_loss_consumes_startup_enable_even_before_readiness(auto_rig, ena
     rig.position = 0.2
     rig.spin()
     assert rig.enable_calls == ([[1.0]] if enabled_before_loss else [])
-    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert not rig.adapter.gate.armed and not rig.angle_targets
 
 
 def test_enable_changed_target_disable_and_separate_feedback(rig):
     """Starting/enabling does not move; slider angles never become feedback."""
-    assert not rig.angle_calls and not rig.enable_calls and not rig.observed
+    assert not rig.angle_targets and not rig.enable_calls and not rig.observed
     assert rig.set_enabled(True).success
     rig.spin()
-    assert rig.enable_calls == [[1.0]] and not rig.angle_calls
+    assert rig.enable_calls == [[1.0]] and not rig.angle_targets
     rig.position = math.radians(-12.34)
-    rig.wait(lambda: len(rig.angle_calls) == 1)
-    assert rig.angle_calls == [[-12.3]]
+    rig.wait(lambda: len(rig.angle_targets) == 1)
+    assert rig.angle_targets == [math.radians(-12.34)]
     rig.spin()
-    assert len(rig.angle_calls) == 1 and not rig.observed
+    assert len(rig.angle_targets) == 1 and not rig.observed
     rig.feedback.publish(JointState(name=['firmware_joint'], position=[0.5]))
     rig.wait(lambda: bool(rig.observed))
     assert rig.observed[-1].name == ['servo_joint']
@@ -249,29 +244,7 @@ def test_enable_changed_target_disable_and_separate_feedback(rig):
     assert rig.set_enabled(False).success
     rig.position = 0.3
     rig.spin()
-    assert rig.enable_calls == [[1.0], [0.0]] and len(rig.angle_calls) == 1
-
-
-def test_slow_rpc_coalesces_to_latest_target_and_failure_disarms(rig):
-    """An outstanding request never accumulates a FIFO of slider positions."""
-    assert rig.set_enabled(True).success
-    rig.hold_angle = Future()
-    rig.position = math.radians(10)
-    rig.wait(lambda: len(rig.angle_calls) == 1)
-    for degrees in (20, 30, 40):
-        rig.position = math.radians(degrees)
-        rig.wait(lambda: rig.adapter.gate.latest == float(degrees))
-    assert rig.angle_calls == [[10.0]]
-    rig.hold_angle.set_result(None)
-    rig.hold_angle = None
-    rig.wait(lambda: len(rig.angle_calls) == 2)
-    assert rig.angle_calls[-1] == [40.0]
-    rig.fail_angle = True
-    rig.position = math.radians(50)
-    rig.wait(lambda: not rig.adapter.gate.armed)
-    rig.position = math.radians(60)
-    rig.spin()
-    assert rig.angle_calls == [[10.0], [40.0], [50.0]]
+    assert rig.enable_calls == [[1.0], [0.0]] and len(rig.angle_targets) == 1
 
 
 def test_replacement_invalidates_inflight_requests_and_requires_explicit_reenable(rig):
@@ -286,12 +259,12 @@ def test_replacement_invalidates_inflight_requests_and_requires_explicit_reenabl
     rig.hold_enable = None
     rig.position = math.radians(30)
     rig.spin()
-    assert not rig.angle_calls and not rig.adapter.gate.armed
+    assert not rig.angle_targets and not rig.adapter.gate.armed
     assert rig.set_enabled(True).success
     rig.spin()
-    assert not rig.angle_calls
+    assert not rig.angle_targets
     rig.position = math.radians(31)
-    rig.wait(lambda: rig.angle_calls == [[31.0]])
+    rig.wait(lambda: rig.angle_targets == [math.radians(31)])
 
 
 def test_disable_supersedes_a_pending_enable(rig):
@@ -309,7 +282,7 @@ def test_disable_supersedes_a_pending_enable(rig):
     assert rig.enable_calls == [[1.0], [0.0]] and not rig.adapter.gate.armed
     rig.position = 0.5
     rig.spin()
-    assert not rig.angle_calls
+    assert not rig.angle_targets
 
 
 def test_inventory_and_slider_expiry_do_not_rearm_automatically(rig):
@@ -325,18 +298,14 @@ def test_inventory_and_slider_expiry_do_not_rearm_automatically(rig):
     rig.wait(lambda: rig.adapter.binding is None)
     rig.inventory_live = True
     rig.wait(lambda: rig.adapter.binding is not None)
-    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert not rig.adapter.gate.armed and not rig.angle_targets
 
 
-def test_rpc_timeout_drops_new_targets_and_late_replies(rig):
-    """An expired request is not retried or replayed after its reply arrives."""
+def test_demo_limits_reject_targets_without_publishing(rig):
+    """Keep the GUI-specific limits while the driver handles descriptor encoding."""
     assert rig.set_enabled(True).success
-    rig.hold_angle = Future()
-    rig.position = 0.2
-    rig.wait(lambda: len(rig.angle_calls) == 1)
-    rig.position = 0.4
-    rig.wait(lambda: not rig.adapter.gate.armed)
-    rig.hold_angle.set_result(None)
-    rig.hold_angle = None
+    rig.position = math.radians(100)
     rig.spin()
-    assert len(rig.angle_calls) == 1 and not rig.adapter.gate.armed
+    assert not rig.angle_targets
+    rig.position = math.radians(15)
+    rig.wait(lambda: rig.angle_targets == [math.radians(15)])

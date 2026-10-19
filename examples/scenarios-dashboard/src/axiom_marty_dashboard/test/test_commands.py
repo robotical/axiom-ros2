@@ -64,3 +64,30 @@ def test_scenario_topic_commands_parse_with_installed_ros_cli():
                     # Newer ROS CLIs allow multiple fields and return a list.
                     fields = [args.field] if isinstance(args.field, str) else args.field
                     assert fields in (["linear_acceleration"], ["range"])
+
+
+def test_output_topic_recipes_use_valid_standard_messages_and_no_legacy_services():
+    """Copy angle and per-pixel colour targets as valid ros2 topic pub commands."""
+    import argparse
+
+    from ros2topic.verb.pub import PubVerb
+    from rosidl_runtime_py.utilities import get_message
+
+    state = {"devices": [{"type": "OutputBoard", "online": True, "commands": [],
+                          "command_topics": [
+                              {"name": "angle", "kind": "angle",
+                               "topic": "output_b1_10/commands/angle",
+                               "message_type": "std_msgs/msg/Float64"},
+                              {"name": "pixels", "kind": "colour", "pixel": 0,
+                               "topic": "output_b1_10/commands/pixels/pixel_0",
+                               "message_type": "std_msgs/msg/ColorRGBA"}]}]}
+    rows = [row for row in recipes(state, "/robot/axiom")
+            if row["group"] == "Device command topics"]
+    assert len(rows) == 2
+    for row in rows:
+        tokens = shlex.split(row["command"])
+        parser = argparse.ArgumentParser()
+        PubVerb().add_arguments(parser, "ros2 topic")
+        args = parser.parse_args(tokens[3:])
+        assert args.topic_name.startswith("/robot/axiom/output_b1_10/commands/")
+        get_message(args.message_type)(**json.loads(tokens[-1]))

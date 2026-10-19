@@ -18,6 +18,9 @@ def device():
     topic = 'roboticalsoloservo_b1_10'
     return {
         'topic': topic, 'revision': 7, 'online': True, 'stale': False, 'metadata_ready': True,
-        'commands': [{'name': a['n'], 'service': topic + '/commands/' + a['n'],
-                      'descriptor': a} for a in profile['actions']],
+        'command_topics': [{'name': 'angle', 'topic': topic + '/commands/angle',
+                            'kind': 'angle', 'message_type': 'std_msgs/msg/Float64',
+                            'unit': 'rad', 'descriptor': profile['actions'][0]}],
+        'commands': [{'name': 'enable', 'service': topic + '/commands/enable',
+                      'descriptor': profile['actions'][1]}],
     }

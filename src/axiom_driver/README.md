@@ -162,7 +162,7 @@ output with `message_type` (for example `sensor_msgs/msg/Illuminance`) and `unit
 The unit is `null` for unitless/unspecified values and messages without a single
 measurement unit, such as IMU, generic JSON, booleans and text. Both maps become
 empty when the device's publishers retire.
-Output-only devices have a readable root and descriptor-command services, with
+Output-only devices have a readable root, command inputs and services, with
 an empty output map. A configured alias reserves its exact path even while
 unbound. The canonical output at that path is suppressed and omitted from
 `public_topics`, so two sources cannot be mixed into that publisher. Offline,
@@ -365,11 +365,61 @@ driver or acquisition. A subscriber can keep a topic name registered after its
 publisher disappears; inspect publisher count with `ros2 topic info --verbose`.
 Unchanged metadata refreshes preserve publishers and device clock estimates.
 
+## Direct output command topics
+
+The driver subscribes directly to supported output targets advertised by live
+descriptors. The `devices` inventory's `command_topics` array provides each exact
+relative `topic`, `message_type`, `unit`, original command `name` and `descriptor`.
+Indexed LED inputs also include `pixel`. Prefix the relative path with the board's
+namespace. These inputs are separate from the measurement `public_topics` map.
+
+| Descriptor command | Topic example beneath a device root | ROS input |
+|---|---|---|
+| Servo `angle` or `set angle` | `commands/angle` (or the escaped action name) | `std_msgs/msg/Float64`, radians |
+| Indexed RGB `LEDPIX` | `commands/pixels/pixel_0`, `pixel_1`, … | `std_msgs/msg/ColorRGBA`, RGB channels in 0..1 |
+| Three-byte `color`, `colour` or `rgb` | `commands/colour` (exact action name) | `std_msgs/msg/ColorRGBA`, RGB channels in 0..1 |
+
+RGB alpha is ignored because the supported devices have no transparency channel.
+Pixel indexes are zero-based and use the descriptor's index order. The driver
+converts RGB channels to bytes and converts servo radians to descriptor units,
+including integer wire resolution and range checks. Servo units come from the
+action's `u`, then the reported `angle` attribute's `u`; the legacy default is
+degrees. Supported units are `degrees`/`deg` and `radians`/`rad`.
+
+```bash
+# Copy the actual full angle topic from the board's command_topics inventory.
+ANGLE_TOPIC='PASTE_DISCOVERED_ANGLE_TOPIC_HERE'
+# Request approximately five degrees using ROS radians.
+ros2 topic pub --once "$ANGLE_TOPIC" std_msgs/msg/Float64 '{data: 0.0872664626}'
+# Copy the actual full topic for the desired LED pixel.
+COLOUR_TOPIC='PASTE_DISCOVERED_PIXEL_TOPIC_HERE'
+# Set that pixel to red using normalized RGB values.
+ros2 topic pub --once "$COLOUR_TOPIC" std_msgs/msg/ColorRGBA '{r: 1.0, g: 0.0, b: 0.0, a: 1.0}'
+```
+
+Command subscriptions use reliable, volatile QoS with depth one. Targets are
+validated without blocking the ROS executor; the existing pipeline worker sends
+them through the existing firmware protocol, allowing acquisition between writes.
+Only the latest pending target per topic is kept. Different pixels retain separate
+targets. Identical acknowledged values are deduplicated. Removed, stale or replaced
+devices and ended sessions discard pending targets and retire subscriptions.
+Queued targets older than `rpc_default_timeout` are discarded. Firmware failures
+are reported through driver logs/diagnostics; topic publication is not a physical
+completion acknowledgement. Failed targets are not retried without fresh input.
+
+The former angle and LED-colour services are removed, with no compatibility mode.
+The remaining `commands` inventory array lists acknowledged services such as
+enable/disable, LED brightness/off, sample-rate and other configuration operations.
+Direct angle publication does not automatically enable a servo. Use its advertised
+enable service first, or use the [slider demo](../../docs/servo-slider.md), which
+enables once on startup by default. Acknowledged enable/off operations discard
+earlier pending targets for that device and invalidate the deduplication cache.
+
 ## Services
 
 All success responses require a firmware acknowledgement where an RPC is involved.
 
-Live descriptors also create `<sensor-instance>/commands/<command>` services
+Other supported descriptor commands create `<sensor-instance>/commands/<command>` services
 of type `axiom_interfaces/srv/DeviceCommand`, including output-only devices.
 The inventory includes command names, paths and descriptors. Numeric `values`
 follow descriptor argument order and units; no-argument commands use `[]`.
@@ -384,9 +434,7 @@ descriptor (52 Hz is an illustrative LSM6DS rate):
 ```bash
 RATE_SERVICE='PASTE_DISCOVERED_SAMPLE_RATE_SERVICE_HERE'
 ros2 service call "$RATE_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: [52.0]}'
-LED_PIXELS_SERVICE='PASTE_DISCOVERED_LED_PIXELS_SERVICE_HERE'
 LED_OFF_SERVICE='PASTE_DISCOVERED_LED_OFF_SERVICE_HERE'
-ros2 service call "$LED_PIXELS_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: [0.0, 0.0, 16.0, 16.0]}'
 ros2 service call "$LED_OFF_SERVICE" axiom_interfaces/srv/DeviceCommand '{values: []}'
 ```
 

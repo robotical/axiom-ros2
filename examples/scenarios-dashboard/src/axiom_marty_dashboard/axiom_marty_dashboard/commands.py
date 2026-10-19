@@ -267,11 +267,20 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
     for device in state.get("devices", []):
         if not device.get("online") or device.get("stale"):
             continue
+        for item in device.get("command_topics", []):
+            payload = ({"data": 0.0} if item["kind"] == "angle"
+                       else {"r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0})
+            label = item["name"] + (f' pixel {item["pixel"]}' if "pixel" in item else "")
+            add(
+                "Device command topics", device["type"] + " · " + label,
+                f'ros2 topic pub --once {root}/{item["topic"]} {item["message_type"]} '
+                + shlex.quote(json.dumps(payload)),
+                "Radian target" if item["kind"] == "angle"
+                else "Normalized RGB; alpha is ignored.",
+            )
         for item in device.get("commands", []):
             action = item["descriptor"]
-            if action.get("f") == "LEDPIX":
-                values = [0, 16, 16, 16]
-            elif action.get("t"):
+            if action.get("t"):
                 # Configuration maps use Hz, not the raw integer format.
                 count = sum(
                     int(n or 1) for n, _ in re.findall(r"([0-9]*)([bBhHiIlLqQfd?])", action["t"])
@@ -300,10 +309,6 @@ def recipes(state, axiom_namespace="/axiom", *, boards=None, boards_file=None):
             ):
                 if value:
                     rows[-1]["help"]["arguments"].append(dict(name=label, description=str(value)))
-            if action.get("f") == "LEDPIX":
-                rows[-1]["help"]["arguments"].append(
-                    dict(name="values order", description="Pixel index, red, green, blue.")
-                )
     for title, goal in (
         (
             "Walk one step",

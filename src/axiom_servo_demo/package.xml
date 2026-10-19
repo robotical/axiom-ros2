@@ -2,7 +2,7 @@
 <package format="3">
   <name>axiom_servo_demo</name>
   <version>0.1.0</version>
-  <description>Joint sliders and a descriptor service adapter for an Axiom servo</description>
+  <description>Joint sliders publishing Axiom angle targets with acknowledged enable control</description>
   <maintainer email="info@robotical.io">Robotical</maintainer>
   <license>MIT</license>
   <license>Apache-2.0</license>
@@ -23,5 +23,6 @@
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>tf2_msgs</test_depend>
+  <test_depend>python3-websockets</test_depend>
   <export><build_type>ament_python</build_type></export>
 </package>

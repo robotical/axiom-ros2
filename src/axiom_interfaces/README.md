@@ -17,7 +17,7 @@ for units, topics, timing and examples. Start with the
 | `PublishedDataSubscription` | devjson delivery rate (zero unsubscribes); no name field |
 | `RicRestUrl` | URL, timeout and optional matching framing → firmware JSON |
 | `SetSampleRate` | Bus, hex address and supported sample rate → actual rate, poll interval and retained poll count |
-| `DeviceCommand` | Numeric values in live descriptor order/units → success, message and firmware response JSON; endpoint follows device lifetime |
+| `DeviceCommand` | Discrete descriptor commands (including enable/configuration): numeric values in descriptor order/units → success, message and firmware response JSON |
 
 Standard IMU, scalar Range and thermal/multizone Image outputs use `sensor_msgs`;
 they do not need new custom message definitions. Image values are `32FC1`, in °C
@@ -26,3 +26,6 @@ for thermal images or metres for supported multizone range images. See the
 
 Rebuild and source the workspace after interface changes. These interfaces expose
 sensor acquisition and configuration; they do not constitute ros2_control actuation.
+Servo angles and LED colours use direct subscriptions to standard `Float64`
+(radians) and `ColorRGBA` (normalized RGB) messages. They have no `DeviceCommand`
+service alternative; see the driver's [command-topic contracts](../axiom_driver/README.md#direct-output-command-topics).

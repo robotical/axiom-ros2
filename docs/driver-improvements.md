@@ -73,7 +73,7 @@ src/axiom_debug_tools/axiom_debug_tools/topic_sniff.py
 src/axiom_driver/axiom_driver/axiom_bridge_node.py
 src/axiom_driver/axiom_driver/core/rpc.py
 src/axiom_driver/axiom_driver/core/session.py
-src/axiom_driver/axiom_driver/descriptor_services.py
+src/axiom_driver/axiom_driver/descriptor_commands.py
 src/axiom_driver/axiom_driver/mini_hdlc.py
 src/axiom_driver/axiom_driver/protocols/ric_serial.py
 src/axiom_driver/axiom_driver/publisher_cache.py

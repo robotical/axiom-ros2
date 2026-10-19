@@ -324,6 +324,14 @@ def explain(title, command):
         arg(tokens[3], "Fully qualified name of the node to inspect, including its namespace.")
     elif family == ["ros2", "interface", "show"]:
         arg(tokens[3], "Interface identifier: package/action/name for this action definition.")
+    elif family == ["ros2", "topic", "pub"]:
+        arg("--once", "Publishes one target; this is not a firmware completion acknowledgement.")
+        arg(tokens[4], "Discovered output-command topic. Its driver must be running.")
+        arg(tokens[5], "Standard ROS input message type advertised in command_topics.")
+        for key, value in json.loads(tokens[6]).items():
+            detail = ("Target servo angle in radians." if key == "data"
+                      else "RGB channels use 0..1; alpha is ignored by the LED hardware.")
+            arg(f"{key}: {json.dumps(value)}", detail)
     elif family == ["ros2", "topic", "echo"]:
         arg(tokens[3], "Topic name to subscribe to. Echo creates a subscriber, not a publisher.")
         index = 4

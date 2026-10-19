@@ -33,7 +33,7 @@ from .core.registry import DeviceKey
 from .core.rpc import SessionError
 from .core.session import Session
 from .core.timing import Receipt
-from .descriptor_services import DescriptorServices
+from .descriptor_commands import DescriptorCommands
 from .ros_adapters import json_text, RosAdapters
 
 
@@ -110,7 +110,7 @@ class AxiomBridgeNode(Node):
             self._issue,
             self.config['metadata_refresh_s'],
         )
-        self.descriptor_services = DescriptorServices(self)
+        self.descriptor_commands = DescriptorCommands(self)
         self._worker = threading.Thread(target=self._work, name='axiom-decode', daemon=True)
         self._worker.start()
         group = ReentrantCallbackGroup()
@@ -213,7 +213,7 @@ class AxiomBridgeNode(Node):
         for device in devices:
             device['stale'] = device['age_s'] > self.config['stale_after_s']
         self.adapters.sync(devices)
-        self.descriptor_services.sync(devices)
+        self.descriptor_commands.sync(devices)
         self._inventory = devices
         self.inventory_pub.publish(String(data=json_text(devices)))
         metadata = {
@@ -243,6 +243,7 @@ class AxiomBridgeNode(Node):
                 self._active_generation = generation
                 self.pipeline.reset()
                 self.adapters.cache.clear()
+                self.descriptor_commands.clear()
             now = time.monotonic()
             if now >= self._next_inventory:
                 self._inventory_changed(
@@ -264,6 +265,7 @@ class AxiomBridgeNode(Node):
                 except Exception as exc:
                     future.set_exception(exc)
                 continue
+            self.descriptor_commands.dispatch_one()
             try:
                 event_generation, data, receipt = self._data.get(timeout=0.05)
             except queue.Empty:
@@ -277,6 +279,7 @@ class AxiomBridgeNode(Node):
                 self._active_generation = generation
                 self.pipeline.reset()
                 self.adapters.cache.clear()
+                self.descriptor_commands.clear()
             try:
                 self.raw_pub.publish(
                     String(
@@ -524,7 +527,7 @@ class AxiomBridgeNode(Node):
         self._worker.join(timeout=5)
         self._connector.shutdown(wait=True, cancel_futures=True)
         self.adapters.cache.clear()
-        self.descriptor_services.clear()
+        self.descriptor_commands.clear()
         return super().destroy_node()
 
 

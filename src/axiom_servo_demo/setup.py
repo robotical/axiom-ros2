@@ -21,7 +21,7 @@ setup(
     zip_safe=True,
     maintainer='Robotical',
     maintainer_email='info@robotical.io',
-    description='Marty-style joint sliders driving Axiom descriptor command services',
+    description='Marty-style joint sliders publishing Axiom angle command topics',
     license='MIT AND Apache-2.0',
     entry_points={'console_scripts': ['servo_adapter = axiom_servo_demo.node:main']},
 )

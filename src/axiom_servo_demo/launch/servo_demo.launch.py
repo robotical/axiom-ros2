@@ -1,4 +1,4 @@
-"""Launch the same joint slider GUI as Marty and an Axiom service adapter."""
+"""Launch Marty's joint slider GUI and publish Axiom angle-command topics."""
 
 import math
 from pathlib import Path
@@ -35,7 +35,7 @@ def demo_nodes(context):
     # The leg has one free joint; the GUI automatically follows its mimic joints.
     description = robot_description(share, model, lower, upper)
     adapter = {name: LaunchConfiguration(name).perform(context) for name in (
-        'axiom_namespace', 'servo', 'angle_command', 'enable_command', 'command_unit')}
+        'axiom_namespace', 'servo', 'enable_command')}
     adapter.update(lower_limit_deg=lower, upper_limit_deg=upper)
     adapter['start_enabled'] = ParameterValue(
         LaunchConfiguration('start_enabled'), value_type=bool)
@@ -61,9 +61,7 @@ def generate_launch_description():
     defaults = {
         'axiom_namespace': ('/axiom', 'Namespace of the already-running Axiom driver'),
         'servo': ('', 'Exact relative device topic root; empty selects one unambiguous servo'),
-        'angle_command': ('angle', 'Live descriptor action name for target angle'),
         'enable_command': ('enable', 'Live descriptor action name accepting 0/1'),
-        'command_unit': ('degrees', 'Angle command units: degrees or radians'),
         'lower_limit_deg': ('-90.0', 'Lower demo angle limit in degrees'),
         'upper_limit_deg': ('90.0', 'Upper demo angle limit in degrees'),
         'command_rate_hz': ('10.0', 'Maximum angle command rate, up to 50 Hz'),

@@ -17,6 +17,7 @@ from rclpy.parameter import Parameter  # noqa: E402
 from rclpy.qos import qos_profile_sensor_data  # noqa: E402
 from rclpy.serialization import serialize_message  # noqa: E402
 from sensor_msgs.msg import Range  # noqa: E402
+from std_msgs.msg import ColorRGBA  # noqa: E402
 from test_ros_integration import wait_until  # noqa: E402
 from test_session import FirmwareServer  # noqa: E402
 
@@ -119,9 +120,13 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
         assert not any('/bus_' in path for path, _ in probe.get_service_names_and_types())
         call(DeviceCommand, brightness, values=[50.0])
         assert 'hexWr=7632' in peers[0].paths[-1]
-        call(DeviceCommand, brightness.replace('brightness', 'pixels'),
-             values=[0.0, 0.0, 16.0, 16.0])
-        assert 'hexWr=7100001010' in peers[0].paths[-1]
+        colour_topic = brightness.replace('brightness', 'pixels/pixel_0')
+        assert brightness.replace('brightness', 'pixels') not in dict(
+            probe.get_service_names_and_types())
+        colour_pub = probe.create_publisher(ColorRGBA, colour_topic, 1)
+        wait_until(lambda: colour_pub.get_subscription_count() == 1)
+        colour_pub.publish(ColorRGBA(r=0., g=16 / 255, b=16 / 255, a=1.))
+        wait_until(lambda: any('hexWr=7100001010' in path for path in peers[0].paths))
         before = len(peers[0].paths)
         call(DeviceCommand, brightness, expect=False, values=[300.0])
         assert len(peers[0].paths) == before
@@ -129,6 +134,7 @@ def test_two_boards_hotplug_aliases_and_output_services(catalogue):
         assert 'hexWr=78' in peers[0].paths[-1]
         publish(0, online=0, data='')
         wait_until(lambda: brightness not in dict(probe.get_service_names_and_types()))
+        wait_until(lambda: colour_pub.get_subscription_count() == 0)
 
         # Replugging restores the stable alias without restarting any node.
         indices[0] = 1

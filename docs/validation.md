@@ -6,6 +6,38 @@ current installation and firmware selection. Historical firmware versions, test
 environments and sensor identities below describe those checks, not requirements
 for a user's host or boards. Results apply to their recorded source snapshots.
 
+## Direct servo and LED command topics — 2026-10-19
+
+The host driver now accepts servo targets as `std_msgs/Float64` radians and RGB
+targets as `std_msgs/ColorRGBA`, using the live device descriptor for conversion,
+range checks and firmware encoding. Indexed LEDs have one topic per pixel. The
+former angle/colour services and the demo's angle-service client are removed.
+Enable/disable, LED brightness/off and configuration remain acknowledged services.
+Inventory advertises topic inputs in `command_topics` separately from `commands`.
+
+All **eight packages built** in a disposable ROS Jazzy container with source
+mounted read-only. The full workspace result, including the final driver/demo
+reruns, is **397 tests, zero errors, zero failures and four existing skips**.
+Another **nine dashboard command/catalogue/help tests passed**. The driver has
+331 test cases and the servo demo has 22, including their ROS style checks.
+
+New tests use real DDS and framed mock firmware to check the advertised standard
+types, absence of the migrated services, exact servo/LED wire writes, per-pixel
+latest-target coalescing, invalid inputs, firmware rejection, device removal and
+session reconnect without replay. A retained publisher's old target is not
+requested by recreated volatile command subscriptions. LED off invalidates the
+deduplication cache so requesting the same colour again works. Conversion tests
+cover radians/degrees and LED stick/ring formats. A catalogue scan recognises both
+servo types and all three indexed LED devices. The combined demo test checks
+startup enable, joint-slider input through the actual driver, and disable.
+The existing installed GUI/TF launch tests pass for both preview models.
+
+Evidence remains in the Git-ignored `.shake-lab/direct-output-topics/` directory.
+The ROS linter emits Python fork/thread warnings; no command-test teardown handle
+errors remain after correcting the test executor lifecycle. This verification
+used simulated peers; Pi/Kilted and physical servo/LED acceptance remain
+pending. Firmware and Raft libraries were not changed, flashed or contacted.
+
 ## Servo startup enable — 2026-10-19
 
 The [servo demo](servo-slider.md#startup-enable-movement-and-disable) now defaults
