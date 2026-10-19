@@ -47,6 +47,8 @@ escaping. The corresponding option is `enable_command` for enable/disable.
 Choose demo limits appropriate to the attached mechanism. These limits apply to
 both the GUI and the adapter; the adapter also enforces live descriptor limits.
 The default range is −90° to +90°. The model is a schematic servo body and horn.
+The demo enables the selected servo once on startup by default. For a visual-only
+test without an enable request, append `start_enabled:=false`.
 
 ```bash
 ros2 launch axiom_servo_demo servo_demo.launch.py \
@@ -69,7 +71,7 @@ physical output is disarmed, disconnected or has not reached the target.
 
 ### Right-leg hip preview and live toggle
 
-To preview the hip of a standalone Marty right leg, append `preview_model:=right_leg`:
+To use the hip model of a standalone Marty right leg, append `preview_model:=right_leg`:
 
 ```bash
 # Show the right-leg hip while keeping the existing servo-control workflow.
@@ -98,28 +100,38 @@ does not disable the servo; use the acknowledged disable service below for that.
 The [asset notes](../src/axiom_servo_demo/meshes/marty_right_leg/README.md) record
 the source revision, Apache-2.0 licence and model adaptations.
 
-## Enable, move and disable
+## Startup enable, movement and disable
 
-The adapter starts disarmed and never automatically enables the servo. In another
-prepared terminal, wait for the slider and selected-device message, then run:
+`start_enabled` defaults to `true`. After selecting a compatible servo, the adapter
+waits for a valid, fresh slider message and the enable service to become available.
+It sends one enable request and waits for firmware acknowledgement before arming
+angle commands. Wait for **Servo enabled; move the slider to send an angle**,
+then move the slider. There is no separate enable command for this normal startup.
+
+The initial slider position is a baseline: the adapter sends no angle on startup
+or enable, including slider changes made while waiting for the acknowledgement.
+Enable itself may energise the motor at its existing target according to firmware.
+Use small changes first. The hardware may move directly to a new target; this
+demo adds neither a trajectory nor a velocity ramp. The driver service response
+confirms firmware acknowledgement, not physical completion.
+
+With `start_enabled:=false`, the adapter stays disarmed until explicitly enabled.
+For this mode, or to re-enable after a disconnect, failure or explicit disable,
+wait for the slider and selected-device message, then run in a prepared terminal:
 
 ```bash
+# Enable explicitly when startup enabling is off or a later re-enable is needed.
 ros2 service call /servo_demo/set_enabled std_srvs/srv/SetBool '{data: true}'
 ```
 
-Success requires the existing descriptor enable service to acknowledge the
-firmware request. Enable itself may energise the motor according to the board's
-firmware; the adapter sends no angle on startup or enable. Once the call succeeds,
-**move the slider** to send a new angle. The current slider position is treated
-as a baseline, so an unchanged startup value is not sent accidentally.
-
-Use small changes first. The hardware may move directly to the new target; this
-demo adds neither a trajectory nor a velocity ramp. The driver service response
-confirms firmware acknowledgement, not physical completion.
+Once the call succeeds, **move the slider** to send a new angle. Explicit enable
+and disable requests cancel any pending automatic startup enable. A failed or
+timed-out startup enable is not retried automatically.
 
 Disable before stopping the demo:
 
 ```bash
+# Disable the physical output and wait for acknowledgement before stopping.
 ros2 service call /servo_demo/set_enabled std_srvs/srv/SetBool '{data: false}'
 ```
 
@@ -165,6 +177,8 @@ longer than 2.5 seconds clears the selection and all pending angles. Slider inpu
 older than one second, a rejected angle service or an RPC timeout disarms output.
 A reconnect never automatically enables or replays the previous angle. Once
 inventory and the slider are live again, call `set_enabled` and move the slider.
+Losing the first selected device cancels startup enabling even if it had not yet
+become ready. Starting a new demo process uses `start_enabled` again.
 
 If selection keeps waiting, check `/axiom/devices` for `online`, `stale`,
 `metadata_ready` and the advertised command names/descriptors. For rejected
@@ -172,8 +186,8 @@ angles, check the command unit and both the configured and live limits. Matching
 ROS domains and a sourced, rebuilt workspace are required in all terminals.
 
 The launch defaults to using an already-running driver. For headless validation,
-append `gui:=false rviz:=false`; publish valid `JointState` messages to
-`/servo_demo/joint_commands` to supply input. The node's timeout parameters are
+append `gui:=false rviz:=false start_enabled:=false`; publish valid `JointState`
+messages to `/servo_demo/joint_commands` to supply input. The node's timeout parameters are
 available through `ros2 run axiom_servo_demo servo_adapter --ros-args` for slower
 links; the normal launch exposes board/command selection, limits and command rate.
 

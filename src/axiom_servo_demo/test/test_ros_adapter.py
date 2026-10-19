@@ -24,26 +24,29 @@ from std_srvs.srv import SetBool  # noqa: E402
 class Rig:
     """Run the real adapter against controllable ROS descriptor-service peers."""
 
-    def __init__(self, device):
+    def __init__(self, device, *, start_enabled=None, slider_live=True):
         rclpy.init()
         self.peer = Node('servo_test_peer', use_global_arguments=False)
+        overrides = [
+            Parameter('axiom_namespace', value='/servo_test_board'),
+            Parameter('inventory_timeout_s', value=0.6),
+            Parameter('slider_timeout_s', value=0.6),
+            Parameter('request_timeout_s', value=0.8),
+        ]
+        if start_enabled is not None:
+            overrides.append(Parameter('start_enabled', value=start_enabled))
         self.adapter = ServoAdapter(
             namespace='/servo_test_demo', use_global_arguments=False,
-            parameter_overrides=[
-                Parameter('axiom_namespace', value='/servo_test_board'),
-                Parameter('inventory_timeout_s', value=0.6),
-                Parameter('slider_timeout_s', value=0.6),
-                Parameter('request_timeout_s', value=0.8),
-            ])
+            parameter_overrides=overrides)
         self.executor = SingleThreadedExecutor()
         self.executor.add_node(self.peer)
         self.executor.add_node(self.adapter)
         self.rows = [copy.deepcopy(device)]
         self.position = 0.0
-        self.inventory_live = self.slider_live = True
+        self.inventory_live, self.slider_live = True, slider_live
         self.angle_calls, self.enable_calls, self.observed = [], [], []
         self.hold_angle = self.hold_enable = None
-        self.fail_angle = False
+        self.fail_angle = self.fail_enable = False
         retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.inventory = self.peer.create_publisher(String, '/servo_test_board/devices', retained)
         self.slider = self.peer.create_publisher(
@@ -53,12 +56,16 @@ class Rig:
         self.peer.create_subscription(
             JointState, '/servo_test_demo/observed_joint_states', self.observed.append, 10)
         group = ReentrantCallbackGroup()
+        self.services = {}
         for kind, callback in (('angle', self.angle), ('enable', self.enable)):
             path = '/servo_test_board/' + device['topic'] + '/commands/' + kind
-            self.peer.create_service(DeviceCommand, path, callback, callback_group=group)
+            self.services[kind] = self.peer.create_service(
+                DeviceCommand, path, callback, callback_group=group)
         self.peer.create_timer(0.05, self.publish)
         self.enabled = self.peer.create_client(SetBool, '/servo_test_demo/set_enabled')
-        self.wait(lambda: self.adapter.gate.latest == 0.)
+        self.wait(lambda: self.adapter.binding is not None)
+        if slider_live:
+            self.wait(lambda: self.adapter.gate.latest == 0.)
 
     def publish(self):
         """Keep the inventory and slider alive independently."""
@@ -81,7 +88,8 @@ class Rig:
         self.enable_calls.append(list(request.values))
         if self.hold_enable:
             await self.hold_enable
-        response.success, response.message = True, 'ok'
+        response.success = not self.fail_enable
+        response.message = 'Enable rejected by test firmware' if self.fail_enable else 'ok'
         return response
 
     def wait(self, predicate, timeout=4):
@@ -119,11 +127,108 @@ class Rig:
 @pytest.fixture
 def rig(device):
     """Supply an isolated real ROS graph for each control scenario."""
-    rig = Rig(device)
+    rig = Rig(device, start_enabled=False)
     try:
         yield rig
     finally:
         rig.close()
+
+
+@pytest.fixture
+def auto_rig(device):
+    """Use the real startup default while withholding slider input initially."""
+    rig = Rig(device, slider_live=False)
+    try:
+        yield rig
+    finally:
+        rig.close()
+
+
+def test_default_startup_waits_for_input_service_and_acknowledgement(auto_rig, device):
+    """Enable once after readiness, using the initial nonzero angle only as a baseline."""
+    rig = auto_rig
+    rig.spin()
+    assert not rig.enable_calls and not rig.angle_calls
+    rig.peer.destroy_service(rig.services['enable'])
+    rig.wait(lambda: not rig.adapter.enable_client.service_is_ready())
+    rig.position, rig.slider_live = math.radians(20), True
+    rig.spin()
+    assert not rig.enable_calls
+    rig.hold_enable = Future()
+    rig.services['enable'] = rig.peer.create_service(
+        DeviceCommand, '/servo_test_board/' + device['topic'] + '/commands/enable',
+        rig.enable, callback_group=ReentrantCallbackGroup())
+    rig.wait(lambda: rig.enable_calls == [[1.0]])
+    assert not rig.adapter.gate.armed and not rig.angle_calls
+    rig.position = math.radians(22)
+    rig.wait(lambda: rig.adapter.gate.latest == 22.0)
+    rig.hold_enable.set_result(None)
+    rig.hold_enable = None
+    rig.wait(lambda: rig.adapter.gate.armed)
+    rig.spin()
+    assert not rig.angle_calls and rig.enable_calls == [[1.0]]
+    rig.position = math.radians(25)
+    rig.wait(lambda: rig.angle_calls == [[25.0]])
+
+
+@pytest.mark.parametrize('failure', ['rejected', 'timeout'])
+def test_startup_failure_is_not_retried_and_manual_enable_recovers(auto_rig, failure):
+    """Keep failures disarmed, including late replies after an enable timeout."""
+    rig = auto_rig
+    if failure == 'rejected':
+        rig.fail_enable = True
+    else:
+        rig.hold_enable = Future()
+    rig.slider_live = True
+    rig.wait(lambda: rig.enable_calls == [[1.0]] and rig.adapter.control is None)
+    if rig.hold_enable is not None:
+        rig.hold_enable.set_result(None)
+        rig.hold_enable = None
+    rig.fail_enable = False
+    rig.position = 0.2
+    rig.spin()
+    assert not rig.adapter.gate.armed and not rig.angle_calls
+    assert rig.enable_calls == [[1.0]]
+    assert rig.set_enabled(True).success
+    assert rig.adapter.gate.armed and not rig.angle_calls
+
+
+@pytest.mark.parametrize('inflight', [False, True])
+def test_explicit_disable_cancels_startup_enable(auto_rig, inflight):
+    """Honor disable both before startup readiness and during its firmware request."""
+    rig = auto_rig
+    if inflight:
+        rig.hold_enable = Future()
+        rig.slider_live = True
+        rig.wait(lambda: rig.enable_calls == [[1.0]])
+    disable = rig.enabled.call_async(SetBool.Request(data=False))
+    rig.wait(lambda: rig.adapter.control is not None and not rig.adapter.control['enabled'])
+    if rig.hold_enable is not None:
+        rig.hold_enable.set_result(None)
+        rig.hold_enable = None
+    rig.wait(disable.done)
+    assert disable.result().success
+    rig.position, rig.slider_live = 0.2, True
+    rig.spin()
+    assert rig.enable_calls == ([[1.0], [0.0]] if inflight else [[0.0]])
+    assert not rig.adapter.gate.armed and not rig.angle_calls
+
+
+@pytest.mark.parametrize('enabled_before_loss', [False, True])
+def test_device_loss_consumes_startup_enable_even_before_readiness(auto_rig, enabled_before_loss):
+    """Never enable a replacement automatically after the first selection is lost."""
+    rig = auto_rig
+    if enabled_before_loss:
+        rig.slider_live = True
+        rig.wait(lambda: rig.adapter.gate.armed)
+    rows, rig.rows = rig.rows, []
+    rig.wait(lambda: rig.adapter.binding is None)
+    rig.rows, rig.slider_live = rows, True
+    rig.wait(lambda: rig.adapter.binding is not None)
+    rig.position = 0.2
+    rig.spin()
+    assert rig.enable_calls == ([[1.0]] if enabled_before_loss else [])
+    assert not rig.adapter.gate.armed and not rig.angle_calls
 
 
 def test_enable_changed_target_disable_and_separate_feedback(rig):

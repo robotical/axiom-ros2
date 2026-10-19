@@ -10,6 +10,7 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def robot_description(share, model, lower, upper):
@@ -36,6 +37,8 @@ def demo_nodes(context):
     adapter = {name: LaunchConfiguration(name).perform(context) for name in (
         'axiom_namespace', 'servo', 'angle_command', 'enable_command', 'command_unit')}
     adapter.update(lower_limit_deg=lower, upper_limit_deg=upper)
+    adapter['start_enabled'] = ParameterValue(
+        LaunchConfiguration('start_enabled'), value_type=bool)
     adapter['command_rate_hz'] = float(LaunchConfiguration('command_rate_hz').perform(context))
     return [
         Node(package='axiom_servo_demo', executable='servo_adapter', namespace='servo_demo',
@@ -64,6 +67,7 @@ def generate_launch_description():
         'lower_limit_deg': ('-90.0', 'Lower demo angle limit in degrees'),
         'upper_limit_deg': ('90.0', 'Upper demo angle limit in degrees'),
         'command_rate_hz': ('10.0', 'Maximum angle command rate, up to 50 Hz'),
+        'start_enabled': ('true', 'Enable once on startup after slider and servo readiness'),
         'preview_model': ('servo', 'RViz target model: servo or right_leg'),
         'gui': ('true', 'Open the Marty-style joint slider window'),
         'rviz': ('true', 'Open the selected target preview in RViz'),

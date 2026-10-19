@@ -13,14 +13,16 @@ import pytest
 rclpy = pytest.importorskip('rclpy')
 from ament_index_python.packages import get_package_share_directory  # noqa: E402,I100
 from rclpy.node import Node  # noqa: E402,I100
+from rclpy.parameter_client import AsyncParameterClient  # noqa: E402
 from rclpy.qos import DurabilityPolicy, QoSProfile  # noqa: E402
 from sensor_msgs.msg import JointState  # noqa: E402
 from std_msgs.msg import String  # noqa: E402
 from tf2_msgs.msg import TFMessage  # noqa: E402
 
 
-@pytest.mark.parametrize('model', ['servo', 'right_leg'])
-def test_installed_launch_starts_slider_and_preview_with_matching_limits(tmp_path, model):
+@pytest.mark.parametrize(('model', 'start_enabled'), [('servo', True), ('right_leg', False)])
+def test_installed_launch_starts_slider_and_preview_with_matching_limits(
+        tmp_path, model, start_enabled):
     """Check both installed models with the real GUI, including the hip linkage."""
     rclpy.init()
     probe = Node('servo_launch_probe', use_global_arguments=False)
@@ -39,7 +41,7 @@ def test_installed_launch_starts_slider_and_preview_with_matching_limits(tmp_pat
         'lower_limit_deg:=20.0', 'upper_limit_deg:=40.0',
     ]
     if model != 'servo':
-        command.append('preview_model:=' + model)
+        command.extend(['preview_model:=' + model, 'start_enabled:=false'])
     log_path = tmp_path / 'servo-launch.log'
     with log_path.open('w') as log:
         process = subprocess.Popen(
@@ -94,6 +96,11 @@ def test_installed_launch_starts_slider_and_preview_with_matching_limits(tmp_pat
             nodes = probe.get_node_names_and_namespaces()
             assert ('servo_adapter', '/servo_demo') in nodes
             assert not any(name == 'axiom_bridge_node' for name, _ in nodes)
+            parameters = AsyncParameterClient(probe, '/servo_demo/servo_adapter')
+            assert parameters.wait_for_services(timeout_sec=3)
+            future = parameters.get_parameters(['start_enabled'])
+            rclpy.spin_until_future_complete(probe, future, timeout_sec=3)
+            assert future.done() and future.result().values[0].bool_value is start_enabled
             process.send_signal(signal.SIGINT)
             assert process.wait(timeout=10) == 0, log_path.read_text()
         finally:

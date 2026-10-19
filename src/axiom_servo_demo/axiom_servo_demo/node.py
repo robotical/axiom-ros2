@@ -27,6 +27,7 @@ class ServoAdapter(Node):
             'axiom_namespace': '/axiom', 'servo': '',
             'angle_command': 'angle', 'enable_command': 'enable',
             'command_unit': 'degrees', 'joint_name': 'servo_joint',
+            'start_enabled': True,
             'lower_limit_deg': -90.0, 'upper_limit_deg': 90.0,
             'command_rate_hz': 10.0, 'request_timeout_s': 4.0,
             'inventory_timeout_s': 2.5, 'slider_timeout_s': 1.0,
@@ -49,6 +50,7 @@ class ServoAdapter(Node):
         if cfg['command_rate_hz'] > 50:
             raise ValueError('command_rate_hz must not exceed 50')
         self.gate = TargetGate()
+        self.startup_enable_pending = cfg['start_enabled']
         self.binding = self.angle_client = self.enable_client = self.feedback_sub = None
         self.rpc = self.control = None
         self.last_inventory = self.last_slider = self.last_send = None
@@ -100,10 +102,15 @@ class ServoAdapter(Node):
         self.feedback_sub = self.create_subscription(
             JointState, self.board + '/' + binding.topic + '/joint_states',
             lambda message: self.on_feedback(message, binding), qos)
-        self.report(f'Selected {binding.topic}; call set_enabled, then move the slider')
+        next_step = ('waiting for slider and service before startup enable'
+                     if self.startup_enable_pending
+                     else 'call set_enabled, then move the slider')
+        self.report(f'Selected {binding.topic}; {next_step}')
 
     def unbind(self, reason):
         """Forget old targets and complete waiting calls before retiring clients."""
+        if self.binding is not None:
+            self.startup_enable_pending = False
         self.gate = TargetGate()
         if self.rpc:
             self.rpc['client'].remove_pending_request(self.rpc['future'])
@@ -148,6 +155,7 @@ class ServoAdapter(Node):
 
     async def set_enabled(self, request, response):
         """Acknowledge firmware enable/disable; arm only after a successful enable."""
+        self.startup_enable_pending = False
         if not request.data:
             self.gate.disarm()
         if self.control:
@@ -165,13 +173,17 @@ class ServoAdapter(Node):
             response.success, response.message = False, 'Wait for valid joint slider messages'
             self.report(response.message)
             return response
+        response.success, response.message = await self.begin_control(request.data)
+        return response
+
+    def begin_control(self, enabled):
+        """Queue startup or manual control through the same acknowledged request path."""
+        self.startup_enable_pending = False
         self.gate.disarm()
         completion = Future()
-        self.control = {'enabled': request.data, 'completion': completion}
-        self.report('Waiting for firmware enable' if request.data
-                    else 'Waiting for firmware disable')
-        response.success, response.message = await completion
-        return response
+        self.control = {'enabled': enabled, 'completion': completion}
+        self.report('Waiting for firmware enable' if enabled else 'Waiting for firmware disable')
+        return completion
 
     def finish_control(self, success, message):
         """Wake an asynchronous SetBool caller once a firmware result is known."""
@@ -232,6 +244,10 @@ class ServoAdapter(Node):
                 self.report('Angle commands active; acknowledgement is not motion completion')
         if not self.binding:
             return
+        if (self.startup_enable_pending and self.last_slider is not None
+                and now - self.last_slider <= self.config['slider_timeout_s']
+                and self.enable_client.service_is_ready()):
+            self.begin_control(True)
         if self.control:
             if not self.enable_client.service_is_ready():
                 self.finish_control(False, 'Enable service is unavailable')

@@ -6,6 +6,30 @@ current installation and firmware selection. Historical firmware versions, test
 environments and sensor identities below describe those checks, not requirements
 for a user's host or boards. Results apply to their recorded source snapshots.
 
+## Servo startup enable — 2026-10-19
+
+The [servo demo](servo-slider.md#startup-enable-movement-and-disable) now defaults
+to `start_enabled:=true`. The adapter enables once after a fresh valid slider
+message and enable-service readiness, then arms only after firmware acknowledgement.
+The initial slider position, including changes during that acknowledgement wait,
+is a baseline rather than an angle command. `start_enabled:=false` retains manual
+enabling. Explicit disable, loss of the first selected device and failed startup
+requests prevent automatic re-enabling or retries during that process lifetime.
+
+The interfaces, driver and servo demo built in a disposable ROS Jazzy container
+with source mounted read-only. All **23 servo-demo tests passed**, with zero errors,
+failures or skips. Real DDS tests cover startup readiness, delayed acknowledgement,
+initial-target suppression, subsequent angle dispatch, rejected and timed-out
+enables, late replies, disable superseding startup and device loss before/after
+startup enable. The existing manual-mode scenarios remain covered. Installed
+launch tests verify the default `true` and explicit `false` parameter values,
+both preview models and actual GUI/TF output. Both style checks, launch argument
+inspection, guide shell syntax and `git diff --check` pass.
+
+Evidence is retained under the Git-ignored `.shake-lab/servo-start-enabled/`
+directory. Tests use synthetic device inventories and command-service peers;
+Pi/Kilted and physical-servo acceptance of this startup change remain pending.
+
 ## Right-leg hip preview — 2026-10-19
 
 The [servo demo](servo-slider.md#right-leg-hip-preview-and-live-toggle) now offers
