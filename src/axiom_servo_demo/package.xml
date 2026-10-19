@@ -5,6 +5,7 @@
   <description>Joint sliders and a descriptor service adapter for an Axiom servo</description>
   <maintainer email="info@robotical.io">Robotical</maintainer>
   <license>MIT</license>
+  <license>Apache-2.0</license>
   <depend>rclpy</depend>
   <depend>rcl_interfaces</depend>
   <depend>axiom_interfaces</depend>

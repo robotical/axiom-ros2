@@ -12,6 +12,17 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
+def robot_description(share, model, lower, upper):
+    """Load a packaged preview with the configured slider limits."""
+    if model not in ('servo', 'right_leg'):
+        raise ValueError('preview_model must be servo or right_leg')
+    robot = ET.parse(share / 'urdf' / (model + '.urdf')).getroot()
+    limit = robot.find("joint[@name='servo_joint']/limit")
+    limit.set('lower', str(math.radians(lower)))
+    limit.set('upper', str(math.radians(upper)))
+    return {'robot_description': ET.tostring(robot, encoding='unicode')}
+
+
 def demo_nodes(context):
     """Apply the same angle limits to the slider URDF and hardware adapter."""
     share = Path(get_package_share_directory('axiom_servo_demo'))
@@ -19,11 +30,9 @@ def demo_nodes(context):
     upper = float(LaunchConfiguration('upper_limit_deg').perform(context))
     if not math.isfinite(lower) or not math.isfinite(upper) or lower >= upper:
         raise ValueError('Demo angle limits must be finite with lower < upper')
-    robot = ET.parse(share / 'urdf/servo.urdf').getroot()
-    limit = robot.find("joint[@name='servo_joint']/limit")
-    limit.set('lower', str(math.radians(lower)))
-    limit.set('upper', str(math.radians(upper)))
-    description = {'robot_description': ET.tostring(robot, encoding='unicode')}
+    model = LaunchConfiguration('preview_model').perform(context)
+    # The leg has one free joint; the GUI automatically follows its mimic joints.
+    description = robot_description(share, model, lower, upper)
     adapter = {name: LaunchConfiguration(name).perform(context) for name in (
         'axiom_namespace', 'servo', 'angle_command', 'enable_command', 'command_unit')}
     adapter.update(lower_limit_deg=lower, upper_limit_deg=upper)
@@ -39,7 +48,7 @@ def demo_nodes(context):
              namespace='servo_demo', output='screen', parameters=[description],
              remappings=[('joint_states', 'joint_commands')]),
         Node(package='rviz2', executable='rviz2', name='servo_rviz', output='screen',
-             arguments=['-d', str(share / 'config/servo.rviz')],
+             arguments=['-d', str(share / 'config' / (model + '.rviz'))],
              condition=IfCondition(LaunchConfiguration('rviz'))),
     ]
 
@@ -55,8 +64,9 @@ def generate_launch_description():
         'lower_limit_deg': ('-90.0', 'Lower demo angle limit in degrees'),
         'upper_limit_deg': ('90.0', 'Upper demo angle limit in degrees'),
         'command_rate_hz': ('10.0', 'Maximum angle command rate, up to 50 Hz'),
+        'preview_model': ('servo', 'RViz target model: servo or right_leg'),
         'gui': ('true', 'Open the Marty-style joint slider window'),
-        'rviz': ('true', 'Open the schematic target preview in RViz'),
+        'rviz': ('true', 'Open the selected target preview in RViz'),
     }
     return LaunchDescription([
         *[DeclareLaunchArgument(name, default_value=value, description=description)

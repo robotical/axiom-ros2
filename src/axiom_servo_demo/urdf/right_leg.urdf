@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+  Marty right-leg geometry, adapted from marty2_description at 3e1e881.
+  Hip target preview only; the knee and twist axes are fixed at neutral.
+  See meshes/marty_right_leg/README.md for provenance and adaptations.
+-->
+<robot name="axiom_right_leg_target_preview">
+  <material name="blue">
+    <color rgba="0.07 0.52 .625 1" />
+  </material>
+  <material name="yellow">
+    <color rgba=".8 .8 0 1" />
+  </material>
+  <link name="axiom_servo_demo_base" />
+  <joint name="hip_right_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0 0 0.15" />
+    <parent link="axiom_servo_demo_base" />
+    <child link="hip_right" />
+  </joint>
+  <link name="hip_right">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/hip.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="servo_joint" type="revolute">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0.00000  0.00025 0.00000" />
+    <parent link="hip_right" />
+    <child link="leg_right_thigh_front" />
+    <axis xyz="0 1 0" />
+    <limit effort="30" lower="-1.0" upper="1.0" velocity="6.29" />
+  </joint>
+  <link name="leg_right_thigh_front">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/thigh.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_thigh_back_joint" type="revolute">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="-0.01620 -0.03795  0.00000" />
+    <parent link="hip_right" />
+    <child link="leg_right_thigh_back" />
+    <axis xyz="0 1 0" />
+    <mimic joint="servo_joint" multiplier="1" />
+    <limit effort="30" lower="-1.0" upper="1.0" velocity="6.29" />
+  </joint>
+  <link name="leg_right_thigh_back">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/thigh.stl" />
+      </geometry>
+      <origin rpy="0 0 3.1416" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_knee_upper_joint" type="revolute">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0.00000  -0.00015  -0.05000" />
+    <parent link="leg_right_thigh_front" />
+    <child link="leg_right_knee_upper" />
+    <axis xyz="0 1 0" />
+    <mimic joint="servo_joint" multiplier="-1" />
+    <limit effort="30" lower="-1.0" upper="1.0" velocity="6.29" />
+  </joint>
+  <link name="leg_right_knee_upper">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/knee_upper.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_twist_upper_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="-0.00810 -0.01885  -0.00968" />
+    <parent link="leg_right_knee_upper" />
+    <child link="leg_right_twist_upper" />
+  </joint>
+  <link name="leg_right_twist_upper">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/twist_upper.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="yellow">
+        <color rgba=".8 .8 0 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_twist_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0.0000 0.0000 0.0000" />
+    <parent link="leg_right_twist_upper" />
+    <child link="leg_right_twist_lower" />
+  </joint>
+  <link name="leg_right_twist_lower">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/twist_lower.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="yellow">
+        <color rgba=".8 .8 0 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_knee_lower_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="-0.01885 0.00810 -0.02075" />
+    <parent link="leg_right_twist_lower" />
+    <child link="leg_right_knee_lower" />
+  </joint>
+  <link name="leg_right_knee_lower">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/knee_lower.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_shin_exterior_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0.03770  -0.01620  0.00000" />
+    <parent link="leg_right_knee_lower" />
+    <child link="leg_right_shin_exterior" />
+  </joint>
+  <link name="leg_right_shin_exterior">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/shin.stl" />
+      </geometry>
+      <origin rpy="0 0 3.1416" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="leg_right_shin_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0.0000 0.0000 0.0000" />
+    <parent link="leg_right_knee_lower" />
+    <child link="leg_right_shin_interior" />
+  </joint>
+  <link name="leg_right_shin_interior">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/shin.stl" />
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <material name="blue">
+        <color rgba="0.07 0.52 .625 1" />
+      </material>
+    </visual>
+  </link>
+  <joint name="foot_right_joint" type="fixed">
+    <origin rpy="0.0000 0.0000 0.0000" xyz="0 0 -0.05000" />
+    <parent link="leg_right_shin_interior" />
+    <child link="foot_right" />
+  </joint>
+  <link name="foot_right">
+    <visual>
+      <geometry>
+        <mesh filename="package://axiom_servo_demo/meshes/marty_right_leg/foot.stl" />
+      </geometry>
+      <origin rpy="0 0 3.1416" xyz="0.0379 -0.0162 0" />
+      <material name="yellow">
+        <color rgba=".8 .8 0 1" />
+      </material>
+    </visual>
+  </link>
+</robot>

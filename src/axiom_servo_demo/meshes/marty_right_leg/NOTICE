@@ -1,0 +1,8 @@
+Marty V2 URDF and STL meshes, Apache-2.0.
+Original marty2_description contributors: Alejandro Bordallo and Sandy Enoch.
+Upstream: https://github.com/robotical/marty2_description
+Source: robotical/marty-ros2, revision 3e1e8816c3124d79524fc2138bc6e762a6519f32,
+src/marty2_description (copied there from marty-urdf-simulator).
+
+axiom_servo_demo includes eight unmodified right-leg meshes and a derived
+visual-only URDF. See README.md for the model adaptations.

@@ -14,6 +14,7 @@ setup(
         ('share/axiom_servo_demo/launch', glob('launch/*.launch.py')),
         ('share/axiom_servo_demo/urdf', glob('urdf/*.urdf')),
         ('share/axiom_servo_demo/config', glob('config/*.rviz')),
+        ('share/axiom_servo_demo/meshes/marty_right_leg', glob('meshes/marty_right_leg/*')),
     ],
     install_requires=['setuptools'],
     extras_require={'test': ['pytest']},
@@ -21,6 +22,6 @@ setup(
     maintainer='Robotical',
     maintainer_email='info@robotical.io',
     description='Marty-style joint sliders driving Axiom descriptor command services',
-    license='MIT',
+    license='MIT AND Apache-2.0',
     entry_points={'console_scripts': ['servo_adapter = axiom_servo_demo.node:main']},
 )

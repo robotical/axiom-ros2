@@ -67,6 +67,37 @@ The joint-slider window and RViz open together. RViz is labelled **Servo target
 preview (not measured position)**: its model follows the GUI even when the
 physical output is disarmed, disconnected or has not reached the target.
 
+### Right-leg hip preview and live toggle
+
+To preview the hip of a standalone Marty right leg, append `preview_model:=right_leg`:
+
+```bash
+# Show the right-leg hip while keeping the existing servo-control workflow.
+ros2 launch axiom_servo_demo servo_demo.launch.py \
+  axiom_namespace:=/axiom \
+  preview_model:=right_leg \
+  lower_limit_deg:=-15.0 upper_limit_deg:=15.0
+```
+
+The package includes only the right-leg URDF geometry and meshes, with no Marty
+driver or separate Marty installation required. The same single `servo_joint`
+slider drives the hip/thigh joint. Its parallel linkage follows through the URDF
+mimic joints, whose calculated positions also appear in `joint_commands`;
+the adapter uses only `servo_joint`. The knee and twist axes remain at neutral.
+This still shows the requested target, not measured hardware position, and uses
+the model's neutral pose and axis direction without calibrating the physical
+servo's mounting.
+
+**Toggle it while running:** in RViz's **Displays** panel, uncheck or check
+**Right leg target preview (not measured position)**. This hides/shows the model
+immediately while the slider and servo adapter keep running. Hiding the preview
+does not disable the servo; use the acknowledged disable service below for that.
+
+`preview_model:=servo` keeps the original schematic preview and is the default.
+`rviz:=false` starts without an RViz window while keeping the joint-slider GUI.
+The [asset notes](../src/axiom_servo_demo/meshes/marty_right_leg/README.md) record
+the source revision, Apache-2.0 licence and model adaptations.
+
 ## Enable, move and disable
 
 The adapter starts disarmed and never automatically enables the servo. In another

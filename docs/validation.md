@@ -6,6 +6,30 @@ current installation and firmware selection. Historical firmware versions, test
 environments and sensor identities below describe those checks, not requirements
 for a user's host or boards. Results apply to their recorded source snapshots.
 
+## Right-leg hip preview — 2026-10-19
+
+The [servo demo](servo-slider.md#right-leg-hip-preview-and-live-toggle) now offers
+`preview_model:=right_leg`. It bundles only Marty's right-leg geometry and eight
+unmodified meshes, with their Apache-2.0 licence and attribution. One hip slider
+drives the thigh and its original coupled linkage. The independent knee and twist
+axes are fixed at neutral. The original schematic preview remains the default.
+The adapter, host driver, firmware and Raft libraries are unchanged.
+
+The interfaces, driver and servo demo built in an empty ROS Jazzy Docker workspace
+with source mounted read-only. All **16 servo-demo tests passed**, including both
+installed-launch/real-GUI variants, actual hip and mimic TF, installed mesh paths,
+right-leg-only model scope, existing DDS service scenarios and
+both style checks. Mesh hashes match the source at Marty revision `3e1e881`.
+
+Actual RViz rendering was checked with Xvfb and Mesa software OpenGL. The model
+loaded with Global Status **Ok** and the GUI showed one hip slider. Unchecking the
+RobotModel display hid the leg; the slider continued publishing while hidden.
+Rechecking restored the preview. GUI targets at +15° and −15° produced the expected
+hip and coupled-joint values. Captures and logs are retained locally under the
+Git-ignored `.shake-lab/servo-right-leg/` directory. These checks used an unused
+board namespace and sent no hardware commands. Pi/Kilted acceptance and physical
+servo zero/direction alignment remain to be checked by the user.
+
 ## Servo joint sliders — 2026-10-19
 
 The [servo demo](servo-slider.md) adds `axiom_servo_demo`: the unchanged
