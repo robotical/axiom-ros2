@@ -10,7 +10,8 @@ docker run --rm -v "$repo_root:/work:ro" -w /ws "$image" bash -lc '
   apt-get install -y -qq python3-serial python3-websocket python3-websockets python3-zeroconf \
     python3-pytest python3-matplotlib python3-numpy \
     ros-jazzy-diagnostic-msgs ros-jazzy-ament-lint-common ros-jazzy-ament-lint-auto \
-    ros-jazzy-rosbag2-storage-mcap
+    ros-jazzy-rosbag2-storage-mcap ros-jazzy-joint-state-publisher-gui \
+    ros-jazzy-robot-state-publisher ros-jazzy-rviz2
   source /opt/ros/jazzy/setup.bash
   export PYTHONDONTWRITEBYTECODE=1
   colcon build --base-paths /work/src
@@ -19,4 +20,5 @@ docker run --rm -v "$repo_root:/work:ro" -w /ws "$image" bash -lc '
   colcon test-result --verbose
   ros2 launch axiom_bringup bringup.launch.py --show-args
   ros2 launch axiom_driver axiom.launch.py --show-args
+  ros2 launch axiom_servo_demo servo_demo.launch.py --show-args
 '

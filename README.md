@@ -25,6 +25,7 @@ the same workflow. Repository walkthroughs:
 - [tmux consoles and clipboard controls](docs/tmux.md)
 - [Sensor discovery, aliases, reconnecting and multiple boards](docs/sensors-and-boards.md)
 - [AMG8833 thermal camera in RViz](docs/thermal-camera.md)
+- [Servo control with Marty's joint sliders](docs/servo-slider.md)
 - [Foxglove thermal heatmap and two-board IMU plots](examples/foxglove/README.md)
 - [Optional scenarios dashboard](examples/scenarios-dashboard/README.md)
 - [Driver parameters and interface contracts](src/axiom_driver/README.md)

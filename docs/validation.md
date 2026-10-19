@@ -6,6 +6,43 @@ current installation and firmware selection. Historical firmware versions, test
 environments and sensor identities below describe those checks, not requirements
 for a user's host or boards. Results apply to their recorded source snapshots.
 
+## Servo joint sliders — 2026-10-19
+
+The [servo demo](servo-slider.md) adds `axiom_servo_demo`: the unchanged
+`joint_state_publisher_gui` used by Marty, an adapter to existing descriptor angle
+and enable services, and a labelled RViz target preview. The adapter selects one
+live device, starts disarmed, converts radians to the selected command units and
+keeps only the latest pending target. Reported joint position stays separate.
+
+Validation used a disposable ROS Jazzy container from the local
+`marty-ros2:jazzy` image. Source was mounted read-only, and the interfaces, driver
+and demo were built into an empty workspace. All **14 package tests passed**:
+five pure selection/encoding/gating checks, six real DDS service-adapter
+scenarios, the installed-launch/real-GUI test and both ROS style checks. The GUI
+ran with Qt's offscreen platform; the test confirmed the actual slider output,
+configured URDF limits, preview TF and absence of a second acquisition driver.
+
+Service scenarios cover no automatic startup/enable angle, explicit disable,
+coalescing delayed requests, firmware rejection, replacement during enable,
+disable superseding enable, inventory/slider expiry, RPC timeout and separate
+reported feedback. The launch argument listing, shell syntax and diff whitespace
+checks also pass. Linter workers emit existing Python fork/thread warnings.
+
+Reproduce after building and sourcing the workspace:
+
+```bash
+colcon test --base-paths src --packages-select axiom_servo_demo \
+  --event-handlers console_direct+ --return-code-on-test-failure
+colcon test-result --verbose
+ros2 launch axiom_servo_demo servo_demo.launch.py --show-args
+```
+
+The repository validation script now installs the slider/robot-state/RViz runtime
+dependencies and inspects the new launch arguments. The full repository suite
+was not rerun for this addition. Tests use synthetic inventory and command-service
+peers. Physical servo movement, the new board's live descriptor and onscreen
+RViz rendering were not exercised.
+
 ## Foxglove sound layout — 2026-10-16
 
 The [sound demo](../examples/foxglove/sound-demo.md) adds a single-import layout
@@ -83,7 +120,7 @@ physical board's flashed firmware.
 ```
 
 The script starts a disposable ROS Jazzy Ubuntu 24.04 container, installs declared
-runtime/test tooling, mounts this repository read-only, builds all seven packages in
+runtime/test tooling, mounts this repository read-only, builds all packages in
 an empty workspace, runs the entire colcon suite and inspects installed launch
 arguments. The base image digest is pinned in the script; apt packages are resolved
 at execution time. `ROS_VALIDATION_IMAGE` can explicitly select another image.

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- Schematic target preview, not a calibrated model of a particular servo. -->
+<robot name="axiom_servo_target_preview">
+  <link name="axiom_servo_demo_base">
+    <visual>
+      <origin xyz="0 0 0.025"/>
+      <geometry><box size="0.06 0.045 0.05"/></geometry>
+      <material name="case"><color rgba="0.16 0.22 0.27 1"/></material>
+    </visual>
+  </link>
+  <link name="servo_horn">
+    <visual>
+      <origin xyz="0.04 0 0"/>
+      <geometry><box size="0.1 0.012 0.008"/></geometry>
+      <material name="horn"><color rgba="0.95 0.55 0.12 1"/></material>
+    </visual>
+  </link>
+  <joint name="servo_joint" type="revolute">
+    <parent link="axiom_servo_demo_base"/>
+    <child link="servo_horn"/>
+    <origin xyz="0 0 0.06"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.5707963267948966" upper="1.5707963267948966" effort="1" velocity="1"/>
+  </joint>
+</robot>

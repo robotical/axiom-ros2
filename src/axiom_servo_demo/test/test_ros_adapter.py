@@ -1,0 +1,237 @@
+"""Real DDS joint input and acknowledged descriptor service calls; no hardware."""
+
+import copy
+import json
+import math
+import time
+
+import pytest
+
+rclpy = pytest.importorskip('rclpy')
+from axiom_interfaces.srv import DeviceCommand  # noqa: E402,I100
+from axiom_servo_demo.node import ServoAdapter  # noqa: E402
+from rclpy.callback_groups import ReentrantCallbackGroup  # noqa: E402
+from rclpy.executors import SingleThreadedExecutor  # noqa: E402
+from rclpy.node import Node  # noqa: E402
+from rclpy.parameter import Parameter  # noqa: E402
+from rclpy.qos import DurabilityPolicy, QoSProfile  # noqa: E402
+from rclpy.task import Future  # noqa: E402
+from sensor_msgs.msg import JointState  # noqa: E402
+from std_msgs.msg import String  # noqa: E402
+from std_srvs.srv import SetBool  # noqa: E402
+
+
+class Rig:
+    """Run the real adapter against controllable ROS descriptor-service peers."""
+
+    def __init__(self, device):
+        rclpy.init()
+        self.peer = Node('servo_test_peer', use_global_arguments=False)
+        self.adapter = ServoAdapter(
+            namespace='/servo_test_demo', use_global_arguments=False,
+            parameter_overrides=[
+                Parameter('axiom_namespace', value='/servo_test_board'),
+                Parameter('inventory_timeout_s', value=0.6),
+                Parameter('slider_timeout_s', value=0.6),
+                Parameter('request_timeout_s', value=0.8),
+            ])
+        self.executor = SingleThreadedExecutor()
+        self.executor.add_node(self.peer)
+        self.executor.add_node(self.adapter)
+        self.rows = [copy.deepcopy(device)]
+        self.position = 0.0
+        self.inventory_live = self.slider_live = True
+        self.angle_calls, self.enable_calls, self.observed = [], [], []
+        self.hold_angle = self.hold_enable = None
+        self.fail_angle = False
+        retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.inventory = self.peer.create_publisher(String, '/servo_test_board/devices', retained)
+        self.slider = self.peer.create_publisher(
+            JointState, '/servo_test_demo/joint_commands', 1)
+        self.feedback = self.peer.create_publisher(
+            JointState, '/servo_test_board/' + device['topic'] + '/joint_states', 10)
+        self.peer.create_subscription(
+            JointState, '/servo_test_demo/observed_joint_states', self.observed.append, 10)
+        group = ReentrantCallbackGroup()
+        for kind, callback in (('angle', self.angle), ('enable', self.enable)):
+            path = '/servo_test_board/' + device['topic'] + '/commands/' + kind
+            self.peer.create_service(DeviceCommand, path, callback, callback_group=group)
+        self.peer.create_timer(0.05, self.publish)
+        self.enabled = self.peer.create_client(SetBool, '/servo_test_demo/set_enabled')
+        self.wait(lambda: self.adapter.gate.latest == 0.)
+
+    def publish(self):
+        """Keep the inventory and slider alive independently."""
+        if self.inventory_live:
+            self.inventory.publish(String(data=json.dumps(self.rows)))
+        if self.slider_live:
+            self.slider.publish(JointState(name=['servo_joint'], position=[self.position]))
+
+    async def angle(self, request, response):
+        """Optionally hold or reject an angle acknowledgement."""
+        self.angle_calls.append(list(request.values))
+        if self.hold_angle:
+            await self.hold_angle
+        response.success = not self.fail_angle
+        response.message = 'Rejected by test firmware' if self.fail_angle else 'ok'
+        return response
+
+    async def enable(self, request, response):
+        """Record both enable and disable writes."""
+        self.enable_calls.append(list(request.values))
+        if self.hold_enable:
+            await self.hold_enable
+        response.success, response.message = True, 'ok'
+        return response
+
+    def wait(self, predicate, timeout=4):
+        """Spin the executor until an observable state is reached."""
+        deadline = time.monotonic() + timeout
+        while not predicate() and time.monotonic() < deadline:
+            self.executor.spin_once(timeout_sec=0.01)
+        assert predicate(), self.adapter.last_message
+
+    def spin(self, duration=0.15):
+        """Let periodic input and replies settle without relying on thread sleeps."""
+        deadline = time.monotonic() + duration
+        while time.monotonic() < deadline:
+            self.executor.spin_once(timeout_sec=0.01)
+
+    def set_enabled(self, value):
+        """Await the public SetBool acknowledgement."""
+        future = self.enabled.call_async(SetBool.Request(data=value))
+        self.wait(future.done)
+        return future.result()
+
+    def close(self):
+        """Release pending callbacks and the ROS context."""
+        for future in (self.hold_angle, self.hold_enable):
+            if future is not None and not future.done():
+                future.set_result(None)
+        self.adapter.unbind('Test finished')
+        self.spin(0.05)
+        self.executor.shutdown()
+        self.adapter.destroy_node()
+        self.peer.destroy_node()
+        rclpy.shutdown()
+
+
+@pytest.fixture
+def rig(device):
+    """Supply an isolated real ROS graph for each control scenario."""
+    rig = Rig(device)
+    try:
+        yield rig
+    finally:
+        rig.close()
+
+
+def test_enable_changed_target_disable_and_separate_feedback(rig):
+    """Starting/enabling does not move; slider angles never become feedback."""
+    assert not rig.angle_calls and not rig.enable_calls and not rig.observed
+    assert rig.set_enabled(True).success
+    rig.spin()
+    assert rig.enable_calls == [[1.0]] and not rig.angle_calls
+    rig.position = math.radians(-12.34)
+    rig.wait(lambda: len(rig.angle_calls) == 1)
+    assert rig.angle_calls == [[-12.3]]
+    rig.spin()
+    assert len(rig.angle_calls) == 1 and not rig.observed
+    rig.feedback.publish(JointState(name=['firmware_joint'], position=[0.5]))
+    rig.wait(lambda: bool(rig.observed))
+    assert rig.observed[-1].name == ['servo_joint']
+    assert list(rig.observed[-1].position) == [0.5]
+    assert rig.set_enabled(False).success
+    rig.position = 0.3
+    rig.spin()
+    assert rig.enable_calls == [[1.0], [0.0]] and len(rig.angle_calls) == 1
+
+
+def test_slow_rpc_coalesces_to_latest_target_and_failure_disarms(rig):
+    """An outstanding request never accumulates a FIFO of slider positions."""
+    assert rig.set_enabled(True).success
+    rig.hold_angle = Future()
+    rig.position = math.radians(10)
+    rig.wait(lambda: len(rig.angle_calls) == 1)
+    for degrees in (20, 30, 40):
+        rig.position = math.radians(degrees)
+        rig.wait(lambda: rig.adapter.gate.latest == float(degrees))
+    assert rig.angle_calls == [[10.0]]
+    rig.hold_angle.set_result(None)
+    rig.hold_angle = None
+    rig.wait(lambda: len(rig.angle_calls) == 2)
+    assert rig.angle_calls[-1] == [40.0]
+    rig.fail_angle = True
+    rig.position = math.radians(50)
+    rig.wait(lambda: not rig.adapter.gate.armed)
+    rig.position = math.radians(60)
+    rig.spin()
+    assert rig.angle_calls == [[10.0], [40.0], [50.0]]
+
+
+def test_replacement_invalidates_inflight_requests_and_requires_explicit_reenable(rig):
+    """A reply from a previous device revision cannot rearm its replacement."""
+    rig.hold_enable = Future()
+    future = rig.enabled.call_async(SetBool.Request(data=True))
+    rig.wait(lambda: rig.enable_calls == [[1.0]])
+    rig.rows[0]['revision'] += 1
+    rig.wait(future.done)
+    assert not future.result().success and not rig.adapter.gate.armed
+    rig.hold_enable.set_result(None)
+    rig.hold_enable = None
+    rig.position = math.radians(30)
+    rig.spin()
+    assert not rig.angle_calls and not rig.adapter.gate.armed
+    assert rig.set_enabled(True).success
+    rig.spin()
+    assert not rig.angle_calls
+    rig.position = math.radians(31)
+    rig.wait(lambda: rig.angle_calls == [[31.0]])
+
+
+def test_disable_supersedes_a_pending_enable(rig):
+    """A late enable reply cannot arm after the user requests disable."""
+    rig.hold_enable = Future()
+    enable = rig.enabled.call_async(SetBool.Request(data=True))
+    rig.wait(lambda: rig.enable_calls == [[1.0]])
+    disable = rig.enabled.call_async(SetBool.Request(data=False))
+    rig.wait(enable.done)
+    assert not enable.result().success
+    rig.hold_enable.set_result(None)
+    rig.hold_enable = None
+    rig.wait(disable.done)
+    assert disable.result().success
+    assert rig.enable_calls == [[1.0], [0.0]] and not rig.adapter.gate.armed
+    rig.position = 0.5
+    rig.spin()
+    assert not rig.angle_calls
+
+
+def test_inventory_and_slider_expiry_do_not_rearm_automatically(rig):
+    """Losing either the board inventory or the control stream drops targets."""
+    assert rig.set_enabled(True).success
+    rig.slider_live = False
+    rig.wait(lambda: not rig.adapter.gate.armed)
+    rig.slider_live = True
+    rig.spin()
+    assert not rig.adapter.gate.armed
+    assert rig.set_enabled(True).success
+    rig.inventory_live = False
+    rig.wait(lambda: rig.adapter.binding is None)
+    rig.inventory_live = True
+    rig.wait(lambda: rig.adapter.binding is not None)
+    assert not rig.adapter.gate.armed and not rig.angle_calls
+
+
+def test_rpc_timeout_drops_new_targets_and_late_replies(rig):
+    """An expired request is not retried or replayed after its reply arrives."""
+    assert rig.set_enabled(True).success
+    rig.hold_angle = Future()
+    rig.position = 0.2
+    rig.wait(lambda: len(rig.angle_calls) == 1)
+    rig.position = 0.4
+    rig.wait(lambda: not rig.adapter.gate.armed)
+    rig.hold_angle.set_result(None)
+    rig.hold_angle = None
+    rig.spin()
+    assert len(rig.angle_calls) == 1 and not rig.adapter.gate.armed

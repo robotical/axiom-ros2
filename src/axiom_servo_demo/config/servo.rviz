@@ -1,0 +1,50 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.05
+      Plane Cell Count: 10
+      Alpha: 0.35
+    - Class: rviz_default_plugins/RobotModel
+      Name: Servo target preview (not measured position)
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /servo_demo/robot_description
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1
+  Enabled: true
+  Global Options:
+    Background Color: 235; 238; 242
+    Fixed Frame: axiom_servo_demo_base
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Target Frame: axiom_servo_demo_base
+      Distance: 0.35
+      Pitch: 0.65
+      Yaw: 0.7
+      Focal Point:
+        X: 0.025
+        Y: 0
+        Z: 0.04
+      Near Clip Distance: 0.005
+Window Geometry:
+  Width: 900
+  Height: 650
