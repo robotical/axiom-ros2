@@ -58,3 +58,36 @@ def test_rgb_without_pixel_index_and_invalid_grids():
     for count in (0, -1, 1025):
         with pytest.raises(ValueError):
             output_topics({}, {'n': 'pixels', 'f': 'LEDPIX', 't': 'BBBB', 'w': 'aa', 'NX': count})
+
+
+@pytest.mark.parametrize('rgb,wire', [
+    ((1., 0., 0.), 'b00000ff0000'), ((0., 1., 0.), 'b0000000ff00'),
+    ((0., 0., 1.), 'b000000000ff'), ((18/255, 52/255, 86/255), 'b00000123456')])
+def test_packed_rgb_preserves_fill_header_and_colour_order(ledstick, rgb, wire):
+    action = next(a for a in ledstick['actions'] if a['n'] == 'colour')
+    spec, = output_topics(ledstick, action)
+    assert encode_command(action, output_values(action, spec, rgb)) == [wire]
+
+
+@pytest.mark.parametrize('period', [0, 40, 250, 65535])
+def test_stacklight_supported_format_uses_bottom_first_states(ledstick, period):
+    action = next(a for a in ledstick['actions'] if a['n'] == 'stacklight')
+    assert output_topics(ledstick, action) == []
+    assert encode_command(action, [period, 0, 1, 6, 15]) == [f'4001{period:04x}0001060f']
+
+
+@pytest.mark.parametrize('values', [
+    [1, 0, 0, 0, 0], [39, 0, 0, 0, 0], [65536, 0, 0, 0, 0], [40.5, 0, 0, 0, 0],
+    [250, -1, 0, 0, 0], [250, 16, 0, 0, 0], [250, .5, 0, 0, 0],
+    [math.nan, 0, 0, 0, 0], [250, math.inf, 0, 0, 0], [250, 0, 0, 0]])
+def test_stacklight_rejects_invalid_periods_states_and_arity(ledstick, values):
+    action = next(a for a in ledstick['actions'] if a['n'] == 'stacklight')
+    with pytest.raises(ValueError):
+        encode_command(action, values)
+
+
+def test_custom_value_formats_still_require_an_explicit_supported_contract(ledstick):
+    action = next(a for a in ledstick['actions'] if a['n'] == 'stacklight')
+    for change in ({'vt': 'unknown'}, {'f': 'OTHER'}, {'t': '<HBBBB'}, {'NY': 8}):
+        with pytest.raises(ValueError, match='custom'):
+            encode_command({**action, **change}, [250, 0, 0, 0, 0])

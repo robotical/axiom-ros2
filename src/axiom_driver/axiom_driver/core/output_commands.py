@@ -33,6 +33,9 @@ def output_topics(metadata, action):
         return [{'kind': 'colour', 'unit': 'normalized_rgb', 'pixel': index}
                 for index in range(count)]
     if name in ('color', 'colour', 'rgb'):
+        if action.get('t') == '>I' and action.get('f') == '06x':
+            encode_command(action, [0])
+            return [{'kind': 'colour', 'unit': 'normalized_rgb', 'packed_rgb': True}]
         if not re.fullmatch(r'[<>!]?(BBB|3B)', action.get('t', '')):
             raise ValueError('RGB colour requires three byte arguments')
         encode_command(action, [0, 0, 0])
@@ -61,5 +64,7 @@ def output_values(action, spec, value):
         values = [round(channel * 255) for channel in value]
         if 'pixel' in spec:
             values.insert(0, spec['pixel'])
+        elif spec.get('packed_rgb'):
+            values = [(values[0] << 16) | (values[1] << 8) | values[2]]
     encode_command(action, values)
     return values

@@ -1,0 +1,5 @@
+<library path="axiom_light_panel">
+  <class name="axiom_light_panel/LightPanel" type="axiom_light_panel::LightPanel" base_class_type="rviz_common::Panel">
+    <description>Discovered Axiom lights: colour, brightness and four-tier stack patterns.</description>
+  </class>
+</library>

@@ -215,6 +215,16 @@ def test_discrete_led_off_invalidates_the_previous_colour_cache(outputs):
     assert [item['hexWr'][0] for item in rig.writes()] == ['7100ff0000', '78', '7100ff0000']
 
 
+def test_distinct_pixel_targets_keep_independent_deduplication(outputs):
+    """Updating another pixel does not invalidate an unchanged target for this one."""
+    rig = outputs
+    red = ColorRGBA(r=1., a=1.)
+    for index in (0, 1, 0, 1):
+        rig.pixels[index].publish(red)
+        time.sleep(.15)
+    assert len(rig.writes()) == 2
+
+
 def test_transient_publisher_does_not_replay_a_target_on_device_reappearance(outputs):
     """Volatile command inputs never request a publisher's retained old target."""
     from rclpy.qos import DurabilityPolicy, QoSProfile
@@ -231,3 +241,77 @@ def test_transient_publisher_does_not_replay_a_target_on_device_reappearance(out
     assert not rig.writes()
     latched.publish(Float64(data=0.2))
     wait_until(lambda: len(rig.writes()) == 1)
+
+
+def test_packed_colour_stack_off_and_pixel_transitions(catalogue, ledstick):
+    """An acknowledged mode change must retire queued and deduplicated colour targets."""
+    catalogue = dict(catalogue, QwiicLEDStick={**ledstick, 'type': 'QwiicLEDStick'})
+    rig = OutputRig(catalogue)
+    try:
+        rig.connect()
+        root = 'qwiicledstick_b1_20/commands/'
+        colour = rig.probe.create_publisher(ColorRGBA, rig.namespace + '/' + root + 'colour', 1)
+        wait_until(lambda: colour.get_subscription_count() == 1)
+        red = ColorRGBA(r=1., g=0., b=0., a=1.)
+        colour.publish(red)
+        wait_until(lambda: len(rig.writes()) == 1)
+        rig.call(DeviceCommand, root + 'stacklight', values=[250., 2., 3., 2., 3.])
+        colour.publish(red)
+        wait_until(lambda: len(rig.writes()) == 3)
+        rig.call(DeviceCommand, root + 'off', values=[])
+        colour.publish(red)
+        wait_until(lambda: len(rig.writes()) == 5)
+        rig.pixels[0].publish(ColorRGBA(g=1., a=1.))
+        wait_until(lambda: len(rig.writes()) == 6)
+        colour.publish(red)
+        wait_until(lambda: len(rig.writes()) == 7)
+        assert [item['hexWr'][0] for item in rig.writes()] == [
+            'b00000ff0000', '400100fa02030203', 'b00000ff0000',
+            'b00000000000', 'b00000ff0000', 'b10000ff00', 'b00000ff0000']
+        rig.probe.destroy_publisher(colour)
+    finally:
+        rig.close()
+
+
+@pytest.mark.parametrize('operation,values', [('off', []), ('stacklight', [250., 2., 3., 2., 3.])])
+def test_discrete_led_mode_changes_discard_earlier_queued_colour(
+    catalogue, ledstick, operation, values
+):
+    """A pending solid target cannot undo a newer acknowledged pattern or Off."""
+    catalogue = dict(catalogue, QwiicLEDStick={**ledstick, 'type': 'QwiicLEDStick'})
+    rig = OutputRig(catalogue)
+    entered, release = threading.Event(), threading.Event()
+    original = rig.driver.pipeline.command
+
+    def delayed(*args):
+        if args[2] == 'angle':
+            entered.set()
+            assert release.wait(3)
+        return original(*args)
+
+    try:
+        rig.connect()
+        rig.driver.pipeline.command = delayed
+        root = rig.namespace + '/qwiicledstick_b1_20/commands/'
+        colour = rig.probe.create_publisher(ColorRGBA, root + 'colour', 1)
+        wait_until(lambda: colour.get_subscription_count() == 1)
+        rig.angle.publish(Float64(data=.1))
+        assert entered.wait(3)
+        colour.publish(ColorRGBA(r=1., a=1.))
+        wait_until(lambda: bool(rig.driver.descriptor_commands.pending))
+        client = rig.probe.create_client(DeviceCommand, root + operation)
+        assert client.wait_for_service(timeout_sec=3)
+        future = client.call_async(DeviceCommand.Request(values=values))
+        wait_until(lambda: not rig.driver._commands.empty())
+        release.set()
+        wait_until(future.done)
+        assert future.result().success, future.result().message
+        time.sleep(.2)
+        assert len(rig.writes()) == 2
+        assert rig.writes()[-1]['hexWr'] == [
+            'b00000000000' if operation == 'off' else '400100fa02030203']
+        rig.probe.destroy_client(client)
+        rig.probe.destroy_publisher(colour)
+    finally:
+        release.set()
+        rig.close()

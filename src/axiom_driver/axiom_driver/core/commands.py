@@ -6,12 +6,18 @@ import struct
 
 
 def command_format(action):
-    if action.get('vt'):
+    if action.get('vt') and not is_stacklight(action):
         raise ValueError('This command needs a custom value format')
     fmt = action.get('t', '')
     if not isinstance(fmt, str) or not re.fullmatch(r'[<>!]?([0-9]*[bBhHiIlLqQfd?])*', fmt):
         raise ValueError('Unsupported numeric command format')
     return fmt if fmt.startswith(('<', '>', '!')) else '<' + fmt
+
+
+def is_stacklight(action):
+    """Recognize the supported four-tier StackLight descriptor contract."""
+    return (action.get('vt') == 'stacklight' and action.get('f') == 'STACKLIGHT'
+            and action.get('t') == '>HBBBB' and action.get('NY') == 4)
 
 
 def encode_command(action, values):
@@ -43,6 +49,11 @@ def encode_command(action, values):
             if kind == '?' and value not in (0, 1):
                 raise ValueError('Boolean argument must be 0 or 1')
         converted.append(value)
+    if is_stacklight(action):
+        if converted[0] != 0 and not 40 <= converted[0] <= 65535:
+            raise ValueError('StackLight base period must be 0 or 40..65535 ms')
+        if any(not 0 <= value <= 15 for value in converted[1:]):
+            raise ValueError('StackLight states must use mode and rate bits only (0..15)')
     try:
         data = struct.pack(fmt, *converted).hex()
     except (struct.error, OverflowError) as exc:

@@ -2,8 +2,8 @@
 
 Connect Axiom to a Linux computer over USB or Wi-Fi and use its sensors in ROS 2.
 The **host driver runs on that computer**. It discovers supported connected devices,
-publishes measurements as ROS topics, and exposes descriptor-defined configuration
-and output commands as ROS services. A compatible Raspberry Pi can serve as the
+publishes measurements as ROS topics, and exposes descriptor-defined output topics
+and acknowledged configuration services. A compatible Raspberry Pi can serve as the
 host just as a desktop computer can.
 
 Use the current **host firmware** variant from the
@@ -26,6 +26,7 @@ the same workflow. Repository walkthroughs:
 - [Sensor discovery, aliases, reconnecting and multiple boards](docs/sensors-and-boards.md)
 - [AMG8833 thermal camera in RViz](docs/thermal-camera.md)
 - [Servo control with Marty's joint sliders](docs/servo-slider.md)
+- [RViz lighting controls and stack patterns](docs/lighting.md)
 - [Foxglove thermal heatmap and two-board IMU plots](examples/foxglove/README.md)
 - [Optional scenarios dashboard](examples/scenarios-dashboard/README.md)
 - [Driver parameters and interface contracts](src/axiom_driver/README.md)

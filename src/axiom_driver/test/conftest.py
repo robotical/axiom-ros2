@@ -19,3 +19,10 @@ def catalogue():
 def grid_profiles():
     fixture = Path(__file__).parent / 'fixtures' / 'grid_profiles.json'
     return json.loads(fixture.read_text())['records']
+
+
+@pytest.fixture
+def ledstick():
+    """Actual four-tier descriptor from Axiom's RSAOTypeRecords.json."""
+    fixture = Path(__file__).parent / 'fixtures' / 'ledstick.json'
+    return json.loads(fixture.read_text())

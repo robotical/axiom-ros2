@@ -377,7 +377,7 @@ namespace. These inputs are separate from the measurement `public_topics` map.
 |---|---|---|
 | Servo `angle` or `set angle` | `commands/angle` (or the escaped action name) | `std_msgs/msg/Float64`, radians |
 | Indexed RGB `LEDPIX` | `commands/pixels/pixel_0`, `pixel_1`, … | `std_msgs/msg/ColorRGBA`, RGB channels in 0..1 |
-| Three-byte `color`, `colour` or `rgb` | `commands/colour` (exact action name) | `std_msgs/msg/ColorRGBA`, RGB channels in 0..1 |
+| Whole-light `color`, `colour` or `rgb` (three-byte or packed `>I`/`06x`) | `commands/colour` (exact action name) | `std_msgs/msg/ColorRGBA`, RGB channels in 0..1 |
 
 RGB alpha is ignored because the supported devices have no transparency channel.
 Pixel indexes are zero-based and use the descriptor's index order. The driver
@@ -414,6 +414,12 @@ Direct angle publication does not automatically enable a servo. Use its advertis
 enable service first, or use the [slider demo](../../docs/servo-slider.md), which
 enables once on startup by default. Acknowledged enable/off operations discard
 earlier pending targets for that device and invalidate the deduplication cache.
+StackLight services do the same. A whole-light colour invalidates pixel target
+caches; a pixel change invalidates the whole-light cache without affecting other
+pixels. This permits returning to the same colour after another control changes it.
+
+The optional [RViz lighting panel](../../docs/lighting.md) discovers these interfaces
+and offers whole colour, brightness, Off and supported four-tier stack patterns.
 
 ## Services
 
@@ -440,8 +446,10 @@ ros2 service call "$LED_OFF_SERVICE" axiom_interfaces/srv/DeviceCommand '{values
 
 The encoder supports numeric struct formats, descriptor scaling, pixel indices,
 and raw write sequences with bounded pauses. Invalid counts, ranges and encodings
-are rejected before transmission. Custom `vt` value formats are not advertised as
-callable services. Unsupported descriptors remain available in `device_metadata`.
+are rejected before transmission. Four-tier `vt: stacklight` commands are supported
+when `f: STACKLIGHT`, `t: '>HBBBB'` and `NY: 4`; see the
+[lighting guide](../../docs/lighting.md) for argument order and limits.
+Other custom formats are not callable. Unsupported descriptors remain in `device_metadata`.
 Success means firmware acknowledgment, not physical completion; these quick
 configuration/output operations use services rather than ROS actions.
 

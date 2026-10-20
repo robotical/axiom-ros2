@@ -9,7 +9,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import ColorRGBA, Float64
 
-from .core.commands import command_format
+from .core.commands import command_format, is_stacklight
 from .core.output_commands import output_topics, output_values
 from .core.registry import DeviceKey, topic_token
 from .ros_adapters import json_text
@@ -75,10 +75,10 @@ class DescriptorCommands:
                         })
                 else:
                     identity = (key, device.revision, name)
-                    services[path] = identity
+                    services[path] = (identity, action)
                     row['commands'].append({'name': name, 'service': path, 'descriptor': action})
         for path, (service, identity) in list(self.services.items()):
-            if services.get(path) != identity:
+            if path not in services or services[path][0] != identity:
                 self.node.destroy_service(service)
                 del self.services[path]
         with self.lock:
@@ -98,10 +98,11 @@ class DescriptorCommands:
                 subscription = self.node.create_subscription(
                     kind, path, self.topic_callback(path, identity, action, spec), self.qos)
                 self.subscriptions[path] = (subscription, identity)
-        for path, identity in services.items():
+        for path, (identity, action) in services.items():
             if path not in self.services:
                 self.services[path] = (self.node.create_service(
-                    DeviceCommand, path, self.service_callback(*identity),
+                    DeviceCommand, path,
+                    self.service_callback(*identity, stacklight=is_stacklight(action)),
                     callback_group=self.group), identity)
 
     def topic_callback(self, path, identity, action, spec):
@@ -133,7 +134,7 @@ class DescriptorCommands:
                     or time.monotonic() - received > self.node.config['rpc_default_timeout']):
                 return
             self.sent.pop(path, None)
-        key, revision, name, _ = identity
+        key, revision, name, pixel = identity
         try:
             self.node.pipeline.command(key, revision, name, values,
                                        self.node.config['stale_after_s'])
@@ -142,9 +143,14 @@ class DescriptorCommands:
         else:
             with self.lock:
                 if self.active.get(path) == identity:
+                    # Whole colour and pixels share the same physical LED state.
+                    # A later command must not be suppressed by an older colour cache.
+                    for other, active in self.active.items():
+                        if active[0] == key and (pixel is None or active[3] is None):
+                            self.sent.pop(other, None)
                     self.sent[path] = values
 
-    def service_callback(self, key, revision, name):
+    def service_callback(self, key, revision, name, stacklight=False):
         def handle(request, response):
             def run():
                 def command():
@@ -152,7 +158,7 @@ class DescriptorCommands:
                         result = self.node.pipeline.command(
                             key, revision, name, request.values, self.node.config['stale_after_s'])
                     finally:
-                        if name in ('enable', 'off'):
+                        if name in ('enable', 'off') or stacklight:
                             # Discrete control must not replay a target queued before its reply.
                             with self.lock:
                                 for path, identity in self.active.items():

@@ -1,0 +1,13 @@
+Panels:
+  - Class: axiom_light_panel/LightPanel
+    Name: Axiom lighting
+Visualization Manager:
+  Class: ""
+  Displays: []
+  Global Options:
+    Background Color: 235; 238; 242
+    Fixed Frame: map
+  Enabled: true
+Window Geometry:
+  Width: 1000
+  Height: 800
